@@ -65,6 +65,24 @@ All AI inference runs locally on open-weight models.
 | Publisher and verifier | Exports timetable grids and calendar files; provides a verification page that compares a file hash against the on-chain value |
 | Evaluation harness | Measures extraction accuracy, rule violations, and explanation quality |
 
+### Comparative Analysis with Existing Solutions
+
+| Dimension | Manual Spreadsheets (Excel, Sheets) | Traditional Solvers (FET, aSc, OptaPlanner) | Generative LLMs (Standalone GPT-4, Claude) | Institutional ERPs (Ellucian, SAP) | **Sanyojan (Our Solution)** |
+|---|---|---|---|---|---|
+| **Input Modality** | Manual data entry across bespoke sheets | Strict proprietary XML, CSV, or form fields | Text and images; lacks coordinated audio-sheet cross-referencing | Structured database schemas and predefined forms | Native multimodal intake (voice notes, photographs, varied spreadsheets, text) |
+| **Schedule Correctness** | Prone to human oversight and accidental double-booking | Guaranteed zero violations via mathematical solvers | Probabilistic generation; prone to hallucinations and rule violations | Enforced through rigid validation rules | Guaranteed zero violations via OR-Tools CP-SAT and independent validation |
+| **Conflict Diagnosis** | Manual inspection of overlapping entries | Generic "infeasible / no solution" flags without context | Verbose explanations, but suggestions may introduce new conflicts | Administrative rejection notices without automated resolution options | Minimal unsatisfiable subset isolation with solver-verified plain-language explanations |
+| **Consent Enforcement** | Informal communication; vulnerable to unilateral coordinator overrides | None; administrator modifies parameters directly | None; recommendations lack transactional authority | Centralized administrative override; no independent owner verification | Smart contract enforces that only the registered owner can approve a rule relaxation |
+| **Auditability** | Vulnerable to edited, replaced, or deleted files | Local logs subject to administrative tampering | Ephemeral chat sessions without verifiable permanence | Central database logs controlled by the host institution | Publicly verifiable, append-only Ethereum event log with content hashing |
+| **Token and Resource Cost** | Manual labour intensive | High computational overhead for manual re-entry | Token costs scale linearly with every table row processed | High recurring software licensing and maintenance fees | Zero token usage on repeat layouts via synthesized, sandboxed parsers |
+| **Data Privacy** | Sensitive availability often circulated via public messaging apps | Runs locally, but requires centralized distribution | Cloud processing exposes personal schedules to third parties | Centralized institutional servers with wide administrative access | Local open-weight inference with only salted cryptographic hashes stored on-chain |
+
+#### Key Architectural Distinctions
+
+1. **Separation of Cognitive Interpretation and Mathematical Verification:** Pure language models attempt to assign schedule slots directly, which frequently produces constraint violations. Traditional solvers guarantee valid schedules but cannot interpret natural language, photographs, or informal voice notes. Sanyojan delegates input comprehension and human communication to Gemma 4, while reserving timetable construction strictly for the constraint solver.
+2. **Deterministic Token Economics via Parser Synthesis:** Rather than processing spreadsheet records through repeated model queries, Gemma 4 synthesizes a deterministic Python parser once for each unique layout. Subsequent files sharing that layout execute in a secure sandbox with zero token consumption.
+3. **Decentralized, Non-Repudiable Consent:** In conventional scheduling workflows, the coordinator who builds the timetable also possesses unilateral authority to modify rules when disputes arise. Sanyojan removes this conflict of interest: rule modifications require cryptographic signatures from affected constraint owners, recorded immutably on Ethereum.
+
 ---
 
 ## 4. Objectives
