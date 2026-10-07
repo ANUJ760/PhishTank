@@ -1,480 +1,412 @@
-# GeCompose
+<p align="center">
+  <img src="gecompose.png" alt="GeCompose Hero Banner" width="100%" />
+</p>
 
-**A consent-aware scheduling system that uses Gemma 4 for multimodal input understanding and conflict explanation, a constraint solver for guaranteed valid schedules, and Ethereum for tamper-proof approval records.**
+<p align="center">
+  <b>Multimodal Constraint Intake &bull; Solver Guaranteed Schedules &bull; On-Chain Consent</b><br>
+  <sub>Hacktoberfest Hack Day</sub>
+</p>
 
-Hacktober Fest Open Source AI Hackathon | Track 2: Best Use of Gemma 4
-
-> **Summary:** GeCompose accepts scheduling rules through voice notes, photographs, spreadsheets or typed text. A constraint solver builds a schedule that satisfies every hard rule. When rules conflict, Gemma 4 explains the conflict in plain language, identifies exactly who is affected, and only those individuals can approve the resolution. Every approval is recorded on Ethereum.
+<p align="center">
+  <a href="https://ai.google.dev/gemma"><img src="https://img.shields.io/badge/Model-Gemma_4_(E4B_+_12B)-4285F4?style=flat-square&logo=google" alt="Gemma 4" /></a>
+  <a href="https://developers.google.com/optimization"><img src="https://img.shields.io/badge/Solver-OR--Tools_CP--SAT-34A853?style=flat-square" alt="OR-Tools" /></a>
+  <a href="https://ethereum.org"><img src="https://img.shields.io/badge/Ledger-Ethereum_EVM-627EEA?style=flat-square&logo=ethereum" alt="EVM" /></a>
+  <a href="https://www.docker.com"><img src="https://img.shields.io/badge/Sandbox-Docker_Containers-2496ED?style=flat-square&logo=docker" alt="Docker" /></a>
+</p>
 
 ---
 
+
 ## 1. Project Name
 
-**GeCompose** (derived from *Gemma* and *composition*, conceptualized as the constructive counterpart to *decomposition* by assembling fragmented constraints into a unified schedule): Multimodal, Consent-Aware Scheduling with Gemma 4.
+### GeCompose (Gemma + Composition)
+
+A smart scheduling system that coordinates three dedicated tools for what they do best:
+
+- **Google Gemma 4** takes inputs from voice, photos, spreadsheets, and text, then explains scheduling conflicts in plain English.
+- **Google OR-Tools CP-SAT** does the heavy math to guarantee 100% clash-free schedules.
+- **Ethereum Smart Contract** ensures nobody can change someone's schedule without their signed permission.
 
 ---
 
 ## 2. Problem Statement
 
-Timetables, duty rosters, exam invigilation lists and shared-lab bookings are still built by a coordinator working across multiple spreadsheets. Four problems persist:
+Every college timetable coordinator, lab manager, and event organizer faces the same nightmare:
 
-1. **Scattered formats.** Constraints are spread across WhatsApp voice notes, handwritten forms, photographs of previous timetables, and spreadsheets with varying layouts. Transferring all of this into a single tool introduces errors.
-2. **Unexplained failures.** When rules cannot all be satisfied, existing tools report "no solution" or silently discard a rule without identifying *which* rules conflict or *who* owns them.
-3. **No tamper-proof consent record.** Disputes follow schedule changes ("I never agreed to Saturday"). Chat messages and spreadsheet edits can be lost or rewritten by the same coordinator whose conduct is in question.
-4. **Language models cannot guarantee valid schedules.** A language model asked to produce a timetable directly can violate stated rules. A constraint solver, by contrast, produces schedules that satisfy hard rules by construction.
-
-In addition, availability data is personal. Individuals do not want it uploaded to third-party cloud services.
-
----
-
-## 3. Project Overview and Solution
-
-GeCompose converts voice, photograph, spreadsheet and text input into a verified schedule. When the rules cannot all be satisfied, it converts each infeasibility into an approval request sent to the owners of the conflicting rules.
-
-### Separation of Duties
-
-| Component | Responsibility | Does not |
+| Pain Point | What Goes Wrong | Why Existing Tools Fail |
 |---|---|---|
-| **Gemma 4** | Understands voice, photographs and text; writes parsers for new spreadsheet layouts; explains conflicts; proposes resolutions | Place classes in slots, certify schedules, or approve changes |
-| **Solver (OR-Tools CP-SAT)** | Finds valid schedules; identifies the minimal set of conflicting rules; re-checks every proposed resolution | Interpret human language |
-| **Ethereum (ConsentLedger)** | Stores constraint ownership and hashes; accepts approvals only from the registered owner; records published schedule hashes | Hold funds, store personal data, or verify schedule correctness |
-
-### Flow
-
-1. **Intake:** The coordinator speaks, uploads photographs or screenshots, uploads spreadsheets (.xlsx or .csv), or types. Gemma 4 converts all inputs into structured constraint objects, each linked to its source (audio timestamp, image region, text span, or spreadsheet cell). For a spreadsheet layout that has not been seen before, Gemma 4 writes a parser once. The stored parser handles all subsequent files of the same layout without requiring further model calls.
-2. **Confirm:** Every extracted constraint is displayed alongside its source evidence and a plain-language paraphrase. A human confirms it before it is registered.
-3. **Solve:** The solver builds a schedule or reports that the constraints are infeasible.
-4. **Explain:** If the constraints are infeasible, the solver returns the minimal conflicting subset. Gemma 4 explains the conflict and proposes ranked relaxations, each of which the solver re-checks for feasibility.
-5. **Consent:** Each proposed relaxation is sent to the owner of the affected rule. The owner approves or rejects it on-chain.
-6. **Publish:** Once all required approvals are received and the independent checker confirms zero violations, the schedule hash is published on-chain.
-
-All AI inference runs locally on open-weight models.
-
-### Solution Layers
-
-| Layer | Description |
-|---|---|
-| Multimodal intake | Gemma 4 converts voice, images and text into constraint objects through function calling |
-| Format adapter (parser synthesis) | Gemma 4 writes and tests a Python parser for each new spreadsheet layout. Stored parsers handle subsequent files of the same layout without using any model tokens |
-| Confirmation screen | Displays each constraint alongside its source evidence and paraphrase |
-| Constraint registry | Stores each constraint with its owner, type (hard or soft), and a salted hash |
-| Solver (CP-SAT) | Builds schedules that guarantee all hard rules are satisfied |
-| Conflict extractor | Identifies the minimal subset of rules that conflict |
-| Gemma 4 explainer | Explains conflicts and ranks proposed relaxations |
-| Consent contract | Enforces owner-only approval and maintains an append-only history |
-| Publisher and verifier | Exports timetable grids and calendar files; provides a verification page that compares a file hash against the on-chain value |
-| Evaluation harness | Measures extraction accuracy, rule violations, and explanation quality |
-
-### Comparative Analysis with Existing Solutions
-
-| Dimension | Manual Spreadsheets (Excel, Sheets) | Traditional Solvers (FET, aSc, OptaPlanner) | Generative LLMs (Standalone GPT-4, Claude) | Institutional ERPs (Ellucian, SAP) | **GeCompose (Our Solution)** |
-|---|---|---|---|---|---|
-| **Input Modality** | Manual data entry across bespoke sheets | Strict proprietary XML, CSV, or form fields | Text and images; lacks coordinated audio-sheet cross-referencing | Structured database schemas and predefined forms | Native multimodal intake (voice notes, photographs, varied spreadsheets, text) |
-| **Schedule Correctness** | Prone to human oversight and accidental double-booking | Guaranteed zero violations via mathematical solvers | Probabilistic generation; prone to hallucinations and rule violations | Enforced through rigid validation rules | Guaranteed zero violations via OR-Tools CP-SAT and independent validation |
-| **Conflict Diagnosis** | Manual inspection of overlapping entries | Generic "infeasible / no solution" flags without context | Verbose explanations, but suggestions may introduce new conflicts | Administrative rejection notices without automated resolution options | Minimal unsatisfiable subset isolation with solver-verified plain-language explanations |
-| **Consent Enforcement** | Informal communication; vulnerable to unilateral coordinator overrides | None; administrator modifies parameters directly | None; recommendations lack transactional authority | Centralized administrative override; no independent owner verification | Smart contract enforces that only the registered owner can approve a rule relaxation |
-| **Auditability** | Vulnerable to edited, replaced, or deleted files | Local logs subject to administrative tampering | Ephemeral chat sessions without verifiable permanence | Central database logs controlled by the host institution | Publicly verifiable, append-only Ethereum event log with content hashing |
-| **Token and Resource Cost** | Manual labour intensive | High computational overhead for manual re-entry | Token costs scale linearly with every table row processed | High recurring software licensing and maintenance fees | Zero token usage on repeat layouts via synthesized, sandboxed parsers |
-| **Data Privacy** | Sensitive availability often circulated via public messaging apps | Runs locally, but requires centralized distribution | Cloud processing exposes personal schedules to third parties | Centralized institutional servers with wide administrative access | Local open-weight inference with only salted cryptographic hashes stored on-chain |
-
-#### Key Architectural Distinctions
-
-1. **Separation of Cognitive Interpretation and Mathematical Verification:** Pure language models attempt to assign schedule slots directly, which frequently produces constraint violations. Traditional solvers guarantee valid schedules but cannot interpret natural language, photographs, or informal voice notes. GeCompose delegates input comprehension and human communication to Gemma 4, while reserving timetable construction strictly for the constraint solver.
-2. **Deterministic Token Economics via Parser Synthesis:** Rather than processing spreadsheet records through repeated model queries, Gemma 4 synthesizes a deterministic Python parser once for each unique layout. Subsequent files sharing that layout execute in a secure sandbox with zero token consumption.
-3. **Decentralized, Non-Repudiable Consent:** In conventional scheduling workflows, the coordinator who builds the timetable also possesses unilateral authority to modify rules when disputes arise. GeCompose removes this conflict of interest: rule modifications require cryptographic signatures from affected constraint owners, recorded immutably on Ethereum.
+| **Scattered Inputs** | Constraints arrive via WhatsApp voice notes, whiteboard photos, paper slips, and messy Excel sheets. | Coordinators spend hours manually re-typing data, introducing human errors. |
+| **Silent Failures** | Solvers just say "No Solution" or drop rules silently. | Nobody knows which two teachers clashed or who needs to compromise. |
+| **No Consent Record** | Admins change slots unilaterally ("I never agreed to 8 AM Saturday!"). | Chat logs get deleted, spreadsheets get overwritten, and disputes drag on. |
+| **LLMs Hallucinate** | Asking ChatGPT or an LLM to "build a timetable" fails. | Language models double-book classrooms and invent non-existent slots. |
 
 ---
 
-## 4. Objectives
+## 3. Project Overview
 
-- Accept scheduling rules through **voice, image and text** using a single open model family.
-- Parse spreadsheets using **stored, tested parsers**. Each layout requires a model call only the first time it appears.
-- Guarantee **zero hard-rule violations** in every published schedule.
-- When the constraints are infeasible, **identify the exact conflicting rules and their owners** and propose solver-verified resolutions.
-- Make every change **consent-based and auditable** through on-chain recording.
-- Keep personal data **private** through local inference, with only salted hashes stored on-chain.
-- Run on **modest hardware** (a laptop-class GPU for the smaller tier).
-- Accept mixed **Hindi, Marathi and English** speech, with extraction accuracy reported per language.
-- Deliver a **reproducible evaluation** under the Apache 2.0 license.
+GeCompose solves scheduling by giving each component one clear job:
 
----
+```mermaid
+flowchart LR
+    A["Voice / Photos / Sheets"] --> B["Gemma 4\n(Extract Rules)"]
+    B --> C["Human Confirm\n(Check Evidence)"]
+    C --> D["CP-SAT Solver\n(Find Slots)"]
+    D -->|"Feasible"| E["Published Schedule\n(Hash on Blockchain)"]
+    D -->|"Conflict"| F["Gemma 4\n(Explain Clash)"]
+    F --> G["Rule Owner Signs\n(Ethereum Contract)"]
+    G --> D
+```
 
-## 5. Target Users and Use Cases
+### Clean Separation of Roles
 
-| User | Need |
-|---|---|
-| College timetable cells and department coordinators | Build and revise class timetables from scattered inputs |
-| Exam cells | Invigilation duties and seating plans with fairness and conflict rules |
-| Shared-lab and inter-college resource managers | Resource booking among parties who do not fully trust a single administrator |
-| Hostels, NGOs and volunteer groups | Duty rosters collected through chat messages and voice notes |
-| Event organisers (hackathons, college fests) | Session and room schedules with speaker availability constraints |
-
-**Core use case:** A coordinator dictates rules in Hindi and English, uploads a photograph of last year's timetable and the room list, and receives a verified schedule. When two rules conflict, their owners receive a plain-language explanation and approve a resolution.
-
----
-
-## 6. Open-Source AI Technology Selected
-
-**Primary model family: Google Gemma 4** (open weights, **Apache 2.0**).
-
-According to the official model card, Gemma 4 is available in five sizes (**E2B, E4B, 12B, 26B A4B, 31B**) with context windows ranging from 128K to 256K tokens. All variants accept text and image input. Audio input is supported on the E2B, E4B and 12B variants. The family provides a thinking mode, native function calling, and support for over 140 languages.
-
-| Role in GeCompose | Variant | Reason |
+| Component | What It Handles | What It Never Does |
 |---|---|---|
-| **Intake:** converts voice, image and text into constraints | **E4B**, 4-bit quantised (approximately 4.5 GB) | Handles audio, image and text within a single model |
-| **Reasoning:** conflict explanation, relaxation ranking, parser writing | **12B** or **26B A4B** (approximately 6.7 to 14.4 GB at 4-bit) | Provides stronger reasoning and code generation capabilities |
-
-**Supporting components** (see Section 13 for the full stack): OR-Tools CP-SAT, Pydantic, pandas, openpyxl, a container-based sandbox, Foundry, OpenZeppelin, web3.py or ethers.js, and Streamlit or Gradio.
-
-*Note: Exact checkpoint names and memory figures will be confirmed against the official model card at the start of the final round.*
+| **Gemma 4** | Listens to audio, reads photos, writes sheet parsers, explains clashes | Never assigns slots or approves changes on its own |
+| **CP-SAT Solver** | Places every class mathematically with zero overlaps | Never guesses human language or intent |
+| **Ethereum Contract** | Stores rule ownership and records signed approvals | Never stores personal data or charges gas to view |
 
 ---
 
-## 7. Why This Technology Was Selected
+## 4. Proposed Solution
 
-- **One model family for three input types.** A pipeline of separate speech recognition, OCR and language model components passes plain text between stages, losing cross-modal context. Gemma 4 receives audio and images within the same session.
-- **Native function calling** allows the model to emit schema-valid constraint objects directly.
-- **Code generation** enables parser synthesis, with a sandbox and automated tests checking every generated parser.
-- **Token savings from stored parsers.** Per-row extraction incurs token costs proportional to the number of rows. Parser synthesis is a one-time cost that does not depend on file size. Subsequent files with the same layout require zero model tokens.
-- **Thinking mode, used selectively.** The thinking mode is activated only when explaining complex conflicts that benefit from deeper reasoning.
-- **Local and private.** The Apache 2.0 license permits unrestricted institutional use. Personal data remains on the coordinator's machine.
-- **Multilingual.** Gemma 4 supports Hindi, Marathi and English code-mixing. Extraction accuracy is measured separately for each language.
-- **A range of model sizes that fit a single laptop.** The smaller model handles high-volume intake, and the mid-size model is called only when a conflict requires explanation.
+GeCompose runs a straightforward 6-step pipeline with human checkpoints at every critical step:
 
-**Why the model does not build the schedule:** Hard rules must hold in every output, and language models provide no such guarantee. The evaluation includes a language-model-only baseline that counts hard-rule violations for comparison.
+1. **Multimodal Intake:** Speak in English, Hindi, or Marathi, upload a photo of a whiteboard timetable, or drop an Excel sheet. Gemma 4 E4B extracts clean rules with proof tags (audio timestamps, image crops, spreadsheet cells).
+2. **Automated Sheet Parsers:** For new spreadsheet layouts, Gemma 4 writes a small Python parser script and runs it in a safe Docker sandbox. Once verified, that parser is saved. Future files with that format run instantly with zero model tokens used.
+3. **Review & Confirm:** You see every rule side-by-side with its source crop or audio playback. You click confirm before anything enters the solver.
+4. **Mathematical Solving:** Google CP-SAT calculates a clash-free timetable. Hard rules are 100% satisfied by math.
+5. **Plain-English Explanations:** If rules clash, CP-SAT pinpoints the exact conflicting subset. Gemma 4 tells you in plain English: "Prof. Rao cannot do Monday, but Section A Lab is pinned to Monday and only Prof. Rao can take it." It suggests solver-verified fixes.
+6. **On-Chain Consent:** The affected teacher or coordinator approves the fix directly from their wallet. The final schedule hash is logged on Ethereum for a permanent, tamper-proof record.
 
 ---
 
-## 8. AI's Role in the System
+## 5. Objectives
 
-Gemma 4 serves as the **interface between people and the solver**. It converts human input into the solver's constraint format, and converts the solver's output into explanations that people can act on.
-
-**What the AI does:**
-1. **Multimodal constraint extraction.** Converts voice, photographs and text into structured constraint objects with source pointers and confidence scores.
-2. **Parser synthesis.** Writes Python parsers for new spreadsheet layouts and rewrites them when tests fail. Stored parsers handle all subsequent files of the same layout.
-3. **Clarifying questions.** Asks for clarification when input is ambiguous.
-4. **Paraphrase for confirmation.** Restates each constraint in plain language so that a human can verify correctness.
-5. **Conflict explanation.** Explains why a set of rules cannot all be satisfied, naming the people and rules involved.
-6. **Relaxation proposals.** Suggests ranked resolutions, using the solver as a feasibility-checking tool.
-7. **Change summaries.** Writes the human-readable summary attached to each published version.
-
-**What the AI does not do:** assign classes to slots, declare a schedule valid, approve any change, submit on-chain transactions, or read individual spreadsheet rows once a parser has passed its tests.
+- **100% Valid Schedules:** Zero double-booked rooms or unavailable teacher clashes.
+- **True Multimodal Support:** Voice, photos, and spreadsheets handled through Gemma 4 without chaining separate OCR or speech APIs.
+- **Zero-Token Sheet Reuse:** Write spreadsheet parsers once; re-use them forever for free.
+- **Clear Explanations:** When a schedule is impossible, explain exactly who clashed and why.
+- **Tamper-Proof Audit Trail:** Rule changes require cryptographic signatures from rule owners.
+- **Privacy by Default:** Audio, photos, and availability stay on your local machine; only secure hashes go on-chain.
+- **Runs on a Laptop:** Intake runs on consumer GPUs (under 8 GB VRAM with 4-bit quantization).
 
 ---
 
-## 9. System Architecture
+## 6. Target Users / Use Case
+
+### Who Needs This?
+
+- **College Department Coordinators:** Managing 50+ faculty members who submit availability over WhatsApp audio and paper notes.
+- **Exam Cells:** Generating invigilation shifts where teachers demand fair rotation and zero overlaps.
+- **Shared Research Labs:** Scheduling access to shared microscopes or computing clusters across competing departments.
+- **Student Hackathons & Fests:** Allocating speaker slots, workshop rooms, and judging panels with last-minute speaker changes.
+
+### A Real Example: The Monday Morning Clash
+
+1. **Intake:** The coordinator speaks: "Prof. Rao cannot take Monday morning classes." They also upload `workload.xlsx`, which shows Prof. Rao is the only teacher for the Database Lab. Another note pins the Database Lab to Monday morning.
+2. **Conflict:** CP-SAT reports that satisfying all three rules is impossible.
+3. **Gemma 4 Explains:** "Database Lab is pinned to Monday, Prof. Rao is the only qualified instructor, but Prof. Rao is unavailable on Monday mornings."
+4. **Verified Options:** Gemma 4 proposes:
+   - **Option 1:** Move Database Lab to Tuesday 10 AM (Needs approval from Department Head).
+   - **Option 2:** Add Prof. Mehta as co-instructor (Needs approval from Dean).
+5. **Consent:** The Department Head approves Option 1 using their wallet. CP-SAT instantly re-solves and publishes the final schedule.
+
+---
+
+## 7. Open-Source AI Technology Selected
+
+### Google Gemma 4 Model Strategy
+
+We use Google's open-weight **Gemma 4** family in a two-tier setup:
+
+| Tier | Model | Size (4-bit) | Job | Why This Variant? |
+|---|---|---|---|---|
+| **Intake Tier** | **Gemma 4 E4B** | ~4.5 GB VRAM | Audio, photo, and text intake | Single model natively hears audio and reads images. Runs easily on laptop GPUs. |
+| **Reasoning Tier** | **Gemma 4 12B** | ~7.2 GB VRAM | Writing sheet parsers and explaining conflicts | Better code synthesis for Python parsers and deeper reasoning for conflict graphs. |
+
+Both models run locally using open-source inference runtimes like **vLLM** or **llama.cpp**.
+
+---
+
+## 8. Why This Technology Was Selected
+
+- **One Model Family vs. Three Separate Tools:** Standard pipelines glue together Whisper (speech), Tesseract (OCR), and an LLM. When one makes a mistake, the whole pipeline breaks. Gemma 4 processes audio, images, and text in the same context window.
+- **Native JSON Output:** Gemma 4 supports direct structured tool calling, outputting clean Pydantic data schemas without messy regex fixes.
+- **Code Generation Saves Tokens:** Instead of feeding 2,000 Excel rows to an LLM every time (costing thousands of tokens), Gemma 4 writes a Python parser once. The Python script parses all future sheets in milliseconds at zero token cost.
+- **Thinking Mode for Hard Conflicts:** Gemma 4's thinking mode is turned on only when explaining complex multi-party conflicts, keeping regular intake fast.
+- **Runs Completely Offline:** Student and teacher availability data is personal. Running Gemma 4 locally means zero data leaves the building.
+
+---
+
+## 9. AI's Role in the System
+
+Gemma 4 serves as the translator between humans and the mathematical solver.
 
 ```mermaid
 flowchart TD
-    A["Voice note"] --> D
-    B["Photo or screenshot"] --> D
-    C["Typed text"] --> D
-    D["Gemma 4 E4B intake"]
-    D --> E["Confirmation screen"]
-    S["Spreadsheet or CSV"] --> Q{"Parser stored?"}
-    Q -->|"yes"| R["Stored parser (no model call)"]
-    Q -->|"no"| W["Gemma 4 12B/26B writes parser"]
-    W --> R
-    R --> E
-    E --> F["Constraint registry"]
-    F --> G["CP-SAT solver"]
-    G -->|"feasible"| K["Candidate schedule"]
-    G -->|"infeasible"| H["Conflict extractor"]
-    H --> I["Gemma 4 12B/26B: explanation + relaxations"]
-    I --> J["Solver re-checks proposals"]
-    J --> L["Proposals sent to owners"]
-    L --> M["Ethereum consent contract"]
-    M --> F
-    K --> N["Independent checker"]
-    N --> O["Publish: schedule hash on-chain"]
-    O --> P["Outputs: grid, calendar, verification page"]
+    subgraph Human["Human Inputs"]
+        H1["Spoken Voice"]
+        H2["Whiteboard Photos"]
+        H3["Excel Sheets"]
+    end
+
+    subgraph AI["Gemma 4 Intelligence"]
+        G1["Extracts Rules & Bounding Boxes"]
+        G2["Synthesizes Python Sheet Parsers"]
+        G3["Translates Solver Infeasibility to Plain English"]
+    end
+
+    subgraph Math["OR-Tools Solver"]
+        S1["Calculates Slots Without Clashes"]
+        S2["Pinpoints Minimal Unsatisfiable Core"]
+    end
+
+    Human --> AI --> Math
+    Math -->|"When Clashes Happen"| AI -->|"Human-Actionable Choices"| Human
 ```
 
-**Round lifecycle:**
+### What AI Does vs. What AI Never Does
+
+- **Gemma 4 DOES:** Parse spoken Hindi/English, read photo notices, write safe parsing scripts, and explain why two rules clash.
+- **Gemma 4 NEVER:** Assign slots directly, claim a schedule is valid without the solver, approve changes for someone else, or touch private keys.
+
+---
+
+## 10. System Architecture
 
 ```mermaid
-stateDiagram-v2
-    [*] --> Collecting
-    Collecting --> Solving: constraints confirmed
-    Solving --> Resolved: feasible
-    Solving --> Conflict: infeasible
-    Conflict --> AwaitingConsent: relaxations proposed
-    AwaitingConsent --> Solving: all owners approved
-    AwaitingConsent --> Conflict: an owner rejected
-    Resolved --> Published: checker passes
-    Published --> [*]
+flowchart TD
+    subgraph INTAKE["1. Multimodal Intake"]
+        V["Voice Audio"] --> G4["Gemma 4 E4B"]
+        P["Roster Photos"] --> G4
+        T["Typed Rules"] --> G4
+        S["Spreadsheets"] --> CHK{"Known Sheet?"}
+        CHK -- No --> GEN["Gemma 4 12B Code Gen"]
+        GEN --> BOX["Docker Sandbox Test"]
+        BOX --> RUN["Run Parser"]
+        CHK -- Yes --> RUN
+    end
+
+    subgraph VERIFY["2. Confirm & Solve"]
+        G4 --> UI["Side-by-Side Review Screen"]
+        RUN --> UI
+        UI --> SOLVE["OR-Tools CP-SAT Solver"]
+    end
+
+    subgraph CONFLICT["3. Infeasibility & Consent"]
+        SOLVE -- Feasible --> CHECK["Independent Checker"]
+        SOLVE -- Infeasible --> MUS["Minimal Conflict Extractor"]
+        MUS --> EXP["Gemma 4 12B Explainer"]
+        EXP --> SIGN["Rule Owner Signs On-Chain"]
+        SIGN --> SOLVE
+    end
+
+    subgraph PUBLISH["4. Publication"]
+        CHECK --> ETH["Anchor Hash to Ethereum"]
+        ETH --> OUT["Interactive Grid & .ics Calendar Export"]
+    end
 ```
 
-The contract records three on-chain states: Open (covering Collecting, Solving, Resolved, Conflict off-chain), AwaitingConsent, and Published.
-
-### Architectural Decisions
-
-| # | Decision | Reason |
-|---|---|---|
-| AD-1 | Solver is the only component that assigns classes to slots | Hard rules must hold in every output |
-| AD-2 | Extracted constraints are human-confirmed before registration | A misread rule is caught before it changes a schedule |
-| AD-3 | Ethereum contract enforces owner-only approval | Coordinator cannot approve on an owner's behalf or edit history |
-| AD-4 | Only hashes on-chain | Personal data stays off-chain |
-| AD-5 | Model process holds no private key or consent-calling tools | Consent actions exist only as human-signed transactions |
-| AD-6 | Consent layer uses a five-call interface | Solver, checker and Gemma 4 tiers are decoupled from the consent implementation |
-| AD-7 | Spreadsheets parsed by stored, immutable parsers | A layout costs model tokens only once; same file always gives same output |
-| AD-8 | Parser code runs only in an isolated sandbox | Generated code is untrusted until tested |
-
 ---
 
-## 10. Component-Level Architecture
+## 11. Component-Level Architecture
 
-| # | Component | Responsibility | Inputs | Outputs |
+| # | Subsystem | Inputs | Outputs | Tech Used |
 |---|---|---|---|---|
-| 1 | **Multimodal intake** | Convert audio, images and text into constraint objects via function calling | Voice, photographs, text | Draft constraints with sources and confidence scores |
-| 1a | **Format adapter** | Write, test and store parsers for spreadsheet layouts; execute stored parsers in a secure sandbox | .xlsx or .csv files | Constraint objects with source cell references |
-| 2 | **Confirmation screen** | Display each constraint alongside its evidence and paraphrase | Draft constraints | Confirmed constraints |
-| 3 | **Constraint registry** | Assign owner address, constraint type (hard or soft), and salted hash | Confirmed constraints | Registered constraints |
-| 4 | **Solver** | Construct schedules satisfying all hard rules | Registered constraints | Schedule or infeasible status |
-| 5 | **Conflict extractor** | Identify the minimal conflicting subset of rules | Infeasible model state | Conflicting constraint subset and owners |
-| 6 | **Explainer** | Explain conflicts; generate and verify candidate relaxations | Conflicting subset | Explanation and ranked resolution proposals |
-| 7 | **Consent contract** | Enforce owner-only approvals and maintain an append-only audit trail | Proposals and signed transactions | Event logs and published hashes |
-| 8 | **Independent checker** | Re-verify every hard rule against the final schedule | Schedule and constraints | Pass or fail status with violation details |
-| 9 | **Publisher** | Export timetable grids, calendar files, and verification utilities | Final schedule | Formatted outputs and verification proofs |
-| 10 | **Evaluation harness** | Reproducible scoring and performance benchmarks | Curated benchmark datasets | Quantitative metrics and ablation reports |
-
-**Constraint object fields:** identifier, owner, rule type (hard or soft), category, parameters, penalty weight (for soft rules), source (modality and reference pointer), extraction confidence, and paraphrase.
-
-**Initial constraint types:** individual or room unavailability, daily or consecutive hour limits, mandatory consecutive slots (laboratory sessions), room capacity and equipment criteria, fixed assignments, exclusion of double-booking, subject spacing rules, mandatory break periods, and soft preferences.
-
-### Format Adapter: Parser Synthesis
-
-*Scope:* .xlsx and .csv inputs. Extraction from tabular PDF documents is planned for future releases (Section 16).
-
-*Layout fingerprint:* A cryptographic hash derived from sheet names and normalized header rows. Files sharing an identical fingerprint reuse the stored parser.
-
-*Synthesis procedure (using reasoning-tier Gemma 4):*
-1. The model receives the header structure, up to 10 sample rows, the constraint schema, and the target function contract.
-2. Gemma 4 generates the parser implementation; the sandbox executes it against the sample records.
-3. A coordinator reviews the parsed sample and corrects any discrepancies. These validated rows form regression tests.
-4. Automated verification verifies that: (a) parser output matches confirmed rows; (b) records satisfy the Pydantic schema; (c) each object includes a source cell pointer; and (d) non-empty rows are not silently discarded.
-5. In the event of a test failure, Gemma 4 inspects the error report and attempts automated repair (up to three attempts). If unsuccessful, processing reverts to row-by-row extraction.
-6. A validated parser is stored with its layout fingerprint, source code, integrity hash, test records, and model metadata.
-
-*Owner mapping:* The parser extracts owner identifiers (for example, instructor names). The coordinator maintains a mapping table connecting these identifiers to Ethereum addresses.
-
-*Layout drift management:* An unrecognised layout fingerprint triggers automatic parser synthesis. For known fingerprints, if more than 5% of non-empty rows are skipped, the file is flagged for re-synthesis.
-
-*Sandbox isolation:* Parsers run in a separate containerized process with network access disabled, read-only access restricted to the uploaded file, strict CPU, memory and runtime limits, and standard output as the sole communication channel. A static import inspection enforces an allowlist (pandas, openpyxl, re, datetime, json) prior to execution.
-
-### Blockchain Layer: `ConsentLedger`
-
-A single Solidity smart contract manages five specific functions:
-
-1. **Registers constraint ownership:** Associates owner addresses with constraint content hashes.
-2. **Enforces owner-only approval:** Reverts any transaction originating from an unauthorized address.
-3. **Restricts premature publication:** Prevents schedule finalization while proposals remain pending.
-4. **Maintains append-only audit logs:** Emits immutable, timestamped event records for every action.
-5. **Supports public verification:** Provides read-only lookups for published schedule validity.
-
-| Function | Authorized Caller | Operational Effect |
-|---|---|---|
-| `registerConstraint(owner, contentHash)` | Administrator | Registers a constraint record and emits `ConstraintRegistered`. |
-| `openRound()` | Administrator | Initializes an active scheduling round. |
-| `proposeRelaxation(roundId, constraintId, newContentHash, explanationHash)` | Administrator | Creates a pending proposal and sets round status to `AwaitingConsent`. |
-| `approveRelaxation(proposalId)` | **Constraint Owner Only** | Approves the relaxation and updates the registered constraint hash. |
-| `rejectRelaxation(proposalId)` | **Constraint Owner Only** | Rejects the relaxation while preserving the existing constraint hash. |
-| `publishSchedule(roundId, scheduleHash, constraintSetHash, summaryHash)` | Administrator | Stores canonical hashes with block timestamps, transitioning round status to `Published`. |
-| `getConstraint(constraintId)` (view) | Public | Returns owner address, active hash, and status. |
-| `getPublication(scheduleHash)` (view) | Public | Returns associated round identifier, hashes, and timestamp. |
-
-**Hashing structure (keccak256):**
-- *Constraint hash:* Canonical JSON concatenated with a random 32-byte secret salt, preventing brute-force reconstruction of predictable availability preferences.
-- *Schedule hash:* Generated from a standardized, canonically sorted schedule representation.
-- *Constraint set hash:* Derived from the concatenated series of active constraint hashes ordered by identifier.
-
-**Off-chain data preservation:** Personal identities, unhashed availability schedules, raw audio recordings, photographs, full timetable contents, and natural language explanations remain off-chain at all times.
-
-**Deployment configuration:** The standard demonstration operates against a local Foundry (Anvil) network pre-seeded with test accounts. Optional deployment to the Sepolia testnet is supported. The contract holds no ether, maintains no payable entrypoints, and is not designed for mainnet financial operations.
-
-**Decentralization rationale:** Because the scheduling coordinator is frequently a party to interpersonal scheduling disputes, central database records are insufficient:
-1. **Cryptographic authorization:** The `approveRelaxation` entrypoint rejects transactions from any account other than the designated owner.
-2. **Tamper-resistant audit history:** Historical records cannot be rewritten or expunged by administrative accounts.
-3. **Independent verifiability:** Any stakeholder can independently compute schedule hashes and query the public ledger without relying on the availability or integrity of the host server.
+| **1** | **Multimodal Intake** | Spoken audio, timetable photos, text | Structured draft rules with source pointers | Gemma 4 E4B |
+| **2** | **Format Adapter** | `.xlsx` and `.csv` files | Clean rows with cell references | Docker Sandbox + Python |
+| **3** | **Review Screen** | Draft rules + image crops / audio clips | Confirmed rules | Streamlit UI |
+| **4** | **Constraint Registry** | Confirmed rules | Salted hashes and rule IDs | Local SQLite |
+| **5** | **CP-SAT Solver** | Mathematical constraints | Complete schedule or conflict set | Google OR-Tools |
+| **6** | **Gemma 4 Explainer** | Conflicting rule IDs | Plain-English summary + verified options | Gemma 4 12B |
+| **7** | **Consent Contract** | Signed approvals from owners | On-chain status update | Solidity (`ConsentLedger.sol`) |
+| **8** | **Schedule Publisher** | Verified timetable matrix | Timetable grid, `.ics` calendar files, proof page | Python + Web3.py |
 
 ---
 
-## 11. Data and Information Flow
+## 12. Data / Information Flow
 
 ```mermaid
 sequenceDiagram
-    participant C as Coordinator
-    participant G as Gemma 4 E4B (intake)
-    participant R as Registry
-    participant S as Solver
-    participant X as Gemma 4 12B (explainer)
-    participant O as Owners
-    participant E as Ethereum contract
-    C->>G: Voice note, photographs, text
-    G->>C: Constraints with evidence and paraphrases
-    C->>R: Confirm, edit or reject
-    R->>S: Registered constraints
-    alt feasible
-        S->>E: Schedule hash after checker passes
-    else infeasible
-        S->>X: Minimal conflicting subset
-        X->>S: Candidate relaxations to test
-        S->>X: Which candidates are feasible
-        X->>O: Explanation and ranked proposals
-        O->>E: Approve or reject (signed by each owner)
-        E->>R: Approved relaxations update constraints
-        R->>S: Solve again
+    autonumber
+    actor Coordinator
+    participant Gemma as Gemma 4 E4B
+    participant Solver as OR-Tools CP-SAT
+    participant Explainer as Gemma 4 12B
+    actor Teacher as Rule Owner
+    participant Chain as Ethereum Contract
+
+    Coordinator->>Gemma: Voice Note + Roster Photo + Sheet
+    Gemma->>Coordinator: Extracted Rules with Audio/Image Evidence
+    Coordinator->>Solver: Confirmed Rules
+    
+    alt Schedule is Feasible
+        Solver->>Chain: Publish Schedule Hash
+    else Rules Conflict
+        Solver->>Explainer: Return Exact Conflicting Rules
+        Explainer->>Teacher: "Here is why your class clashed + 2 choices"
+        Teacher->>Chain: Sign approval for Option 1
+        Chain->>Solver: Rule updated on-chain -> Re-Solve
     end
-    E->>C: Published version and verification page
 ```
 
-**Illustrative operational example:**
+### Privacy & Storage Breakdown
 
-- A coordinator provides instructions in mixed Hindi and English: "Rao sir Monday ko available nahi hain. Section A ka DBMS lab Monday ko hi rakhna hai." A photograph of the prior year's schedule and an institutional workload spreadsheet (.xlsx) are uploaded concurrently.
-- Three constraints are extracted: (C1) Professor Rao is unavailable on Mondays; (C2) Section A database laboratory is pinned to Monday; (C3) Professor Rao is designated as the sole qualified instructor for this laboratory. Constraints C1 and C2 originate from speech; C3 originates from the spreadsheet through a newly synthesized parser.
-- The solver determines that the problem is infeasible and isolates the minimal conflicting subset: {C1, C2, C3}.
-- Gemma 4 synthesizes a plain-language explanation: "Section A's laboratory must occur on Monday, only Professor Rao is qualified to instruct it, and Professor Rao is unavailable on Mondays." It offers two viable resolutions: (R1) reschedule the laboratory to Tuesday (requiring approval from the owner of C2), or (R2) assign an additional qualified instructor to the laboratory (requiring approval from the owner of C3). The solver confirms that both alternatives are feasible.
-- The designated owner executes a transaction approving the selected proposal on-chain. The solver recalculates the schedule, the independent verification script confirms zero violations, and the schedule hash is published to the ledger.
-
----
-
-## 12. Bounded Agentic Workflow
-
-GeCompose employs a structured, bounded agentic loop with strict human checkpoints:
-
-1. **Extraction:** The intake model parses source materials into candidate constraints and prompts clarifying questions when input is ambiguous.
-2. **Human Confirmation:** The coordinator validates, edits, or discards each parsed constraint before registration.
-3. **Solving and Conflict Isolation:** The constraint solver builds a schedule or extracts the minimal conflicting constraint subset.
-4. **Explanation and Synthesis:** The reasoning model explains root causes, designs relaxation strategies, and submits each candidate to the solver for feasibility validation.
-5. **Consent Execution:** Affected constraint owners submit `approveRelaxation` or `rejectRelaxation` transactions directly to the contract. Rejections return the workflow to the explanation stage with the rejected option eliminated.
-6. **Termination Boundaries:** The system permits at most three iterative relaxation rounds. Unresolved conflicts are escalated to administrators for manual intervention.
-
-**Model tool access:** The reasoning model may invoke function calls to record draft constraints, request clarification, inspect conflict graphs, verify proposed relaxations with the solver, compose version summaries, and dispatch parser implementations to the sandbox.
-
-**Security guardrails:** The model process possesses no private keys and cannot trigger state-changing blockchain methods. Every proposed relaxation must pass solver feasibility verification before it is presented to users.
-
----
-
-## 13. Technology Stack
-
-| Layer | Selection | Rationale |
+| Data Type | Where It Stays | Is It Ever Sent to Blockchain? |
 |---|---|---|
-| AI Models | Gemma 4 E4B (intake), Gemma 4 12B or 26B A4B (reasoning and explanation) | Multimodal input understanding, code generation, and multilingual inference |
-| Local Inference Runtime | Ollama, llama.cpp, or vLLM | Local open-weight execution preserving organizational data privacy |
-| Structured Outputs | Native function calling and Pydantic validation | Deterministic, schema-compliant constraint serialization |
-| Constraint Solver | Google OR-Tools CP-SAT | Mathematical guarantees of schedule correctness and minimal conflict isolation |
-| Data Processing and Sandbox | pandas, openpyxl, Docker Engine | Tabular data ingestion within an isolated, unprivileged container runtime |
-| Smart Contracts | Solidity 0.8.x (`ConsentLedger`), Foundry, OpenZeppelin | Formally verified access control and repeatable contract testing |
-| Web3 Integration | web3.py or ethers.js | Standard Ethereum JSON-RPC client interactions |
-| Blockchain Network | Local Anvil node (primary demonstration environment) or Sepolia testnet | Zero financial risk with deterministic test accounts |
-| User Interface | Streamlit or Gradio | Interactive visual interface supporting audio capture and image uploads |
-| Schedule Outputs | Grid visualizations, iCalendar (.ics) files, web verification utility | Standard export formats for calendars and academic systems |
-| Benchmark Evaluation | Python, scikit-learn, matplotlib | Rigorous, repeatable experimental measurement |
-| Licensing | Apache 2.0 | Open-source distribution allowing institutional deployment |
+| Voice recordings & photos | Local machine only | Never |
+| Personal availability rules | Local machine only | Never |
+| Rule hashes (salted) | Ethereum public ledger | Yes (32-byte cryptographic hash) |
+| Published schedule hash | Ethereum public ledger | Yes (32-byte cryptographic hash) |
+| Final timetable grid | Exported to `.ics` / PDF | Downloaded locally |
 
 ---
 
-## 14. Implementation Roadmap and Evaluation
+## 13. Agentic Workflow
 
-Development is organized into modular phases:
+GeCompose runs a bounded agentic loop with clear human guardrails:
 
-**Phase 1: Core Foundation (Essential)**
-1. Standardized constraint schema and registry implementation.
-2. Text-based intake leveraging Gemma 4 E4B with human confirmation workflows.
-3. CP-SAT solver integration, independent rule validator, and timetable visualization.
-4. Conflict extractor coupled with Gemma 4 automated explanations and verified relaxations.
-5. Automated evaluation harness and initial benchmark dataset.
+```mermaid
+flowchart LR
+    A["Extract Rules"] --> B["Human Review Gate"]
+    B --> C["CP-SAT Solver"]
+    C -->|"Conflict"| D["Gemma 4 Diagnoses Clash"]
+    D --> E["Solver Pre-Checks Fixes"]
+    E --> F["Owner Signs On-Chain"]
+    F --> C
+    C -->|"Solved"| G["Publish Schedule"]
+```
 
-**Phase 2: Multimodal Intake and Consensus (Target)**
-6. Voice ingestion pipeline utilizing Gemma 4 native audio capabilities.
-7. Image ingestion for handwritten schedules, room inventories, and historical timetables.
-8. Format adapter module: dynamic parser synthesis, sandbox execution, and parser registry.
-9. Solidity consensus contract, automated unit tests, and local testnet integration.
-10. Public verification interface.
+- **Strict Limits:** The loop runs at most 3 relaxation cycles. If stakeholders cannot agree after 3 tries, it stops and alerts the coordinator.
+- **Safe Tools:** The AI agent can only inspect the conflict graph and test candidate fixes against the solver. It has zero access to wallet private keys.
 
-**Phase 3: Refinement and Localization (Extensions)**
-11. Optional deployment to Ethereum Sepolia testnet.
-12. Explanations localized in Hindi and Marathi, alongside iCalendar exports.
-13. Comprehensive ablation study and final demonstration scenarios.
+---
 
-### Quantitative Evaluation Plan
+## 14. Technology Stack
 
-| Evaluation Domain | Methodology |
+| Layer | Tool | License | Why We Picked It |
+|---|---|---|---|
+| **AI Models** | Google Gemma 4 (E4B & 12B) | Apache 2.0 | Native audio/vision handling, local weights, fast inference |
+| **Local Inference** | llama.cpp / vLLM | MIT / Apache 2.0 | Runs 4-bit quantized models smoothly on laptop GPUs |
+| **Constraint Solver** | Google OR-Tools CP-SAT | Apache 2.0 | Industry-standard discrete optimizer; mathematically guaranteed results |
+| **Validation** | Pydantic v2 | MIT | Strict type enforcement for extracted constraints |
+| **Code Sandbox** | Docker Engine | Apache 2.0 | Runs generated spreadsheet parsers with network access turned off |
+| **Blockchain** | Solidity 0.8.24 + Foundry (Anvil) | MIT / Apache 2.0 | Local testnet with zero transaction fees and instant block mining |
+| **Web3 Client** | Web3.py | MIT | Connects Python backend to the local Ethereum node |
+| **Frontend UI** | Streamlit | Apache 2.0 | Interactive web UI with audio recording and image crop displays |
+
+---
+
+## 15. Expected Features
+
+### Core Capabilities
+
+- **Voice Ingestion:** Speak scheduling rules in mixed Hindi, Marathi, or English; Gemma 4 extracts structured rules with timestamps.
+- **Photo Roster Scanning:** Upload photos of legacy paper timetables or whiteboard rosters with bounding-box highlighting.
+- **One-Shot Sheet Parsers:** Gemma 4 writes Python code to parse custom Excel layouts; future sheets parse in milliseconds with zero tokens.
+- **Zero Double-Bookings:** CP-SAT mathematically eliminates room and teacher overlaps.
+- **Plain-English Explanations:** Explains schedule conflicts clearly, naming the exact people and constraints involved.
+- **Pre-Verified Compromises:** Every proposed fix is tested against the solver before being shown to users.
+- **Cryptographic Consent:** Changes require an on-chain signature from the affected person's wallet.
+- **Public Schedule Verifier:** Anyone can drop a schedule file into a web page to verify its hash against the blockchain.
+- **Calendar Feeds:** One-click export to `.ics` for Google Calendar, Outlook, and Apple Calendar.
+
+---
+
+## 16. Implementation Approach
+
+Our engineering implementation divides the system into four decoupled modules, each with independent unit testing and integration criteria:
+
+### Module 1: Multimodal Ingestion and Layout Parsing
+- **Audio and Image Feature Lifting:** Stream raw microphone audio and document crops into Gemma 4 E4B using native structured tool calling. Map temporal references and visual regions to concrete time slots and room identifiers.
+- **Sandboxed Parser Generation:** When an unindexed spreadsheet layout is uploaded, invoke Gemma 4 12B to write a standalone Python parsing function. Execute the script inside a network-isolated Docker container against 10 sample rows. Verify that outputs match the confirmed schema before caching the parser for recurring use.
+
+### Module 2: Constraint Modeling and Conflict Isolation
+- **Mathematical Scheduling Core:** Map confirmed Pydantic constraint records into Google OR-Tools CP-SAT Boolean decision variables. Formulate room capacities, instructor non-overlap, and session continuity as linear constraints.
+- **Minimal Conflict Core Extraction:** When the constraint set is infeasible, trigger assumption-literal extraction in CP-SAT to isolate the exact minimal unsatisfiable subset (MUS) rather than returning a generic failure.
+
+### Module 3: Smart Contract Consensus Protocol
+- **ConsentLedger Deployment:** Implement and compile `ConsentLedger.sol` using Foundry, targeting an isolated local Anvil node with zero network fees.
+- **Non-Repudiation Enforcement:** Restrict the `approveRelaxation` entrypoint so only the registered rule owner can sign off on changes. Anchor the final schedule hash immutably on-chain.
+
+### Module 4: Coordinator Interface and Verification
+- **Streamlit Frontend:** Build an interactive single-page dashboard featuring live audio capture, visual evidence crops, interactive timetable grids, and conflict resolution cards.
+- **Client-Side Proof Checker:** Provide a standalone verification utility that re-computes local schedule hashes and queries the public ledger to guarantee authenticity.
+
+### Milestone Schedule and Validation Targets
+
+| Engineering Sprint | Core Deliverable | Validation Mechanism | Success Benchmark |
+|---|---|---|---|
+| **Sprint 1: Core Solver & Schema** | Constraint models, CP-SAT solver, conflict extractor | Synthetic benchmark test suite | 100% hard rule satisfaction on 50 test instances |
+| **Sprint 2: Multimodal & Sandbox** | Gemma 4 E4B intake, Docker parser sandbox | Sample audio files and diverse Excel templates | > 95% parser synthesis accuracy within 3 attempts |
+| **Sprint 3: On-Chain Consensus** | `ConsentLedger.sol`, Foundry unit test suite | Automated Anvil deployment scripts | Owner authorization reverts all non-owner calls |
+| **Sprint 4: Frontend & Evaluation** | Streamlit UI, public proof portal, full integration | End-to-end integration test with user walkthrough | Sub-3-second rule extraction on laptop hardware |
+
+---
+
+## 17. Expected Final Output
+
+1. **Interactive Web App:** A clean Streamlit application supporting microphone recording, image upload, spreadsheet drop, and live timetable grid visualization.
+2. **Side-by-Side Evidence Inspector:** Click any rule to see the highlighted photo crop, audio player snippet, or spreadsheet cell it came from.
+3. **Conflict Diagnostic Screen:** When rules clash, see a plain-English explanation, the people involved, and one-click solver-tested fixes.
+4. **Local Blockchain Explorer:** View the local Anvil event log showing rule registrations, signed approvals, and published schedule hashes.
+5. **Universal Export:** Download verified timetables in interactive grid view, PDF, or `.ics` calendar format.
+
+---
+
+## 18. Future Scope / Scalability
+
+- **Gasless Mobile Approvals (EIP-712):** Allow teachers to sign shift changes on their phones with FaceID/TouchID without needing crypto tokens or gas fees.
+- **Zero-Knowledge Availability:** Use zero-knowledge proofs so teachers can prove they are available without revealing their personal calendars to administrators.
+- **Cross-College Resource Sharing:** Connect multiple department nodes so two colleges can share auditoriums and laboratories fairly without a central boss.
+- **PDF Timetable Extraction:** Extend one-shot parser synthesis to extract timetables trapped inside messy PDF documents.
+
+---
+
+## 19. Open-Source Dependencies / Components
+
+| Component | Repository Link | License | Role |
+|---|---|---|---|
+| **Google Gemma 4** | [ai.google.dev/gemma](https://ai.google.dev/gemma) | Apache 2.0 | Multimodal intake, parser coding, conflict explanations |
+| **Google OR-Tools** | [github.com/google/or-tools](https://github.com/google/or-tools) | Apache 2.0 | Discrete constraint optimization solver |
+| **llama.cpp** | [github.com/ggerganov/llama.cpp](https://github.com/ggerganov/llama.cpp) | MIT | Fast local 4-bit quantized inference |
+| **Pydantic** | [docs.pydantic.dev](https://docs.pydantic.dev) | MIT | Data schema validation |
+| **Foundry** | [book.getfoundry.sh](https://book.getfoundry.sh) | MIT / Apache 2.0 | Local Ethereum testnet (Anvil) & contract compiler |
+| **OpenZeppelin** | [openzeppelin.com/contracts](https://www.openzeppelin.com/contracts) | MIT | Secure smart contract primitives |
+| **Web3.py** | [web3py.readthedocs.io](https://web3py.readthedocs.io) | MIT | Python blockchain communication client |
+| **Docker Engine** | [docker.com](https://www.docker.com) | Apache 2.0 | Isolated container sandbox for parsing scripts |
+| **Streamlit** | [streamlit.io](https://streamlit.io) | Apache 2.0 | Interactive web user interface |
+| **pandas & openpyxl** | [pandas.pydata.org](https://pandas.pydata.org) | BSD-3 / MIT | Tabular dataset processing |
+
+---
+
+## 20. Expected Challenges and Mitigation
+
+| # | Challenge | Severity | Practical Mitigation |
+|---|---|---|---|
+| **1** | Spoken Dialect & Accents | Medium | Gemma 4 multilingual training + coordinator confirms every rule before solving. |
+| **2** | Blurry Whiteboard Photos | Medium | Confidence scoring flags low-res crops and asks for manual confirmation. |
+| **3** | Unsafe Generated Code | Critical | Generated Python parsers run in a container with **network access disabled** and strict timeouts. |
+| **4** | Solver Stalling on Huge Schedules | High | 10-second solver timeout with soft-constraint relaxation heuristics. |
+| **5** | Changed Spreadsheet Layouts | Medium | If more than 5% of rows fail, the system automatically triggers a re-synthesis of the parser. |
+| **6** | Users Unfamiliar with Wallets | Medium | Pre-configured local test accounts for demo; roadmap adds gasless one-tap signatures. |
+| **7** | Laptop GPU Memory Limits | High | Lightweight E4B model for intake; larger 12B model called only when a conflict occurs. |
+
+---
+
+
+### Project and Team Details
+
+| Item | Details |
 |---|---|
-| Constraint Extraction Accuracy | Benchmarked against curated datasets spanning typed text, spoken audio (including Hindi-English mixed samples), and photographic forms. Evaluation reports precision, recall, and slot-filling accuracy per modality and language. |
-| Parser Synthesis Performance | Evaluated across diverse tabular layouts. Reported metrics include synthesis success rate within three iterations, exact-match row extraction accuracy, undetected layout errors, and token savings compared to row-by-row LLM parsing. |
-| Schedule Correctness | Verified via the independent validator across all generated schedules, contrasted against an unconstrained language-model baseline measuring hard constraint violation rates. |
-| Conflict Analysis Quality | Verification that highlighted constraints correspond to solver-isolated minimal unsatisfiable subsets, supplemented by human assessments of explanation clarity. |
-| Resolution Viability | Percentage of proposed relaxations that produce mathematically viable schedules before and after solver validation. |
-| Smart Contract Security | Foundry unit test suites verifying permission boundaries, reversion conditions for unauthorized callers, invariant state preservation, and gas efficiency. |
-| Computational Efficiency | End-to-end execution latency, memory footprint across quantization tiers, and token throughput per stage. |
-| Ablation Studies | Incremental removal of human verification, audio-visual modalities, solver re-checks, and compiled parsers to quantify individual subsystem contributions. |
+| **Project Title** | GeCompose |
+| **Track** | 2. Best Use of Gemma 4 / Gemma 4 Open-Source|
+| **Team Name** | PhishTank |
+| **Members** | Rounak Mishra |
+|             | Anuj Lulu |
+|             | Adarsh Jha |
+|             | Shlok Tiwari |
 
----
 
-## 15. Deliverables
+--- 
 
-1. A **functional web application** supporting voice, image, spreadsheet, and text inputs to produce verified schedules.
-2. An **interactive conflict inspector** detailing conflicting rules, constraint owners, natural language explanations, and verified fixes.
-3. A **tested Solidity smart contract** deployed to an Anvil test network with an explorer interface.
-4. A **public verification portal** enabling external validation of timetable authenticity against the distributed ledger.
-5. **Standardized exports** providing visual timetable grids and iCalendar format feeds.
-6. A **reproducible evaluation framework** providing comparative baselines and ablation results.
-7. A **public GitHub repository** distributed under the Apache 2.0 license.
-
----
-
-## 16. Future Scope
-
-- **Inter-institutional coordination:** Deploying shared consent ledgers across autonomous academic departments and partner universities.
-- **Gasless meta-transactions:** Implementing EIP-712 signature verification (`approveRelaxationBySig`) to allow fee-free coordinator-relayed approvals.
-- **Zero-knowledge verification:** Generating cryptographic proofs that schedules satisfy all constraints without revealing private personal availability.
-- **Fairness auditing:** Quantifying the distribution of soft-penalty burdens across participants to detect systemic workload imbalances.
-- **Extended domains:** Adapting the underlying constraint model for hospital clinical shifts, disaster relief teams, and conference programs.
-- **Expanded format synthesis:** Extending synthesis pipelines to extract structured tables from complex unstructured PDF documents.
-- **Edge deployment:** Running quantized models directly on client hardware for air-gapped, offline environments.
-
----
-
-## 17. Open-Source Dependencies
-
-| Component | Function | License |
-|---|---|---|
-| Gemma 4 (E4B, 12B, 26B A4B) | Multimodal intake, parser synthesis, and reasoning | Apache 2.0 |
-| Ollama / llama.cpp / vLLM | Local model execution | MIT / MIT / Apache 2.0 |
-| Google OR-Tools | CP-SAT constraint optimization | Apache 2.0 |
-| Pydantic | Schema definition and data validation | MIT |
-| pandas, openpyxl | Tabular data manipulation | BSD-3-Clause / MIT |
-| Docker Engine | Parser isolation sandbox | Apache 2.0 |
-| Foundry | Solidity development and automated testing | MIT / Apache 2.0 |
-| OpenZeppelin Contracts | Access control primitives | MIT |
-| solc | Solidity compiler | GPL-3.0 |
-| web3.py / ethers.js | Ethereum client connectivity | MIT |
-| Streamlit / Gradio | Web presentation layer | Apache 2.0 |
-| scikit-learn, matplotlib | Statistical evaluation and visualization | BSD-3-Clause / PSF |
-
----
-
-## 18. Risk Management and Mitigations
-
-| Identified Risk | Potential Impact | Mitigation Strategy |
-|---|---|---|
-| **Misinterpretation of voice or visual input** | Inaccurate constraints injected into the schedule | Side-by-side evidence inspection, natural language paraphrasing, confidence scoring, and mandatory human confirmation. |
-| **Degraded photographic quality** | Unreliable optical extraction | Automatic prompts for clearer captures or manual text input; explicit flagging of low-confidence fields. |
-| **Dialect and multilingual variability** | Suboptimal extraction on regional language inputs | Empirical testing against curated multilingual benchmarks; routing uncertain audio directly to manual transcription. |
-| **Execution of synthesized parser code** | Potential resource exhaustion or unauthorized system access | Strict container isolation with network access disabled, resource quotas, and static import validation. |
-| **Uncaught parser edge cases** | Undetected constraint omission | Mandatory confirmation sample testing, skipped-row threshold alerts, and summary row reviews for every file. |
-| **Layout drift in subsequent files** | Incompatible parsing logic applied to revised formats | Header-based layout fingerprinting; files exceeding a 5% unparsed row threshold automatically trigger re-synthesis. |
-| **Model formalization errors** | Incorrect mathematical constraints formulated | Strict Pydantic schema validation coupled with plain-language round-trip confirmation. |
-| **Infeasible relaxation proposals** | Stakeholders prompted to approve non-viable compromises | Automated re-solving filters out invalid relaxation candidates before human presentation. |
-| **Unauthorized administrative publication** | Discrepancies between published hash and actual schedule | Public independent verification script comparing local files against on-chain constraint hashes. |
-| **Participant wallet accessibility** | Inability of non-technical stakeholders to sign transactions | Demonstration accounts pre-configured with local credentials; long-term support for gasless EIP-712 signatures. |
-| **Public testnet instability** | Dependency on external faucet infrastructure | Primary demonstration self-contained on local Anvil nodes; public testnets treated as optional extensions. |
-| **Smart contract vulnerabilities** | Unauthorized modification of constraint state | Minimal custom logic, integration of battle-tested OpenZeppelin modules, and extensive automated test suites. |
-| **Privacy leak of schedule preferences** | Unauthorized visibility into personal availability | Strictly local inference; only cryptographic hashes and salts stored on public ledgers. |
-| **Project timeline constraints** | Incomplete deliverables at competition deadline | Tiered architectural design ensuring a functional core system operates independently of advanced extensions. |
-| **Local hardware limitations** | High GPU memory pressure | Intake tier runs quantized E4B locally; reasoning tasks support quantized 12B or selective offloading. |
-
----
-
-*Team details, contact information, and license files will be finalized in repository metadata. This repository contains only this documentation in compliance with submission guidelines.*
