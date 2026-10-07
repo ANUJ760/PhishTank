@@ -1,9 +1,10 @@
 # Sanyojan
 
 **A consent-aware scheduler where Gemma 4 listens, reads and explains, a solver decides, and Ethereum records who agreed.**
+
 Hacktober Fest Open Source AI Hackathon | Track 2: Best Use of Gemma 4
 
-> **One line:** Tell Sanyojan your scheduling rules by voice note, photo, spreadsheet or text. A constraint solver builds a schedule that meets every hard rule. When the rules clash, Gemma 4 explains the clash in plain language, names exactly who is affected, and only those people can approve the fix, which is recorded on Ethereum.
+> **Summary:** Sanyojan accepts scheduling rules through voice notes, photographs, spreadsheets or typed text. A constraint solver builds a schedule that satisfies every hard rule. When rules conflict, Gemma 4 explains the conflict in plain language, identifies exactly who is affected, and only those individuals can approve the resolution. Every approval is recorded on Ethereum.
 
 ---
 
@@ -15,82 +16,82 @@ Hacktober Fest Open Source AI Hackathon | Track 2: Best Use of Gemma 4
 
 ## 2. Problem Statement
 
-Timetables, duty rosters, exam invigilation lists and shared-lab bookings are still built by a coordinator juggling spreadsheets. Four problems keep repeating:
+Timetables, duty rosters, exam invigilation lists and shared-lab bookings are still built by a coordinator working across multiple spreadsheets. Four problems persist:
 
-1. **Scattered formats.** Constraints live in WhatsApp voice notes, handwritten forms, photos of old timetables, and spreadsheets with varying layouts. Re-mapping all of it into a tool introduces mistakes.
-2. **Unexplained failures.** When rules cannot all be met, tools report "no solution" or silently drop a rule without naming *which* rules clash or *who* owns them.
-3. **No tamper-proof consent record.** Disputes follow schedule changes ("I never agreed to Saturday"). Chat messages and spreadsheet edits can be lost or rewritten by the same coordinator whose conduct is disputed.
-4. **LLMs cannot guarantee valid schedules.** A language model asked to produce a timetable directly can violate stated rules. A solver produces schedules that meet hard rules by construction.
+1. **Scattered formats.** Constraints are spread across WhatsApp voice notes, handwritten forms, photographs of previous timetables, and spreadsheets with varying layouts. Transferring all of this into a single tool introduces errors.
+2. **Unexplained failures.** When rules cannot all be satisfied, existing tools report "no solution" or silently discard a rule without identifying *which* rules conflict or *who* owns them.
+3. **No tamper-proof consent record.** Disputes follow schedule changes ("I never agreed to Saturday"). Chat messages and spreadsheet edits can be lost or rewritten by the same coordinator whose conduct is in question.
+4. **Language models cannot guarantee valid schedules.** A language model asked to produce a timetable directly can violate stated rules. A constraint solver, by contrast, produces schedules that satisfy hard rules by construction.
 
-Additionally, availability data is personal-people do not want it uploaded to third-party cloud services.
+In addition, availability data is personal. Individuals do not want it uploaded to third-party cloud services.
 
 ---
 
-## 3. Project Overview & Solution
+## 3. Project Overview and Solution
 
-Sanyojan converts voice, photo, spreadsheet and text input into a verified schedule, and turns every infeasibility into an approval request sent to the owners of the clashing rules.
+Sanyojan converts voice, photograph, spreadsheet and text input into a verified schedule. When the rules cannot all be satisfied, it converts each infeasibility into an approval request sent to the owners of the conflicting rules.
 
 ### Separation of Duties
 
-| Who | Does what | Never does |
+| Component | Responsibility | Does not |
 |---|---|---|
-| **Gemma 4** | Understands voice, photos and text; writes parsers for new spreadsheet layouts; explains conflicts; proposes fixes | Place classes in slots, certify schedules, or approve changes |
-| **Solver (OR-Tools CP-SAT)** | Finds valid schedules; pinpoints minimal clashing rule sets; re-checks every proposed fix | Interpret human language |
-| **Ethereum (`ConsentLedger`)** | Stores constraint ownership and hashes; accepts approvals only from owners; records published schedule hashes | Hold funds, store personal data, or verify schedule correctness |
+| **Gemma 4** | Understands voice, photographs and text; writes parsers for new spreadsheet layouts; explains conflicts; proposes resolutions | Place classes in slots, certify schedules, or approve changes |
+| **Solver (OR-Tools CP-SAT)** | Finds valid schedules; identifies the minimal set of conflicting rules; re-checks every proposed resolution | Interpret human language |
+| **Ethereum (ConsentLedger)** | Stores constraint ownership and hashes; accepts approvals only from the registered owner; records published schedule hashes | Hold funds, store personal data, or verify schedule correctness |
 
 ### Flow
 
-1. **Intake:** Coordinator speaks, uploads photos/screenshots, uploads spreadsheets (.xlsx/.csv), or types. Gemma 4 converts all inputs into structured constraint objects, each linked to its source (audio timestamp, image region, text span, or spreadsheet cell). For new spreadsheet layouts, Gemma 4 writes a parser once; the stored parser handles later files without model calls.
-2. **Confirm:** Every extracted constraint is shown next to its source evidence with a plain-language paraphrase, confirmed by a human before it counts.
-3. **Solve:** The solver builds a schedule or reports infeasibility.
-4. **Explain:** If infeasible, the solver returns the minimal conflicting subset. Gemma 4 explains it and proposes ranked relaxations, each re-checked by the solver.
-5. **Consent:** Each relaxation goes to the owner of the affected rule. They approve or reject on-chain.
-6. **Publish:** Once consent is complete and the independent checker finds zero violations, the schedule hash is published on-chain.
+1. **Intake:** The coordinator speaks, uploads photographs or screenshots, uploads spreadsheets (.xlsx or .csv), or types. Gemma 4 converts all inputs into structured constraint objects, each linked to its source (audio timestamp, image region, text span, or spreadsheet cell). For a spreadsheet layout that has not been seen before, Gemma 4 writes a parser once. The stored parser handles all subsequent files of the same layout without requiring further model calls.
+2. **Confirm:** Every extracted constraint is displayed alongside its source evidence and a plain-language paraphrase. A human confirms it before it is registered.
+3. **Solve:** The solver builds a schedule or reports that the constraints are infeasible.
+4. **Explain:** If the constraints are infeasible, the solver returns the minimal conflicting subset. Gemma 4 explains the conflict and proposes ranked relaxations, each of which the solver re-checks for feasibility.
+5. **Consent:** Each proposed relaxation is sent to the owner of the affected rule. The owner approves or rejects it on-chain.
+6. **Publish:** Once all required approvals are received and the independent checker confirms zero violations, the schedule hash is published on-chain.
 
-Everything AI-related runs locally on open weights.
+All AI inference runs locally on open-weight models.
 
 ### Solution Layers
 
-| Layer | What it does |
+| Layer | Description |
 |---|---|
-| Multimodal intake | Gemma 4 converts voice, images and text into constraint objects via function calling |
-| Format adapter (parser synthesis) | Gemma 4 writes and tests a Python parser per new spreadsheet layout; stored parsers handle repeat layouts with zero model tokens |
-| Confirmation screen | Shows each constraint beside its source evidence and paraphrase |
-| Constraint registry | Stores each constraint with owner, type (hard/soft), and salted hash |
-| Solver (CP-SAT) | Builds schedules guaranteeing hard rules |
-| Conflict extractor | Finds minimal conflicting rule subsets |
-| Gemma 4 explainer | Explains conflicts and ranks relaxations |
-| Consent contract | Enforces owner-only approval with append-only history |
-| Publisher and verifier | Exports grid/calendar files; verification page compares file hash against on-chain value |
+| Multimodal intake | Gemma 4 converts voice, images and text into constraint objects through function calling |
+| Format adapter (parser synthesis) | Gemma 4 writes and tests a Python parser for each new spreadsheet layout. Stored parsers handle subsequent files of the same layout without using any model tokens |
+| Confirmation screen | Displays each constraint alongside its source evidence and paraphrase |
+| Constraint registry | Stores each constraint with its owner, type (hard or soft), and a salted hash |
+| Solver (CP-SAT) | Builds schedules that guarantee all hard rules are satisfied |
+| Conflict extractor | Identifies the minimal subset of rules that conflict |
+| Gemma 4 explainer | Explains conflicts and ranks proposed relaxations |
+| Consent contract | Enforces owner-only approval and maintains an append-only history |
+| Publisher and verifier | Exports timetable grids and calendar files; provides a verification page that compares a file hash against the on-chain value |
 | Evaluation harness | Measures extraction accuracy, rule violations, and explanation quality |
 
 ---
 
 ## 4. Objectives
 
-- Accept scheduling rules through **voice, image and text** with one open model family.
-- Parse spreadsheets with **stored, tested parsers**-a layout needs a model call only once.
+- Accept scheduling rules through **voice, image and text** using a single open model family.
+- Parse spreadsheets using **stored, tested parsers**. Each layout requires a model call only the first time it appears.
 - Guarantee **zero hard-rule violations** in every published schedule.
-- When infeasible, **name the exact clashing rules and their owners** and propose solver-verified fixes.
-- Make every change **consent-based and auditable** on-chain.
-- Keep personal data **private**: local inference, only salted hashes on-chain.
-- Run on **modest hardware** (laptop-class GPU for the small tier).
-- Accept mixed **Hindi, Marathi and English** speech with per-language accuracy reporting.
-- Ship a **reproducible evaluation** under Apache 2.0.
+- When the constraints are infeasible, **identify the exact conflicting rules and their owners** and propose solver-verified resolutions.
+- Make every change **consent-based and auditable** through on-chain recording.
+- Keep personal data **private** through local inference, with only salted hashes stored on-chain.
+- Run on **modest hardware** (a laptop-class GPU for the smaller tier).
+- Accept mixed **Hindi, Marathi and English** speech, with extraction accuracy reported per language.
+- Deliver a **reproducible evaluation** under the Apache 2.0 license.
 
 ---
 
-## 5. Target Users / Use Case
+## 5. Target Users and Use Cases
 
 | User | Need |
 |---|---|
 | College timetable cells and department coordinators | Build and revise class timetables from scattered inputs |
 | Exam cells | Invigilation duties and seating plans with fairness and conflict rules |
-| Shared-lab and inter-college resource managers | Booking among parties who do not fully trust one administrator |
-| Hostels, NGOs and volunteer groups | Duty rosters collected over chat and voice notes |
-| Event organizers (hackathons, fests) | Session and room schedules with speaker availability |
+| Shared-lab and inter-college resource managers | Resource booking among parties who do not fully trust a single administrator |
+| Hostels, NGOs and volunteer groups | Duty rosters collected through chat messages and voice notes |
+| Event organisers (hackathons, college fests) | Session and room schedules with speaker availability constraints |
 
-**Core use case:** A coordinator dictates rules in Hindi and English, uploads a photo of last year's timetable and the room list, and gets a verified schedule. When two rules clash, their owners receive a plain-language explanation and approve a fix.
+**Core use case:** A coordinator dictates rules in Hindi and English, uploads a photograph of last year's timetable and the room list, and receives a verified schedule. When two rules conflict, their owners receive a plain-language explanation and approve a resolution.
 
 ---
 
@@ -98,48 +99,48 @@ Everything AI-related runs locally on open weights.
 
 **Primary model family: Google Gemma 4** (open weights, **Apache 2.0**).
 
-Per the official model card, Gemma 4 comes in five sizes (**E2B, E4B, 12B, 26B A4B, 31B**) with context windows of 128K–256K tokens. All handle text and image input; audio is supported on E2B, E4B and 12B. The family offers thinking mode, native function calling, and 140+ language support.
+According to the official model card, Gemma 4 is available in five sizes (**E2B, E4B, 12B, 26B A4B, 31B**) with context windows ranging from 128K to 256K tokens. All variants accept text and image input. Audio input is supported on the E2B, E4B and 12B variants. The family provides a thinking mode, native function calling, and support for over 140 languages.
 
 | Role in Sanyojan | Variant | Reason |
 |---|---|---|
-| **Intake:** voice, image and text → constraints | **E4B**, 4-bit quantized (~4.5 GB) | Handles audio, image and text in one model |
-| **Reasoning:** conflict explanation, relaxation ranking, parser writing | **12B** or **26B A4B** (~6.7–14.4 GB at 4-bit) | Stronger reasoning and code generation |
+| **Intake:** converts voice, image and text into constraints | **E4B**, 4-bit quantised (approximately 4.5 GB) | Handles audio, image and text within a single model |
+| **Reasoning:** conflict explanation, relaxation ranking, parser writing | **12B** or **26B A4B** (approximately 6.7 to 14.4 GB at 4-bit) | Provides stronger reasoning and code generation capabilities |
 
-**Supporting components** (see Section 13 for full stack): OR-Tools CP-SAT, Pydantic, pandas/openpyxl, container sandbox, Foundry/OpenZeppelin, web3.py or ethers.js, Streamlit or Gradio.
+**Supporting components** (see Section 13 for the full stack): OR-Tools CP-SAT, Pydantic, pandas, openpyxl, a container-based sandbox, Foundry, OpenZeppelin, web3.py or ethers.js, and Streamlit or Gradio.
 
-*Note: exact checkpoint names and memory figures will be re-confirmed against the official model card at the start of the final.*
+*Note: Exact checkpoint names and memory figures will be confirmed against the official model card at the start of the final round.*
 
 ---
 
 ## 7. Why This Technology Was Selected
 
-- **One model family for three input types.** A pipeline of separate ASR, OCR and LLM passes plain text between stages, losing cross-modal context. Gemma 4 receives audio and images in the same session.
-- **Native function calling** emits schema-valid constraint objects directly.
-- **Code generation** for parser synthesis, with sandbox and tests checking every parser.
-- **Token savings from stored parsers.** Per-row extraction costs tokens proportional to row count. Parser synthesis is a one-time cost independent of file size; later files of the same layout use zero model tokens.
-- **Thinking mode, used selectively** only for tangled conflict explanations.
-- **Local and private.** Apache 2.0 license; personal data stays on the coordinator's machine.
-- **Multilingual.** Supports Hindi, Marathi and English code-mixing; accuracy measured per language.
-- **A size ladder** fitting one laptop-small model for high-volume intake, mid-size for conflict explanation.
+- **One model family for three input types.** A pipeline of separate speech recognition, OCR and language model components passes plain text between stages, losing cross-modal context. Gemma 4 receives audio and images within the same session.
+- **Native function calling** allows the model to emit schema-valid constraint objects directly.
+- **Code generation** enables parser synthesis, with a sandbox and automated tests checking every generated parser.
+- **Token savings from stored parsers.** Per-row extraction incurs token costs proportional to the number of rows. Parser synthesis is a one-time cost that does not depend on file size. Subsequent files with the same layout require zero model tokens.
+- **Thinking mode, used selectively.** The thinking mode is activated only when explaining complex conflicts that benefit from deeper reasoning.
+- **Local and private.** The Apache 2.0 license permits unrestricted institutional use. Personal data remains on the coordinator's machine.
+- **Multilingual.** Gemma 4 supports Hindi, Marathi and English code-mixing. Extraction accuracy is measured separately for each language.
+- **A range of model sizes that fit a single laptop.** The smaller model handles high-volume intake, and the mid-size model is called only when a conflict requires explanation.
 
-**Why the model does not build the schedule:** hard rules must hold in every output, and LLMs give no such guarantee. The evaluation includes an LLM-only baseline counting hard-rule violations.
+**Why the model does not build the schedule:** Hard rules must hold in every output, and language models provide no such guarantee. The evaluation includes a language-model-only baseline that counts hard-rule violations for comparison.
 
 ---
 
 ## 8. AI's Role in the System
 
-Gemma 4 is the **interface between people and the solver**. It converts human input into the solver's constraint format, and converts solver output into explanations.
+Gemma 4 serves as the **interface between people and the solver**. It converts human input into the solver's constraint format, and converts the solver's output into explanations that people can act on.
 
 **What the AI does:**
-1. **Multimodal constraint extraction** - voice, photo, text → structured constraint objects with source pointers and confidence.
-2. **Parser synthesis** - writes Python parsers for new spreadsheet layouts; rewrites on test failure; stored parsers handle repeat layouts.
-3. **Clarifying questions** - asks when input is ambiguous.
-4. **Paraphrase for confirmation** - restates each constraint in plain language.
-5. **Conflict explanation** - explains why rules clash, naming people and rules involved.
-6. **Relaxation proposals** - suggests ranked fixes, using the solver as a feasibility tool.
-7. **Change summaries** - writes the human-readable summary for each published version.
+1. **Multimodal constraint extraction.** Converts voice, photographs and text into structured constraint objects with source pointers and confidence scores.
+2. **Parser synthesis.** Writes Python parsers for new spreadsheet layouts and rewrites them when tests fail. Stored parsers handle all subsequent files of the same layout.
+3. **Clarifying questions.** Asks for clarification when input is ambiguous.
+4. **Paraphrase for confirmation.** Restates each constraint in plain language so that a human can verify correctness.
+5. **Conflict explanation.** Explains why a set of rules cannot all be satisfied, naming the people and rules involved.
+6. **Relaxation proposals.** Suggests ranked resolutions, using the solver as a feasibility-checking tool.
+7. **Change summaries.** Writes the human-readable summary attached to each published version.
 
-**What the AI does not do:** assign classes to slots, declare schedules valid, approve changes, submit on-chain transactions, or read spreadsheet rows once a parser has passed its tests.
+**What the AI does not do:** assign classes to slots, declare a schedule valid, approve any change, submit on-chain transactions, or read individual spreadsheet rows once a parser has passed its tests.
 
 ---
 
