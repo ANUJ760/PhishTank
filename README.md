@@ -1,6 +1,6 @@
 # Sanyojan
 
-**A consent-aware scheduler where Gemma 4 listens, reads and explains, a solver decides, and Ethereum records who agreed.**
+**A consent-aware scheduling system that uses Gemma 4 for multimodal input understanding and conflict explanation, a constraint solver for guaranteed valid schedules, and Ethereum for tamper-proof approval records.**
 
 Hacktober Fest Open Source AI Hackathon | Track 2: Best Use of Gemma 4
 
