@@ -1,16 +1,16 @@
-# Sanyojan
+# GeCompose
 
 **A consent-aware scheduling system that uses Gemma 4 for multimodal input understanding and conflict explanation, a constraint solver for guaranteed valid schedules, and Ethereum for tamper-proof approval records.**
 
 Hacktober Fest Open Source AI Hackathon | Track 2: Best Use of Gemma 4
 
-> **Summary:** Sanyojan accepts scheduling rules through voice notes, photographs, spreadsheets or typed text. A constraint solver builds a schedule that satisfies every hard rule. When rules conflict, Gemma 4 explains the conflict in plain language, identifies exactly who is affected, and only those individuals can approve the resolution. Every approval is recorded on Ethereum.
+> **Summary:** GeCompose accepts scheduling rules through voice notes, photographs, spreadsheets or typed text. A constraint solver builds a schedule that satisfies every hard rule. When rules conflict, Gemma 4 explains the conflict in plain language, identifies exactly who is affected, and only those individuals can approve the resolution. Every approval is recorded on Ethereum.
 
 ---
 
 ## 1. Project Name
 
-**Sanyojan** (Sanskrit/Hindi for "coordination" or "arrangement"): Multimodal, Consent-Aware Scheduling with Gemma 4.
+**GeCompose**: Multimodal, Consent-Aware Scheduling with Gemma 4.
 
 ---
 
@@ -29,7 +29,7 @@ In addition, availability data is personal. Individuals do not want it uploaded 
 
 ## 3. Project Overview and Solution
 
-Sanyojan converts voice, photograph, spreadsheet and text input into a verified schedule. When the rules cannot all be satisfied, it converts each infeasibility into an approval request sent to the owners of the conflicting rules.
+GeCompose converts voice, photograph, spreadsheet and text input into a verified schedule. When the rules cannot all be satisfied, it converts each infeasibility into an approval request sent to the owners of the conflicting rules.
 
 ### Separation of Duties
 
@@ -67,7 +67,7 @@ All AI inference runs locally on open-weight models.
 
 ### Comparative Analysis with Existing Solutions
 
-| Dimension | Manual Spreadsheets (Excel, Sheets) | Traditional Solvers (FET, aSc, OptaPlanner) | Generative LLMs (Standalone GPT-4, Claude) | Institutional ERPs (Ellucian, SAP) | **Sanyojan (Our Solution)** |
+| Dimension | Manual Spreadsheets (Excel, Sheets) | Traditional Solvers (FET, aSc, OptaPlanner) | Generative LLMs (Standalone GPT-4, Claude) | Institutional ERPs (Ellucian, SAP) | **GeCompose (Our Solution)** |
 |---|---|---|---|---|---|
 | **Input Modality** | Manual data entry across bespoke sheets | Strict proprietary XML, CSV, or form fields | Text and images; lacks coordinated audio-sheet cross-referencing | Structured database schemas and predefined forms | Native multimodal intake (voice notes, photographs, varied spreadsheets, text) |
 | **Schedule Correctness** | Prone to human oversight and accidental double-booking | Guaranteed zero violations via mathematical solvers | Probabilistic generation; prone to hallucinations and rule violations | Enforced through rigid validation rules | Guaranteed zero violations via OR-Tools CP-SAT and independent validation |
@@ -79,9 +79,9 @@ All AI inference runs locally on open-weight models.
 
 #### Key Architectural Distinctions
 
-1. **Separation of Cognitive Interpretation and Mathematical Verification:** Pure language models attempt to assign schedule slots directly, which frequently produces constraint violations. Traditional solvers guarantee valid schedules but cannot interpret natural language, photographs, or informal voice notes. Sanyojan delegates input comprehension and human communication to Gemma 4, while reserving timetable construction strictly for the constraint solver.
+1. **Separation of Cognitive Interpretation and Mathematical Verification:** Pure language models attempt to assign schedule slots directly, which frequently produces constraint violations. Traditional solvers guarantee valid schedules but cannot interpret natural language, photographs, or informal voice notes. GeCompose delegates input comprehension and human communication to Gemma 4, while reserving timetable construction strictly for the constraint solver.
 2. **Deterministic Token Economics via Parser Synthesis:** Rather than processing spreadsheet records through repeated model queries, Gemma 4 synthesizes a deterministic Python parser once for each unique layout. Subsequent files sharing that layout execute in a secure sandbox with zero token consumption.
-3. **Decentralized, Non-Repudiable Consent:** In conventional scheduling workflows, the coordinator who builds the timetable also possesses unilateral authority to modify rules when disputes arise. Sanyojan removes this conflict of interest: rule modifications require cryptographic signatures from affected constraint owners, recorded immutably on Ethereum.
+3. **Decentralized, Non-Repudiable Consent:** In conventional scheduling workflows, the coordinator who builds the timetable also possesses unilateral authority to modify rules when disputes arise. GeCompose removes this conflict of interest: rule modifications require cryptographic signatures from affected constraint owners, recorded immutably on Ethereum.
 
 ---
 
@@ -119,7 +119,7 @@ All AI inference runs locally on open-weight models.
 
 According to the official model card, Gemma 4 is available in five sizes (**E2B, E4B, 12B, 26B A4B, 31B**) with context windows ranging from 128K to 256K tokens. All variants accept text and image input. Audio input is supported on the E2B, E4B and 12B variants. The family provides a thinking mode, native function calling, and support for over 140 languages.
 
-| Role in Sanyojan | Variant | Reason |
+| Role in GeCompose | Variant | Reason |
 |---|---|---|
 | **Intake:** converts voice, image and text into constraints | **E4B**, 4-bit quantised (approximately 4.5 GB) | Handles audio, image and text within a single model |
 | **Reasoning:** conflict explanation, relaxation ranking, parser writing | **12B** or **26B A4B** (approximately 6.7 to 14.4 GB at 4-bit) | Provides stronger reasoning and code generation capabilities |
@@ -340,7 +340,7 @@ sequenceDiagram
 
 ## 12. Bounded Agentic Workflow
 
-Sanyojan employs a structured, bounded agentic loop with strict human checkpoints:
+GeCompose employs a structured, bounded agentic loop with strict human checkpoints:
 
 1. **Extraction:** The intake model parses source materials into candidate constraints and prompts clarifying questions when input is ambiguous.
 2. **Human Confirmation:** The coordinator validates, edits, or discards each parsed constraint before registration.
