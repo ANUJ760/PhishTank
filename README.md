@@ -10,7 +10,7 @@ Hacktober Fest Open Source AI Hackathon | Track 2: Best Use of Gemma 4
 
 ## 1. Project Name
 
-**GeCompose**: Multimodal, Consent-Aware Scheduling with Gemma 4.
+**GeCompose** (derived from *Gemma* and *composition*, conceptualized as the constructive counterpart to *decomposition* by assembling fragmented constraints into a unified schedule): Multimodal, Consent-Aware Scheduling with Gemma 4.
 
 ---
 
