@@ -208,80 +208,80 @@ The contract records three on-chain states: Open (covering Collecting, Solving, 
 
 | # | Component | Responsibility | Inputs | Outputs |
 |---|---|---|---|---|
-| 1 | **Multimodal intake** | Convert audio, images and text into constraint objects via function calling | Voice, photos, text | Draft constraints with sources and confidence |
-| 1a | **Format adapter** | Write/test/store parsers for spreadsheet layouts; run stored parsers in sandbox | .xlsx/.csv files | Constraint objects with cell sources |
-| 2 | **Confirmation screen** | Show each constraint beside its evidence and paraphrase | Draft constraints | Confirmed constraints |
-| 3 | **Constraint registry** | Assign owner, type (hard/soft), salted hash | Confirmed constraints | Registered constraints |
-| 4 | **Solver** | Build schedule satisfying hard rules | Registered constraints | Schedule or "infeasible" |
-| 5 | **Conflict extractor** | Find minimal conflicting rule subset | Infeasible model | Conflicting subset and owners |
-| 6 | **Explainer** | Explain conflict; generate and verify relaxation candidates | Conflicting subset | Explanation and ranked proposals |
-| 7 | **Consent contract** | Enforce owner-only approval; append-only history | Proposals; signed transactions | Event log, published hashes |
-| 8 | **Independent checker** | Re-verify every hard rule against final schedule | Schedule and constraints | Pass/fail with violations |
-| 9 | **Publisher** | Export grid, calendar files, verification page | Final schedule | Outputs and verification |
-| 10 | **Evaluation harness** | Reproducible scoring | Gold test sets | Metrics and ablation report |
+| 1 | **Multimodal intake** | Convert audio, images and text into constraint objects via function calling | Voice, photographs, text | Draft constraints with sources and confidence scores |
+| 1a | **Format adapter** | Write, test and store parsers for spreadsheet layouts; execute stored parsers in a secure sandbox | .xlsx or .csv files | Constraint objects with source cell references |
+| 2 | **Confirmation screen** | Display each constraint alongside its evidence and paraphrase | Draft constraints | Confirmed constraints |
+| 3 | **Constraint registry** | Assign owner address, constraint type (hard or soft), and salted hash | Confirmed constraints | Registered constraints |
+| 4 | **Solver** | Construct schedules satisfying all hard rules | Registered constraints | Schedule or infeasible status |
+| 5 | **Conflict extractor** | Identify the minimal conflicting subset of rules | Infeasible model state | Conflicting constraint subset and owners |
+| 6 | **Explainer** | Explain conflicts; generate and verify candidate relaxations | Conflicting subset | Explanation and ranked resolution proposals |
+| 7 | **Consent contract** | Enforce owner-only approvals and maintain an append-only audit trail | Proposals and signed transactions | Event logs and published hashes |
+| 8 | **Independent checker** | Re-verify every hard rule against the final schedule | Schedule and constraints | Pass or fail status with violation details |
+| 9 | **Publisher** | Export timetable grids, calendar files, and verification utilities | Final schedule | Formatted outputs and verification proofs |
+| 10 | **Evaluation harness** | Reproducible scoring and performance benchmarks | Curated benchmark datasets | Quantitative metrics and ablation reports |
 
-**Constraint object fields:** identifier, owner, hard/soft, type, parameters, penalty weight (soft), source (modality + pointer), extraction confidence, paraphrase.
+**Constraint object fields:** identifier, owner, rule type (hard or soft), category, parameters, penalty weight (for soft rules), source (modality and reference pointer), extraction confidence, and paraphrase.
 
-**Initial constraint types:** unavailability, daily/consecutive limits, required consecutive slots (labs), room capacity/type, pinned assignments, no double-booking, spread rules, required breaks, soft preferences.
+**Initial constraint types:** individual or room unavailability, daily or consecutive hour limits, mandatory consecutive slots (laboratory sessions), room capacity and equipment criteria, fixed assignments, exclusion of double-booking, subject spacing rules, mandatory break periods, and soft preferences.
 
 ### Format Adapter: Parser Synthesis
 
-*Scope:* .xlsx and .csv inputs. PDF tables are future scope (Section 16).
+*Scope:* .xlsx and .csv inputs. Extraction from tabular PDF documents is planned for future releases (Section 16).
 
-*Layout fingerprint:* hash of sheet names + normalized header rows. Same fingerprint → same stored parser.
+*Layout fingerprint:* A cryptographic hash derived from sheet names and normalized header rows. Files sharing an identical fingerprint reuse the stored parser.
 
-*Synthesis loop (reasoning-tier Gemma 4):*
-1. Model receives header row, up to 10 sample rows, constraint schema, and output contract (function returning constraint-object JSON with source cells).
-2. Gemma 4 writes the parser; sandbox runs it on the sample.
-3. Human reviews parsed sample, corrects wrong rows → corrected rows become test cases.
-4. Tests: (a) output matches confirmed rows; (b) Pydantic schema validation; (c) every object has a source cell; (d) no non-empty row silently dropped.
-5. On failure, Gemma 4 reads the test report and rewrites (max 3 attempts). After that, fall back to per-row extraction.
-6. Passing parser is stored with fingerprint, source code, hash, test rows, and model version.
+*Synthesis procedure (using reasoning-tier Gemma 4):*
+1. The model receives the header structure, up to 10 sample rows, the constraint schema, and the target function contract.
+2. Gemma 4 generates the parser implementation; the sandbox executes it against the sample records.
+3. A coordinator reviews the parsed sample and corrects any discrepancies. These validated rows form regression tests.
+4. Automated verification verifies that: (a) parser output matches confirmed rows; (b) records satisfy the Pydantic schema; (c) each object includes a source cell pointer; and (d) non-empty rows are not silently discarded.
+5. In the event of a test failure, Gemma 4 inspects the error report and attempts automated repair (up to three attempts). If unsuccessful, processing reverts to row-by-row extraction.
+6. A validated parser is stored with its layout fingerprint, source code, integrity hash, test records, and model metadata.
 
-*Owner labels:* parser outputs owner labels (e.g., faculty names). Coordinator maintains a label → Ethereum address table.
+*Owner mapping:* The parser extracts owner identifiers (for example, instructor names). The coordinator maintains a mapping table connecting these identifiers to Ethereum addresses.
 
-*Layout drift:* new fingerprint triggers synthesis. For known fingerprints, >5% skipped non-empty rows (configurable) flags the file for re-synthesis.
+*Layout drift management:* An unrecognised layout fingerprint triggers automatic parser synthesis. For known fingerprints, if more than 5% of non-empty rows are skipped, the file is flagged for re-synthesis.
 
-*Sandbox:* separate process in a container with network disabled, read-only access to the one uploaded file, CPU/memory/time limits, JSON stdout only. Static import check (allowlist: pandas, openpyxl, re, datetime, json) runs before execution.
+*Sandbox isolation:* Parsers run in a separate containerized process with network access disabled, read-only access restricted to the uploaded file, strict CPU, memory and runtime limits, and standard output as the sole communication channel. A static import inspection enforces an allowlist (pandas, openpyxl, re, datetime, json) prior to execution.
 
 ### Blockchain Layer: `ConsentLedger`
 
-One Solidity contract performing five functions:
+A single Solidity smart contract manages five specific functions:
 
-1. **Registers constraint ownership** - stores owner address and constraint hash.
-2. **Enforces owner-only approval** - reverts calls from any non-owner address.
-3. **Blocks publication while consent is pending.**
-4. **Keeps append-only history** - timestamped events that cannot be edited.
-5. **Answers verification queries** - read-only lookup of published schedule hashes.
+1. **Registers constraint ownership:** Associates owner addresses with constraint content hashes.
+2. **Enforces owner-only approval:** Reverts any transaction originating from an unauthorized address.
+3. **Restricts premature publication:** Prevents schedule finalization while proposals remain pending.
+4. **Maintains append-only audit logs:** Emits immutable, timestamped event records for every action.
+5. **Supports public verification:** Provides read-only lookups for published schedule validity.
 
-| Function | Caller | Effect |
+| Function | Authorized Caller | Operational Effect |
 |---|---|---|
-| `registerConstraint(owner, contentHash)` | Admin | Creates constraint record. Emits `ConstraintRegistered`. |
-| `openRound()` | Admin | Creates Open round. |
-| `proposeRelaxation(roundId, constraintId, newContentHash, explanationHash)` | Admin | Creates Pending proposal; round → AwaitingConsent. |
-| `approveRelaxation(proposalId)` | **Owner only** | Marks Approved; updates constraint hash. |
-| `rejectRelaxation(proposalId)` | **Owner only** | Marks Rejected; constraint unchanged. |
-| `publishSchedule(roundId, scheduleHash, constraintSetHash, summaryHash)` | Admin | Stores hashes + timestamp; round → Published. |
-| `getConstraint(constraintId)` (view) | Anyone | Returns owner, hash, status. |
-| `getPublication(scheduleHash)` (view) | Anyone | Returns round, hashes, timestamp. |
+| `registerConstraint(owner, contentHash)` | Administrator | Registers a constraint record and emits `ConstraintRegistered`. |
+| `openRound()` | Administrator | Initializes an active scheduling round. |
+| `proposeRelaxation(roundId, constraintId, newContentHash, explanationHash)` | Administrator | Creates a pending proposal and sets round status to `AwaitingConsent`. |
+| `approveRelaxation(proposalId)` | **Constraint Owner Only** | Approves the relaxation and updates the registered constraint hash. |
+| `rejectRelaxation(proposalId)` | **Constraint Owner Only** | Rejects the relaxation while preserving the existing constraint hash. |
+| `publishSchedule(roundId, scheduleHash, constraintSetHash, summaryHash)` | Administrator | Stores canonical hashes with block timestamps, transitioning round status to `Published`. |
+| `getConstraint(constraintId)` (view) | Public | Returns owner address, active hash, and status. |
+| `getPublication(scheduleHash)` (view) | Public | Returns associated round identifier, hashes, and timestamp. |
 
-**Hashing (keccak256):**
-- *Constraint hash:* canonical JSON + random 32-byte salt (prevents brute-force matching of low-entropy constraints).
-- *Schedule hash:* canonical CSV with fixed column/row order.
-- *Constraint-set hash:* concatenated constraint hashes in ID order.
+**Hashing structure (keccak256):**
+- *Constraint hash:* Canonical JSON concatenated with a random 32-byte secret salt, preventing brute-force reconstruction of predictable availability preferences.
+- *Schedule hash:* Generated from a standardized, canonically sorted schedule representation.
+- *Constraint set hash:* Derived from the concatenated series of active constraint hashes ordered by identifier.
 
-**Not on-chain:** names, availability, constraint text, audio, images, schedule contents, explanation text.
+**Off-chain data preservation:** Personal identities, unhashed availability schedules, raw audio recordings, photographs, full timetable contents, and natural language explanations remain off-chain at all times.
 
-**Deployment:** local Foundry (Anvil) chain with pre-funded test accounts. Optional Sepolia. No mainnet, no real funds.
+**Deployment configuration:** The standard demonstration operates against a local Foundry (Anvil) network pre-seeded with test accounts. Optional deployment to the Sepolia testnet is supported. The contract holds no ether, maintains no payable entrypoints, and is not designed for mainnet financial operations.
 
-**Why blockchain instead of a database:** the coordinator who operates the scheduler is also the party whose conduct is disputed. Three properties a coordinator-operated database cannot provide:
-1. **Authorization the coordinator doesn't control** - `approveRelaxation` reverts unless sender is the registered owner.
-2. **History the coordinator cannot rewrite** - past blocks cannot be edited.
-3. **Verification independent of the scheduler's server** - anyone hashes a file and calls `getPublication` on a public node.
+**Decentralization rationale:** Because the scheduling coordinator is frequently a party to interpersonal scheduling disputes, central database records are insufficient:
+1. **Cryptographic authorization:** The `approveRelaxation` entrypoint rejects transactions from any account other than the designated owner.
+2. **Tamper-resistant audit history:** Historical records cannot be rewritten or expunged by administrative accounts.
+3. **Independent verifiability:** Any stakeholder can independently compute schedule hashes and query the public ledger without relying on the availability or integrity of the host server.
 
 ---
 
-## 11. Data / Information Flow
+## 11. Data and Information Flow
 
 ```mermaid
 sequenceDiagram
@@ -292,7 +292,7 @@ sequenceDiagram
     participant X as Gemma 4 12B (explainer)
     participant O as Owners
     participant E as Ethereum contract
-    C->>G: Voice note, photos, text
+    C->>G: Voice note, photographs, text
     G->>C: Constraints with evidence and paraphrases
     C->>R: Confirm, edit or reject
     R->>S: Registered constraints
@@ -310,160 +310,153 @@ sequenceDiagram
     E->>C: Published version and verification page
 ```
 
-**Illustrative example** (fictional names):
+**Illustrative operational example:**
 
-- Coordinator says in Hinglish: "Rao sir Monday ko available nahi hain. Section A ka DBMS lab Monday ko hi rakhna hai." A photo of last year's timetable and the department's workload sheet (.xlsx) are also uploaded.
-- Three rules extracted: (C1) Prof. Rao unavailable Mondays, (C2) Section A DBMS lab pinned to Monday, (C3) only Prof. Rao teaches that lab. C1 and C2 from voice; C3 from the workload sheet (parsed by a newly synthesized parser).
-- Solver: infeasible. Minimal conflicting subset: {C1, C2, C3}.
-- Gemma 4 explains: "Section A's lab must be on Monday, only Prof. Rao teaches it, and Prof. Rao is unavailable on Mondays." Proposes: (R1) move lab to Tuesday (needs C2 owner's approval), (R2) allow a second teacher (needs C3 owner's approval). Solver confirms both feasible.
-- Only the named owner approves on-chain. Solver re-runs, checker passes, schedule hash published.
+- A coordinator provides instructions in mixed Hindi and English: "Rao sir Monday ko available nahi hain. Section A ka DBMS lab Monday ko hi rakhna hai." A photograph of the prior year's schedule and an institutional workload spreadsheet (.xlsx) are uploaded concurrently.
+- Three constraints are extracted: (C1) Professor Rao is unavailable on Mondays; (C2) Section A database laboratory is pinned to Monday; (C3) Professor Rao is designated as the sole qualified instructor for this laboratory. Constraints C1 and C2 originate from speech; C3 originates from the spreadsheet through a newly synthesized parser.
+- The solver determines that the problem is infeasible and isolates the minimal conflicting subset: {C1, C2, C3}.
+- Gemma 4 synthesizes a plain-language explanation: "Section A's laboratory must occur on Monday, only Professor Rao is qualified to instruct it, and Professor Rao is unavailable on Mondays." It offers two viable resolutions: (R1) reschedule the laboratory to Tuesday (requiring approval from the owner of C2), or (R2) assign an additional qualified instructor to the laboratory (requiring approval from the owner of C3). The solver confirms that both alternatives are feasible.
+- The designated owner executes a transaction approving the selected proposal on-chain. The solver recalculates the schedule, the independent verification script confirms zero violations, and the schedule hash is published to the ledger.
 
 ---
 
-## 12. Agentic Workflow
+## 12. Bounded Agentic Workflow
 
-Sanyojan uses a **bounded** agentic loop:
+Sanyojan employs a structured, bounded agentic loop with strict human checkpoints:
 
-1. **Extract:** intake model proposes constraints; asks clarifying questions when ambiguous.
-2. **Confirm:** human accepts, edits or rejects each constraint.
-3. **Solve and diagnose:** solver builds a schedule or returns the minimal conflicting subset.
-4. **Explain and propose:** reasoning-tier model explains the conflict, generates relaxations, calls solver to test each.
-5. **Consent:** each affected owner signs `approveRelaxation` or `rejectRelaxation` on-chain. Rejection returns to step 4 with that option excluded.
-6. **Repeat, then stop:** at most three relaxation rounds per conflict. If unresolved, the system reports to the coordinator for manual decision.
+1. **Extraction:** The intake model parses source materials into candidate constraints and prompts clarifying questions when input is ambiguous.
+2. **Human Confirmation:** The coordinator validates, edits, or discards each parsed constraint before registration.
+3. **Solving and Conflict Isolation:** The constraint solver builds a schedule or extracts the minimal conflicting constraint subset.
+4. **Explanation and Synthesis:** The reasoning model explains root causes, designs relaxation strategies, and submits each candidate to the solver for feasibility validation.
+5. **Consent Execution:** Affected constraint owners submit `approveRelaxation` or `rejectRelaxation` transactions directly to the contract. Rejections return the workflow to the explanation stage with the rejected option eliminated.
+6. **Termination Boundaries:** The system permits at most three iterative relaxation rounds. Unresolved conflicts are escalated to administrators for manual intervention.
 
-**Tools the model may call:** add draft constraint, ask clarifying question, fetch conflict details, test relaxation with solver, write change summary, submit parser for sandbox testing, read test report.
+**Model tool access:** The reasoning model may invoke function calls to record draft constraints, request clarification, inspect conflict graphs, verify proposed relaxations with the solver, compose version summaries, and dispatch parser implementations to the sandbox.
 
-**Guardrails:** the model process holds no private key and no tool that calls approve, reject or publish. Every model-proposed relaxation is solver-verified before anyone sees it.
+**Security guardrails:** The model process possesses no private keys and cannot trigger state-changing blockchain methods. Every proposed relaxation must pass solver feasibility verification before it is presented to users.
 
 ---
 
 ## 13. Technology Stack
 
-| Area | Choice |
-|---|---|
-| AI models | Gemma 4 E4B (intake), Gemma 4 12B or 26B A4B (explanation) |
-| Local inference | Ollama, llama.cpp or vLLM (whichever supports Gemma 4 audio/image best) |
-| Structured output | Native function calling + Pydantic |
-| Solver | Google OR-Tools CP-SAT |
-| Spreadsheets & sandbox | pandas, openpyxl; containerized sandbox with network disabled |
-| Smart contract | Solidity 0.8.x (`ConsentLedger`); Foundry + OpenZeppelin AccessControl |
-| Chain access | web3.py or ethers.js |
-| Network | Local Anvil chain (primary); optional Sepolia. No mainnet |
-| Interface | Streamlit or Gradio with audio/image upload |
-| Outputs | Timetable grid, ICS calendar files, verification page |
-| Evaluation | Python scripts, scikit-learn, matplotlib |
-| Packaging | Docker, pinned dependencies, fixed random seeds |
-| License | Apache 2.0, public GitHub repository |
+| Layer | Selection | Rationale |
+|---|---|---|
+| AI Models | Gemma 4 E4B (intake), Gemma 4 12B or 26B A4B (reasoning and explanation) | Multimodal input understanding, code generation, and multilingual inference |
+| Local Inference Runtime | Ollama, llama.cpp, or vLLM | Local open-weight execution preserving organizational data privacy |
+| Structured Outputs | Native function calling and Pydantic validation | Deterministic, schema-compliant constraint serialization |
+| Constraint Solver | Google OR-Tools CP-SAT | Mathematical guarantees of schedule correctness and minimal conflict isolation |
+| Data Processing and Sandbox | pandas, openpyxl, Docker Engine | Tabular data ingestion within an isolated, unprivileged container runtime |
+| Smart Contracts | Solidity 0.8.x (`ConsentLedger`), Foundry, OpenZeppelin | Formally verified access control and repeatable contract testing |
+| Web3 Integration | web3.py or ethers.js | Standard Ethereum JSON-RPC client interactions |
+| Blockchain Network | Local Anvil node (primary demonstration environment) or Sepolia testnet | Zero financial risk with deterministic test accounts |
+| User Interface | Streamlit or Gradio | Interactive visual interface supporting audio capture and image uploads |
+| Schedule Outputs | Grid visualizations, iCalendar (.ics) files, web verification utility | Standard export formats for calendars and academic systems |
+| Benchmark Evaluation | Python, scikit-learn, matplotlib | Rigorous, repeatable experimental measurement |
+| Licensing | Apache 2.0 | Open-source distribution allowing institutional deployment |
 
 ---
 
-## 14. Implementation Approach
+## 14. Implementation Roadmap and Evaluation
 
-Work is organized in tiers. Each module is independent, so any one can slip without breaking the core loop.
+Development is organized into modular phases:
 
-**Tier 1: Working core (must have)**
-1. Constraint schema and registry.
-2. Text intake with Gemma 4 E4B and confirmation screen.
-3. CP-SAT solver, independent checker, timetable grid output.
-4. Conflict extractor and Gemma 4 explanation with solver-verified relaxations.
-5. Evaluation harness with a first test set.
+**Phase 1: Core Foundation (Essential)**
+1. Standardized constraint schema and registry implementation.
+2. Text-based intake leveraging Gemma 4 E4B with human confirmation workflows.
+3. CP-SAT solver integration, independent rule validator, and timetable visualization.
+4. Conflict extractor coupled with Gemma 4 automated explanations and verified relaxations.
+5. Automated evaluation harness and initial benchmark dataset.
 
-**Tier 2: Multimodal intake and consent layer (should have)**
-6. Voice intake (Gemma 4 audio input).
-7. Image intake for timetable photos, availability forms, room lists.
-8. Format adapter: parser synthesis, sandbox, parser registry.
-9. Consent contract with tests, local chain, owner-approval flow.
-10. Verification page.
+**Phase 2: Multimodal Intake and Consensus (Target)**
+6. Voice ingestion pipeline utilizing Gemma 4 native audio capabilities.
+7. Image ingestion for handwritten schedules, room inventories, and historical timetables.
+8. Format adapter module: dynamic parser synthesis, sandbox execution, and parser registry.
+9. Solidity consensus contract, automated unit tests, and local testnet integration.
+10. Public verification interface.
 
-**Tier 3: Polish (nice to have)**
-11. Sepolia testnet deployment.
-12. Hindi/Marathi explanations; calendar export.
-13. Ablation report and polished demo script.
+**Phase 3: Refinement and Localization (Extensions)**
+11. Optional deployment to Ethereum Sepolia testnet.
+12. Explanations localized in Hindi and Marathi, alongside iCalendar exports.
+13. Comprehensive ablation study and final demonstration scenarios.
 
-### Evaluation Plan
+### Quantitative Evaluation Plan
 
-| What | How |
+| Evaluation Domain | Methodology |
 |---|---|
-| Extraction accuracy | Gold set across typed text, spoken audio (including Hindi-English mixes), and photographed forms; precision, recall and field-level accuracy per modality and language |
-| Parser synthesis | Set of spreadsheet layouts with hand-checked files. Metrics: parser pass rate within 3 attempts, repair attempts needed, exact-match rate, missed errors, token usage comparison vs. per-row extraction |
-| Schedule validity | Independent checker on every output; LLM-only baseline counting rule violations |
-| Conflict diagnosis | Explanation matches solver's minimal conflicting subset; human clarity rating |
-| Proposal quality | Share of proposals that are feasible, with and without solver verification |
-| Contract behavior | Foundry tests: non-owner approve/reject reverts, non-admin register/publish reverts, publish reverts while pending, events carry expected arguments, gas per function |
-| Efficiency | Time per stage, memory use, tokens per model call |
-| Ablations | Remove confirmation, voice, image, solver verification, or stored parsers; report accuracy/time/model-call changes |
+| Constraint Extraction Accuracy | Benchmarked against curated datasets spanning typed text, spoken audio (including Hindi-English mixed samples), and photographic forms. Evaluation reports precision, recall, and slot-filling accuracy per modality and language. |
+| Parser Synthesis Performance | Evaluated across diverse tabular layouts. Reported metrics include synthesis success rate within three iterations, exact-match row extraction accuracy, undetected layout errors, and token savings compared to row-by-row LLM parsing. |
+| Schedule Correctness | Verified via the independent validator across all generated schedules, contrasted against an unconstrained language-model baseline measuring hard constraint violation rates. |
+| Conflict Analysis Quality | Verification that highlighted constraints correspond to solver-isolated minimal unsatisfiable subsets, supplemented by human assessments of explanation clarity. |
+| Resolution Viability | Percentage of proposed relaxations that produce mathematically viable schedules before and after solver validation. |
+| Smart Contract Security | Foundry unit test suites verifying permission boundaries, reversion conditions for unauthorized callers, invariant state preservation, and gas efficiency. |
+| Computational Efficiency | End-to-end execution latency, memory footprint across quantization tiers, and token throughput per stage. |
+| Ablation Studies | Incremental removal of human verification, audio-visual modalities, solver re-checks, and compiled parsers to quantify individual subsystem contributions. |
 
 ---
 
-## 15. Expected Final Output
+## 15. Deliverables
 
-1. A **working web app** accepting voice, images, spreadsheets and text, producing verified schedules.
-2. A **conflict view** with clashing rules, owners, explanation and solver-verified fixes.
-3. A **smart contract** with tests on a local chain (optionally Sepolia), plus consent log view.
-4. A **verification page** checking any timetable file against the on-chain record.
-5. **Exports:** timetable grid and calendar files.
-6. A **reproducible evaluation report** with LLM-only baseline and ablations.
-7. A **public GitHub repository** under Apache 2.0.
+1. A **functional web application** supporting voice, image, spreadsheet, and text inputs to produce verified schedules.
+2. An **interactive conflict inspector** detailing conflicting rules, constraint owners, natural language explanations, and verified fixes.
+3. A **tested Solidity smart contract** deployed to an Anvil test network with an explorer interface.
+4. A **public verification portal** enabling external validation of timetable authenticity against the distributed ledger.
+5. **Standardized exports** providing visual timetable grids and iCalendar format feeds.
+6. A **reproducible evaluation framework** providing comparative baselines and ablation results.
+7. A **public GitHub repository** distributed under the Apache 2.0 license.
 
 ---
 
 ## 16. Future Scope
 
-- **Shared institutions:** one consent ledger across departments/colleges for shared resources.
-- **Gasless approvals:** `approveRelaxationBySig` with EIP-712 signatures so owners need no crypto.
-- **Privacy-preserving proofs:** ZK proofs that a schedule satisfies rules without revealing availability.
-- **Fairness reporting:** distribution of soft-rule costs across people.
-- **More domains:** hospital rosters, volunteer shifts, event programmes.
-- **More file formats:** PDF tables via the same synthesis loop.
-- **Mobile and offline:** small Gemma 4 tier supports on-premise deployment.
-- **Learning from corrections:** coordinator edits improve extraction accuracy.
-- **Larger models:** leverage long context of bigger Gemma 4 sizes for full documents.
+- **Inter-institutional coordination:** Deploying shared consent ledgers across autonomous academic departments and partner universities.
+- **Gasless meta-transactions:** Implementing EIP-712 signature verification (`approveRelaxationBySig`) to allow fee-free coordinator-relayed approvals.
+- **Zero-knowledge verification:** Generating cryptographic proofs that schedules satisfy all constraints without revealing private personal availability.
+- **Fairness auditing:** Quantifying the distribution of soft-penalty burdens across participants to detect systemic workload imbalances.
+- **Extended domains:** Adapting the underlying constraint model for hospital clinical shifts, disaster relief teams, and conference programs.
+- **Expanded format synthesis:** Extending synthesis pipelines to extract structured tables from complex unstructured PDF documents.
+- **Edge deployment:** Running quantized models directly on client hardware for air-gapped, offline environments.
 
 ---
 
 ## 17. Open-Source Dependencies
 
-| Component | Purpose | License |
+| Component | Function | License |
 |---|---|---|
-| Gemma 4 (E4B, 12B, 26B A4B) | Intake and explanation | Apache 2.0 |
-| Ollama / llama.cpp / vLLM | Local inference | MIT / MIT / Apache 2.0 |
-| Google OR-Tools | CP-SAT solver | Apache 2.0 |
-| Pydantic | Schema validation | MIT |
-| pandas, openpyxl | Spreadsheet reading | BSD / MIT |
-| Docker Engine | Parser sandbox | Apache 2.0 |
-| Foundry | Contract tests and local chain | MIT / Apache 2.0 |
-| OpenZeppelin Contracts | Access control | MIT |
-| Solidity compiler (solc) | Contract compilation | GPL-3.0 |
-| web3.py / ethers.js | Chain access | MIT |
-| Streamlit / Gradio | Interface | Apache 2.0 |
-| scikit-learn, matplotlib | Metrics and plots | BSD / PSF-style |
-
-*License types will be re-verified when dependencies are pinned.*
+| Gemma 4 (E4B, 12B, 26B A4B) | Multimodal intake, parser synthesis, and reasoning | Apache 2.0 |
+| Ollama / llama.cpp / vLLM | Local model execution | MIT / MIT / Apache 2.0 |
+| Google OR-Tools | CP-SAT constraint optimization | Apache 2.0 |
+| Pydantic | Schema definition and data validation | MIT |
+| pandas, openpyxl | Tabular data manipulation | BSD-3-Clause / MIT |
+| Docker Engine | Parser isolation sandbox | Apache 2.0 |
+| Foundry | Solidity development and automated testing | MIT / Apache 2.0 |
+| OpenZeppelin Contracts | Access control primitives | MIT |
+| solc | Solidity compiler | GPL-3.0 |
+| web3.py / ethers.js | Ethereum client connectivity | MIT |
+| Streamlit / Gradio | Web presentation layer | Apache 2.0 |
+| scikit-learn, matplotlib | Statistical evaluation and visualization | BSD-3-Clause / PSF |
 
 ---
 
-## 18. Challenges and Mitigation
+## 18. Risk Management and Mitigations
 
-| Challenge | Mitigation |
-|---|---|
-| **Misread rules from voice or photos** | Evidence-linked confirmation, paraphrases, confidence flags, clarifying questions; per-modality accuracy measurement |
-| **Low-quality photos** | Ask for clearer photo or typed correction; mark low-confidence fields |
-| **Hindi/Marathi speech accuracy** | Measure per language on gold set; route low-confidence speech to typed confirmation |
-| **Untrusted model-written code** | Containerized sandbox with network disabled, resource limits, import allowlist |
-| **Parser passes tests but misreads other rows** | Summary review per file (counts, first 10 rows, skipped rows); evaluation counts missed errors |
-| **Layout changes after parser stored** | Changed headers → new fingerprint → new synthesis; >5% skipped rows triggers re-synthesis |
-| **Irreparable parser** | Fall back to per-row extraction; flag for manual review |
-| **Model mis-formalizes a rule** | Schema validation, paraphrase round-trip, human confirmation |
-| **Model proposes unworkable fix** | Every proposal solver-verified before display |
-| **Admin can publish arbitrary hash** | Parties run independent checker; constraint-set hash recomputable from contract |
-| **Owners without wallets** | Demo uses pre-funded test accounts; EIP-712 relay planned |
-| **Testnet faucets unreliable** | Local Foundry chain is primary; Sepolia optional |
-| **Contract bugs** | OpenZeppelin, Foundry tests, no payable functions, test network only, "not audited" notice |
-| **Personal data exposure** | Local inference; only salted hashes on-chain |
-| **Hackathon time limit** | Tiered plan; core loop works without voice, image, parsers or contract |
-| **Hardware limits** | E4B intake runs on laptop GPU; explanation tier can run quantized 12B |
+| Identified Risk | Potential Impact | Mitigation Strategy |
+|---|---|---|
+| **Misinterpretation of voice or visual input** | Inaccurate constraints injected into the schedule | Side-by-side evidence inspection, natural language paraphrasing, confidence scoring, and mandatory human confirmation. |
+| **Degraded photographic quality** | Unreliable optical extraction | Automatic prompts for clearer captures or manual text input; explicit flagging of low-confidence fields. |
+| **Dialect and multilingual variability** | Suboptimal extraction on regional language inputs | Empirical testing against curated multilingual benchmarks; routing uncertain audio directly to manual transcription. |
+| **Execution of synthesized parser code** | Potential resource exhaustion or unauthorized system access | Strict container isolation with network access disabled, resource quotas, and static import validation. |
+| **Uncaught parser edge cases** | Undetected constraint omission | Mandatory confirmation sample testing, skipped-row threshold alerts, and summary row reviews for every file. |
+| **Layout drift in subsequent files** | Incompatible parsing logic applied to revised formats | Header-based layout fingerprinting; files exceeding a 5% unparsed row threshold automatically trigger re-synthesis. |
+| **Model formalization errors** | Incorrect mathematical constraints formulated | Strict Pydantic schema validation coupled with plain-language round-trip confirmation. |
+| **Infeasible relaxation proposals** | Stakeholders prompted to approve non-viable compromises | Automated re-solving filters out invalid relaxation candidates before human presentation. |
+| **Unauthorized administrative publication** | Discrepancies between published hash and actual schedule | Public independent verification script comparing local files against on-chain constraint hashes. |
+| **Participant wallet accessibility** | Inability of non-technical stakeholders to sign transactions | Demonstration accounts pre-configured with local credentials; long-term support for gasless EIP-712 signatures. |
+| **Public testnet instability** | Dependency on external faucet infrastructure | Primary demonstration self-contained on local Anvil nodes; public testnets treated as optional extensions. |
+| **Smart contract vulnerabilities** | Unauthorized modification of constraint state | Minimal custom logic, integration of battle-tested OpenZeppelin modules, and extensive automated test suites. |
+| **Privacy leak of schedule preferences** | Unauthorized visibility into personal availability | Strictly local inference; only cryptographic hashes and salts stored on public ledgers. |
+| **Project timeline constraints** | Incomplete deliverables at competition deadline | Tiered architectural design ensuring a functional core system operates independently of advanced extensions. |
+| **Local hardware limitations** | High GPU memory pressure | Intake tier runs quantized E4B locally; reasoning tasks support quantized 12B or selective offloading. |
 
 ---
 
-*Team details, contact information and the license file will be added to the repository metadata. This repository intentionally contains only this README, per the qualifier rules.*
-# PhishTank
+*Team details, contact information, and license files will be finalized in repository metadata. This repository contains only this documentation in compliance with submission guidelines.*
