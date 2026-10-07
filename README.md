@@ -22,7 +22,7 @@ Timetables, duty rosters, exam invigilation lists and shared-lab bookings are st
 3. **No tamper-proof consent record.** Disputes follow schedule changes ("I never agreed to Saturday"). Chat messages and spreadsheet edits can be lost or rewritten by the same coordinator whose conduct is disputed.
 4. **LLMs cannot guarantee valid schedules.** A language model asked to produce a timetable directly can violate stated rules. A solver produces schedules that meet hard rules by construction.
 
-Additionally, availability data is personal—people do not want it uploaded to third-party cloud services.
+Additionally, availability data is personal-people do not want it uploaded to third-party cloud services.
 
 ---
 
@@ -69,7 +69,7 @@ Everything AI-related runs locally on open weights.
 ## 4. Objectives
 
 - Accept scheduling rules through **voice, image and text** with one open model family.
-- Parse spreadsheets with **stored, tested parsers**—a layout needs a model call only once.
+- Parse spreadsheets with **stored, tested parsers**-a layout needs a model call only once.
 - Guarantee **zero hard-rule violations** in every published schedule.
 - When infeasible, **name the exact clashing rules and their owners** and propose solver-verified fixes.
 - Make every change **consent-based and auditable** on-chain.
@@ -120,7 +120,7 @@ Per the official model card, Gemma 4 comes in five sizes (**E2B, E4B, 12B, 26B A
 - **Thinking mode, used selectively** only for tangled conflict explanations.
 - **Local and private.** Apache 2.0 license; personal data stays on the coordinator's machine.
 - **Multilingual.** Supports Hindi, Marathi and English code-mixing; accuracy measured per language.
-- **A size ladder** fitting one laptop—small model for high-volume intake, mid-size for conflict explanation.
+- **A size ladder** fitting one laptop-small model for high-volume intake, mid-size for conflict explanation.
 
 **Why the model does not build the schedule:** hard rules must hold in every output, and LLMs give no such guarantee. The evaluation includes an LLM-only baseline counting hard-rule violations.
 
@@ -131,13 +131,13 @@ Per the official model card, Gemma 4 comes in five sizes (**E2B, E4B, 12B, 26B A
 Gemma 4 is the **interface between people and the solver**. It converts human input into the solver's constraint format, and converts solver output into explanations.
 
 **What the AI does:**
-1. **Multimodal constraint extraction** — voice, photo, text → structured constraint objects with source pointers and confidence.
-2. **Parser synthesis** — writes Python parsers for new spreadsheet layouts; rewrites on test failure; stored parsers handle repeat layouts.
-3. **Clarifying questions** — asks when input is ambiguous.
-4. **Paraphrase for confirmation** — restates each constraint in plain language.
-5. **Conflict explanation** — explains why rules clash, naming people and rules involved.
-6. **Relaxation proposals** — suggests ranked fixes, using the solver as a feasibility tool.
-7. **Change summaries** — writes the human-readable summary for each published version.
+1. **Multimodal constraint extraction** - voice, photo, text → structured constraint objects with source pointers and confidence.
+2. **Parser synthesis** - writes Python parsers for new spreadsheet layouts; rewrites on test failure; stored parsers handle repeat layouts.
+3. **Clarifying questions** - asks when input is ambiguous.
+4. **Paraphrase for confirmation** - restates each constraint in plain language.
+5. **Conflict explanation** - explains why rules clash, naming people and rules involved.
+6. **Relaxation proposals** - suggests ranked fixes, using the solver as a feasibility tool.
+7. **Change summaries** - writes the human-readable summary for each published version.
 
 **What the AI does not do:** assign classes to slots, declare schedules valid, approve changes, submit on-chain transactions, or read spreadsheet rows once a parser has passed its tests.
 
@@ -247,11 +247,11 @@ The contract records three on-chain states: Open (covering Collecting, Solving, 
 
 One Solidity contract performing five functions:
 
-1. **Registers constraint ownership** — stores owner address and constraint hash.
-2. **Enforces owner-only approval** — reverts calls from any non-owner address.
+1. **Registers constraint ownership** - stores owner address and constraint hash.
+2. **Enforces owner-only approval** - reverts calls from any non-owner address.
 3. **Blocks publication while consent is pending.**
-4. **Keeps append-only history** — timestamped events that cannot be edited.
-5. **Answers verification queries** — read-only lookup of published schedule hashes.
+4. **Keeps append-only history** - timestamped events that cannot be edited.
+5. **Answers verification queries** - read-only lookup of published schedule hashes.
 
 | Function | Caller | Effect |
 |---|---|---|
@@ -274,9 +274,9 @@ One Solidity contract performing five functions:
 **Deployment:** local Foundry (Anvil) chain with pre-funded test accounts. Optional Sepolia. No mainnet, no real funds.
 
 **Why blockchain instead of a database:** the coordinator who operates the scheduler is also the party whose conduct is disputed. Three properties a coordinator-operated database cannot provide:
-1. **Authorization the coordinator doesn't control** — `approveRelaxation` reverts unless sender is the registered owner.
-2. **History the coordinator cannot rewrite** — past blocks cannot be edited.
-3. **Verification independent of the scheduler's server** — anyone hashes a file and calls `getPublication` on a public node.
+1. **Authorization the coordinator doesn't control** - `approveRelaxation` reverts unless sender is the registered owner.
+2. **History the coordinator cannot rewrite** - past blocks cannot be edited.
+3. **Verification independent of the scheduler's server** - anyone hashes a file and calls `getPublication` on a public node.
 
 ---
 
