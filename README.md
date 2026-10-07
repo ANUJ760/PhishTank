@@ -19,9 +19,7 @@
 
 ## 1. Project Name
 
-### GeCompose (Gemma + Composition)
-
-A smart scheduling system that coordinates three dedicated tools for what they do best:
+**GeCompose** (derived from *Gemma* and *composition*) is a smart scheduling system that coordinates three dedicated tools for what they do best:
 
 - **Google Gemma 4** takes inputs from voice, photos, spreadsheets, and text, then explains scheduling conflicts in plain English.
 - **Google OR-Tools CP-SAT** does the heavy math to guarantee 100% clash-free schedules.
