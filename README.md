@@ -400,10 +400,10 @@ Our engineering implementation divides the system into four decoupled modules, e
 | **Project Title** | GeCompose |
 | **Track** | 2. Best Use of Gemma 4 / Gemma 4 Open-Source|
 | **Team Name** | PhishTank |
-| **Members** | Rounak Mishra |
-|             | Anuj Lulu |
-|             | Adarsh Jha |
-|             | Shlok Tiwari |
+| **Members** | Rounak Mishra [@rounakkm](https://github.com/rounakkm) |
+|             | Anuj Lulu [@ANUJ760](https://github.com/ANUJ760)       |
+|             | Adarsh Jha [@Adarsh2709](https://github.com/Adarsh2709)|
+|             | Shlok Tiwari [@1shhlok](https://github.com/1shhlok)    |
 
 
 --- 
