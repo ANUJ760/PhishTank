@@ -1,9 +1,11 @@
-"""PostgreSQL-backed registry with short-lived, transaction-scoped connections."""
+"""PostgreSQL and SQLite dual-backend registry with short-lived, transaction-scoped connections."""
 from __future__ import annotations
 
 import atexit
+import logging
 from pathlib import Path
 import re
+import sqlite3
 import threading
 import time
 from contextlib import contextmanager
@@ -12,83 +14,223 @@ from typing import Iterator
 from backend import config
 from backend.models import RelaxOption, Rule, Roster, Schedule
 
+log = logging.getLogger(__name__)
+
 _pool = None
 _pool_lock = threading.Lock()
+_sqlite_conn = None
+_sqlite_lock = threading.RLock()
+_engine_type: str | None = None
+_db_initialized = False
+_init_lock = threading.Lock()
+
+
+class _SQLiteCursorAdapter:
+    def __init__(self, cursor: sqlite3.Cursor):
+        self._cursor = cursor
+
+    def fetchone(self):
+        return self._cursor.fetchone()
+
+    def fetchall(self):
+        return self._cursor.fetchall()
+
+    def __getattr__(self, name: str):
+        return getattr(self._cursor, name)
+
+
+class _SQLiteConnectionAdapter:
+    def __init__(self, conn: sqlite3.Connection):
+        self._conn = conn
+
+    def execute(self, sql: str, params: tuple | list | None = None):
+        adapted_sql = sql.replace("%s", "?")
+        if " FOR UPDATE" in adapted_sql:
+            adapted_sql = adapted_sql.replace(" FOR UPDATE", "")
+        if params is None:
+            cur = self._conn.execute(adapted_sql)
+        else:
+            cur = self._conn.execute(adapted_sql, tuple(params))
+        return _SQLiteCursorAdapter(cur)
+
+    def commit(self):
+        self._conn.commit()
 
 
 def _close_pool():
-    global _pool
+    global _pool, _sqlite_conn
     if _pool is not None:
         try:
             _pool.close()
         except Exception:
             pass
         _pool = None
+    if _sqlite_conn is not None:
+        try:
+            _sqlite_conn.close()
+        except Exception:
+            pass
+        _sqlite_conn = None
 
 
 atexit.register(_close_pool)
 
 
+def _get_sqlite_path() -> Path:
+    db_url = config.DATABASE_URL
+    if db_url.startswith("sqlite:///"):
+        path_str = db_url[len("sqlite:///"):]
+    elif db_url.startswith("sqlite://"):
+        path_str = db_url[len("sqlite://"):]
+    elif db_url.startswith("sqlite:"):
+        path_str = db_url[len("sqlite:"):]
+    else:
+        path_str = "data/gecompose.db"
+    path = Path(path_str)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def _get_sqlite_conn() -> sqlite3.Connection:
+    global _sqlite_conn
+    if _sqlite_conn is None:
+        path = _get_sqlite_path()
+        conn = sqlite3.connect(
+            str(path),
+            timeout=30.0,
+            check_same_thread=False,
+            isolation_level=None,  # autocommit mode; we manage transactions explicitly
+        )
+        conn.execute("PRAGMA journal_mode = WAL;")
+        conn.execute("PRAGMA foreign_keys = ON;")
+        conn.execute("PRAGMA synchronous = NORMAL;")
+        _sqlite_conn = conn
+    return _sqlite_conn
+
+
 def _get_pool():
-    global _pool
+    global _pool, _engine_type
+    if _engine_type == "sqlite":
+        return None
     if _pool is not None:
         return _pool
     with _pool_lock:
+        if _engine_type == "sqlite":
+            return None
         if _pool is not None:
             return _pool
+
+        # Check if SQLite is explicitly requested
+        if config.DATABASE_URL.startswith("sqlite"):
+            _engine_type = "sqlite"
+            return None
+
         try:
             from psycopg_pool import ConnectionPool
-        except ImportError as exc:
-            raise RuntimeError("PostgreSQL driver missing; install requirements.txt") from exc
-        try:
             pool = ConnectionPool(
                 conninfo=config.DATABASE_URL,
                 min_size=1,
                 max_size=10,
-                timeout=10,
-                kwargs={"connect_timeout": 5, "application_name": "gecompose-backend"},
+                timeout=1,
+                kwargs={"connect_timeout": 1, "application_name": "gecompose-backend"},
                 open=False,
             )
-            pool.open(wait=True, timeout=10)
+            pool.open(wait=True, timeout=1)
             _pool = pool
+            _engine_type = "postgres"
+            return _pool
         except Exception as exc:
+            if config.DB_FALLBACK_SQLITE:
+                log.warning(
+                    "PostgreSQL connection failed (%s); falling back to local SQLite at %s",
+                    exc,
+                    _get_sqlite_path(),
+                )
+                _engine_type = "sqlite"
+                return None
             raise RuntimeError(f"Cannot connect to PostgreSQL: {exc}") from exc
-    return _pool
 
 
 @contextmanager
 def _connect() -> Iterator:
-    try:
-        from psycopg import OperationalError
-        from psycopg_pool import PoolTimeout
-    except ImportError as exc:
-        raise RuntimeError("PostgreSQL driver missing; install requirements.txt") from exc
-    try:
-        pool = _get_pool()
-        with pool.connection() as connection:
-            yield connection
-    except (OperationalError, PoolTimeout) as exc:
-        raise RuntimeError(f"Cannot connect to PostgreSQL: {exc}") from exc
+    global _db_initialized
+    if not _db_initialized:
+        with _init_lock:
+            if not _db_initialized:
+                _db_initialized = True
+                init_db()
+
+    pool = _get_pool()
+    if pool is not None:
+        try:
+            with pool.connection() as connection:
+                yield connection
+        except Exception as exc:
+            raise RuntimeError(f"PostgreSQL connection error: {exc}") from exc
+    else:
+        # SQLite mode
+        with _sqlite_lock:
+            conn = _get_sqlite_conn()
+            adapter = _SQLiteConnectionAdapter(conn)
+            yield adapter
+
+
+def get_engine_type() -> str:
+    if _engine_type is None:
+        _get_pool()
+    return _engine_type or "sqlite"
 
 
 def init_db() -> None:
-    statements = (
-        "CREATE TABLE IF NOT EXISTS rules(id TEXT PRIMARY KEY,json TEXT NOT NULL,salt BYTEA,rule_hash TEXT,status TEXT NOT NULL)",
-        "CREATE INDEX IF NOT EXISTS rules_status_id_idx ON rules(status,id)",
-        "CREATE TABLE IF NOT EXISTS roster(id SMALLINT PRIMARY KEY CHECK(id=1),json TEXT NOT NULL)",
-        "CREATE TABLE IF NOT EXISTS parsers(layout_signature TEXT PRIMARY KEY,code TEXT NOT NULL,created_at DOUBLE PRECISION NOT NULL)",
-        "CREATE TABLE IF NOT EXISTS schedules(hash TEXT PRIMARY KEY,version INTEGER NOT NULL,json TEXT NOT NULL,tx_hash TEXT NOT NULL,created_at DOUBLE PRECISION NOT NULL)",
-        "CREATE INDEX IF NOT EXISTS schedules_latest_idx ON schedules(version DESC,created_at DESC)",
-        "CREATE TABLE IF NOT EXISTS options(id TEXT PRIMARY KEY,json TEXT NOT NULL)",
-        "CREATE TABLE IF NOT EXISTS llm_calls(id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,fn TEXT,model TEXT,tokens_in INTEGER,tokens_out INTEGER,ms INTEGER,mock BOOLEAN,ts DOUBLE PRECISION)",
-        "CREATE INDEX IF NOT EXISTS llm_calls_timestamp_idx ON llm_calls(ts)",
-        "CREATE TABLE IF NOT EXISTS id_sequences(name TEXT PRIMARY KEY,value BIGINT NOT NULL CHECK(value >= 0))",
-        "CREATE TABLE IF NOT EXISTS audit_events(id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,event TEXT NOT NULL,entity_id TEXT NOT NULL,user_id TEXT NOT NULL,details TEXT NOT NULL,created_at DOUBLE PRECISION NOT NULL)",
-        "CREATE INDEX IF NOT EXISTS audit_events_created_idx ON audit_events(created_at DESC)",
-    )
-    with _connect() as connection:
-        for statement in statements:
-            connection.execute(statement)
+    engine = get_engine_type()
+    if engine == "postgres":
+        statements = (
+            "CREATE TABLE IF NOT EXISTS rules(id TEXT PRIMARY KEY,json TEXT NOT NULL,salt BYTEA,rule_hash TEXT,status TEXT NOT NULL)",
+            "CREATE INDEX IF NOT EXISTS rules_status_id_idx ON rules(status,id)",
+            "CREATE TABLE IF NOT EXISTS roster(id SMALLINT PRIMARY KEY CHECK(id=1),json TEXT NOT NULL)",
+            "CREATE TABLE IF NOT EXISTS parsers(layout_signature TEXT PRIMARY KEY,code TEXT NOT NULL,created_at DOUBLE PRECISION NOT NULL)",
+            "CREATE TABLE IF NOT EXISTS schedules(hash TEXT PRIMARY KEY,version INTEGER NOT NULL,json TEXT NOT NULL,tx_hash TEXT NOT NULL,created_at DOUBLE PRECISION NOT NULL)",
+            "CREATE INDEX IF NOT EXISTS schedules_latest_idx ON schedules(version DESC,created_at DESC)",
+            "CREATE TABLE IF NOT EXISTS options(id TEXT PRIMARY KEY,json TEXT NOT NULL)",
+            "CREATE TABLE IF NOT EXISTS llm_calls(id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,fn TEXT,model TEXT,tokens_in INTEGER,tokens_out INTEGER,ms INTEGER,mock BOOLEAN,ts DOUBLE PRECISION)",
+            "CREATE INDEX IF NOT EXISTS llm_calls_timestamp_idx ON llm_calls(ts)",
+            "CREATE TABLE IF NOT EXISTS id_sequences(name TEXT PRIMARY KEY,value BIGINT NOT NULL CHECK(value >= 0))",
+            "CREATE TABLE IF NOT EXISTS audit_events(id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,event TEXT NOT NULL,entity_id TEXT NOT NULL,user_id TEXT NOT NULL,details TEXT NOT NULL,created_at DOUBLE PRECISION NOT NULL)",
+            "CREATE INDEX IF NOT EXISTS audit_events_created_idx ON audit_events(created_at DESC)",
+        )
+    else:
+        statements = (
+            "CREATE TABLE IF NOT EXISTS rules(id TEXT PRIMARY KEY,json TEXT NOT NULL,salt BLOB,rule_hash TEXT,status TEXT NOT NULL)",
+            "CREATE INDEX IF NOT EXISTS rules_status_id_idx ON rules(status,id)",
+            "CREATE TABLE IF NOT EXISTS roster(id INTEGER PRIMARY KEY CHECK(id=1),json TEXT NOT NULL)",
+            "CREATE TABLE IF NOT EXISTS parsers(layout_signature TEXT PRIMARY KEY,code TEXT NOT NULL,created_at REAL NOT NULL)",
+            "CREATE TABLE IF NOT EXISTS schedules(hash TEXT PRIMARY KEY,version INTEGER NOT NULL,json TEXT NOT NULL,tx_hash TEXT NOT NULL,created_at REAL NOT NULL)",
+            "CREATE INDEX IF NOT EXISTS schedules_latest_idx ON schedules(version DESC,created_at DESC)",
+            "CREATE TABLE IF NOT EXISTS options(id TEXT PRIMARY KEY,json TEXT NOT NULL)",
+            "CREATE TABLE IF NOT EXISTS llm_calls(id INTEGER PRIMARY KEY AUTOINCREMENT,fn TEXT,model TEXT,tokens_in INTEGER,tokens_out INTEGER,ms INTEGER,mock BOOLEAN,ts REAL)",
+            "CREATE INDEX IF NOT EXISTS llm_calls_timestamp_idx ON llm_calls(ts)",
+            "CREATE TABLE IF NOT EXISTS id_sequences(name TEXT PRIMARY KEY,value INTEGER NOT NULL CHECK(value >= 0))",
+            "CREATE TABLE IF NOT EXISTS audit_events(id INTEGER PRIMARY KEY AUTOINCREMENT,event TEXT NOT NULL,entity_id TEXT NOT NULL,user_id TEXT NOT NULL,details TEXT NOT NULL,created_at REAL NOT NULL)",
+            "CREATE INDEX IF NOT EXISTS audit_events_created_idx ON audit_events(created_at DESC)",
+        )
+
+    # Note: bypass _connect's auto-init check by executing directly
+    pool = _get_pool()
+    if pool is not None:
+        with pool.connection() as connection:
+            for statement in statements:
+                connection.execute(statement)
+    else:
+        with _sqlite_lock:
+            conn = _get_sqlite_conn()
+            conn.execute("BEGIN IMMEDIATE;")
+            try:
+                for statement in statements:
+                    conn.execute(statement)
+                conn.execute("COMMIT;")
+            except Exception:
+                conn.execute("ROLLBACK;")
+                raise
 
 
 def check_connection() -> None:
@@ -193,7 +335,7 @@ def get_rule_hash(rule_id: str) -> str:
 def save_parser(sig: str, code: str) -> None:
     with _connect() as connection:
         connection.execute(
-            "INSERT INTO parsers VALUES(%s,%s,%s) ON CONFLICT(layout_signature) DO UPDATE SET code=EXCLUDED.code,created_at=EXCLUDED.created_at",
+            "INSERT INTO parsers(layout_signature,code,created_at) VALUES(%s,%s,%s) ON CONFLICT(layout_signature) DO UPDATE SET code=EXCLUDED.code,created_at=EXCLUDED.created_at",
             (sig, code, time.time()),
         )
 
@@ -313,6 +455,3 @@ def list_audit_events() -> list[dict]:
         }
         for row in rows
     ]
-
-
-init_db()
