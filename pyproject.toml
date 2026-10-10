@@ -7,10 +7,16 @@ name = "gecompose"
 version = "0.1.0"
 description = "Deterministic scheduling engine for GeCompose using Google OR-Tools CP-SAT"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
-    "ortools>=9.10.0",
-    "pydantic>=2.0.0",
+    "ortools>=9.11",
+    "pydantic>=2.7",
+    "web3>=7",
+    "openai>=1.40",
+    "python-dotenv>=1.0",
+    "psycopg[binary,pool]>=3.2",
+    "pandas>=2.2",
+    "openpyxl>=3.1",
 ]
 
 [project.optional-dependencies]
@@ -21,3 +27,9 @@ dev = [
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
+
+[tool.setuptools.packages.find]
+include = ["backend*", "gecompose*"]
+
+[tool.setuptools.package-data]
+"backend.llm" = ["fixtures/*.json"]
