@@ -5,6 +5,7 @@ import json
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Optional
+from pydantic import BaseModel
 
 from fastapi import (
     FastAPI,
@@ -287,14 +288,39 @@ async def edit_rule(
         raise HTTPException(status_code=400, detail=str(e))
 
 
+class RuleConfirmBody(BaseModel):
+    type: Optional[str] = None
+    owner: Optional[str] = None
+    params: Optional[dict[str, Any]] = None
+    evidence_ref: Optional[str] = None
+
+
 @app.post("/api/v1/rules/{rule_id}/confirm")
 async def confirm_rule(
     rule_id: str,
+    body: Optional[RuleConfirmBody] = None,
     user: UserResponse = Depends(require_coordinator),
 ):
     try:
-        confirmed = await run_in_threadpool(api.confirm_rule, rule_id)
-        return confirmed.model_dump()
+        try:
+            confirmed = await run_in_threadpool(api.confirm_rule, rule_id)
+            return confirmed.model_dump()
+        except LookupError:
+            if body and body.type and body.params:
+                from backend.models import Rule, Evidence
+                from backend.registry import db
+                new_rule = Rule(
+                    id=rule_id,
+                    type=body.type,
+                    owner=body.owner or "Coordinator",
+                    params=body.params,
+                    status="draft",
+                    evidence=[Evidence(kind="text", ref=body.evidence_ref or "data-dump")],
+                )
+                db.save_rule(new_rule)
+                confirmed = await run_in_threadpool(api.confirm_rule, rule_id)
+                return confirmed.model_dump()
+            raise
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 

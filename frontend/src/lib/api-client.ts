@@ -155,9 +155,10 @@ export const api = {
         method: "PATCH",
         body: JSON.stringify({ params, owner }),
       }),
-    confirm: (id: string) =>
+    confirm: (id: string, body?: { type?: string; owner?: string; params?: Record<string, any>; evidence_ref?: string }) =>
       request<Rule>(`/rules/${id}/confirm`, {
         method: "POST",
+        body: body ? JSON.stringify(body) : undefined,
       }),
     reject: (id: string) =>
       request<Rule>(`/rules/${id}/reject`, {

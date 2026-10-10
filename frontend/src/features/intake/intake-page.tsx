@@ -133,14 +133,19 @@ export function IntakePage() {
     }
   };
 
-  const handleConfirmRule = async (ruleId: string) => {
-    setConfirmingId(ruleId);
+  const handleConfirmRule = async (card: ExtractedRuleCard) => {
+    setConfirmingId(card.id);
     try {
-      await api.rules.confirm(ruleId);
-      setConfirmedRules((prev) => ({ ...prev, [ruleId]: true }));
-      toast.success(`Rule ${ruleId} activated and applied to timetable solver.`);
+      await api.rules.confirm(card.id, {
+        type: card.type,
+        owner: card.owner,
+        params: card.params,
+        evidence_ref: card.evidence_ref,
+      });
+      setConfirmedRules((prev) => ({ ...prev, [card.id]: true }));
+      toast.success(`Rule ${card.id} activated and applied to timetable solver.`);
     } catch (err: any) {
-      toast.error(err?.message || `Failed to confirm rule ${ruleId}`);
+      toast.error(err?.message || `Failed to confirm rule ${card.id}`);
     } finally {
       setConfirmingId(null);
     }
@@ -726,7 +731,7 @@ export function IntakePage() {
                         <button
                           type="button"
                           disabled={isConfirmed || confirmingId === card.id}
-                          onClick={() => handleConfirmRule(card.id)}
+                          onClick={() => handleConfirmRule(card)}
                           className={`min-h-10 px-3 rounded-md text-sm font-semibold transition-all flex items-center gap-1.5 ${
                             isConfirmed
                               ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 cursor-default"

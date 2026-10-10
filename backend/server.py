@@ -149,10 +149,32 @@ async def edit_rule(id: str, edit_data: dict):
 
 
 @app.post("/rules/{id}/confirm")
-async def confirm_rule(id: str):
+async def confirm_rule(id: str, request: Request):
     try:
-        rule = api.confirm_rule(id)
-        return JSONResponse(rule.model_dump())
+        body = {}
+        try:
+            body = await request.json()
+        except Exception:
+            pass
+        try:
+            rule = api.confirm_rule(id)
+            return JSONResponse(rule.model_dump())
+        except LookupError:
+            if body and body.get("type") and body.get("params"):
+                from backend.models import Rule, Evidence
+                from backend.registry import db
+                new_rule = Rule(
+                    id=id,
+                    type=body["type"],
+                    owner=body.get("owner", "Coordinator"),
+                    params=body["params"],
+                    status="draft",
+                    evidence=[Evidence(kind="text", ref=body.get("evidence_ref", "data-dump"))],
+                )
+                db.save_rule(new_rule)
+                rule = api.confirm_rule(id)
+                return JSONResponse(rule.model_dump())
+            raise
     except Exception as exc:
         return JSONResponse({"error": str(exc)}, status_code=400)
 
