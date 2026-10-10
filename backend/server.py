@@ -1,4 +1,4 @@
-"""Production-grade HTTP REST API server exposing GeCompose services with CORS and full endpoint coverage."""
+"""Production-grade unified HTTP REST API server exposing GeCompose services."""
 from __future__ import annotations
 
 import json
@@ -10,17 +10,20 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from starlette.applications import Starlette
-from starlette.middleware import Middleware
-from starlette.middleware.cors import CORSMiddleware
+from starlette.requests import Request
 from starlette.responses import HTMLResponse, JSONResponse, Response
-from starlette.routing import Route
 
 from backend import api, config
 from backend.models import Conflict, Rule
+from backend.http.app import app
 
 
-async def index(request):
+# -------------------------------------------------------------------------
+# Direct Convenience Endpoints (for Streamlit, direct curl, and testing)
+# -------------------------------------------------------------------------
+
+@app.get("/", response_class=HTMLResponse)
+async def index():
     h = api.health().items
     return HTMLResponse(f"""
     <!DOCTYPE html>
@@ -86,167 +89,116 @@ async def index(request):
     """)
 
 
-async def get_health(request):
+@app.get("/health")
+async def get_health():
     try:
         return JSONResponse(api.health().model_dump())
     except Exception as exc:
         return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
 
 
-async def get_roster(request):
+@app.get("/roster")
+async def get_roster():
     try:
         return JSONResponse(api.get_roster().model_dump())
     except Exception as exc:
         return JSONResponse({"error": str(exc)}, status_code=404)
 
 
-async def get_rules(request):
+@app.get("/rules")
+async def get_rules(status: str | None = None):
     try:
-        status = request.query_params.get("status")
         rules = [r.model_dump() for r in api.list_rules(status)]
         return JSONResponse({"rules": rules})
     except Exception as exc:
         return JSONResponse({"error": str(exc)}, status_code=500)
 
 
-async def post_rule(request):
+@app.post("/rules", status_code=201)
+async def post_rule(rule_data: dict):
     try:
-        data = await request.json()
-        rule = Rule.model_validate(data)
+        rule = Rule.model_validate(rule_data)
         api.db.save_rule(rule)
         return JSONResponse(rule.model_dump(), status_code=201)
     except Exception as exc:
         return JSONResponse({"error": str(exc)}, status_code=400)
 
 
-async def edit_rule(request):
-    rule_id = request.path_params["id"]
+@app.post("/rules/{id}")
+async def edit_rule(id: str, edit_data: dict):
     try:
-        data = await request.json()
-        updated = api.edit_rule(rule_id, params=data.get("params"), owner=data.get("owner"))
+        updated = api.edit_rule(id, params=edit_data.get("params"), owner=edit_data.get("owner"))
         return JSONResponse(updated.model_dump())
     except Exception as exc:
         return JSONResponse({"error": str(exc)}, status_code=400)
 
 
-async def confirm_rule(request):
-    rule_id = request.path_params["id"]
+@app.post("/rules/{id}/confirm")
+async def confirm_rule(id: str):
     try:
-        rule = api.confirm_rule(rule_id)
+        rule = api.confirm_rule(id)
         return JSONResponse(rule.model_dump())
     except Exception as exc:
         return JSONResponse({"error": str(exc)}, status_code=400)
 
 
-async def reject_rule(request):
-    rule_id = request.path_params["id"]
+@app.post("/rules/{id}/reject")
+async def reject_rule(id: str):
     try:
-        rule = api.reject_rule(rule_id)
+        rule = api.reject_rule(id)
         return JSONResponse(rule.model_dump())
     except Exception as exc:
         return JSONResponse({"error": str(exc)}, status_code=400)
 
 
-async def intake_text(request):
-    try:
-        data = await request.json()
-        text = data.get("text", "")
-        rules = api.ingest_text(text)
-        return JSONResponse({"rules": [r.model_dump() for r in rules]})
-    except Exception as exc:
-        return JSONResponse({"error": str(exc)}, status_code=400)
-
-
-async def intake_sheet(request):
-    try:
-        form = await request.form()
-        file_item = form.get("file")
-        if file_item is None:
-            return JSONResponse({"error": "No file uploaded (use form key 'file')"}, status_code=400)
-        filename = getattr(file_item, "filename", "workload.xlsx")
-        content = await file_item.read()
-        result = api.ingest_sheet(content, filename)
-        return JSONResponse(result.model_dump())
-    except Exception as exc:
-        return JSONResponse({"error": str(exc)}, status_code=400)
-
-
-async def intake_audio(request):
-    try:
-        form = await request.form()
-        file_item = form.get("file")
-        if file_item is None:
-            return JSONResponse({"error": "No audio file uploaded"}, status_code=400)
-        filename = getattr(file_item, "filename", "voice.wav")
-        content = await file_item.read()
-        rules = api.ingest_audio(content, filename)
-        return JSONResponse({"rules": [r.model_dump() for r in rules]})
-    except Exception as exc:
-        return JSONResponse({"error": str(exc)}, status_code=400)
-
-
-async def intake_image(request):
-    try:
-        form = await request.form()
-        file_item = form.get("file")
-        if file_item is None:
-            return JSONResponse({"error": "No image file uploaded"}, status_code=400)
-        filename = getattr(file_item, "filename", "photo.png")
-        content = await file_item.read()
-        rules = api.ingest_image(content, filename)
-        return JSONResponse({"rules": [r.model_dump() for r in rules]})
-    except Exception as exc:
-        return JSONResponse({"error": str(exc)}, status_code=400)
-
-
-async def post_solve(request):
-    try:
-        min_change = request.query_params.get("minimal_change", "true").lower() == "true"
-        result = api.solve(minimal_change=min_change)
-        return JSONResponse(result.model_dump())
-    except Exception as exc:
-        return JSONResponse({"error": str(exc)}, status_code=500)
-
-
-async def get_schedule(request):
+@app.get("/schedule")
+async def get_schedule():
     sched = api.db.latest_schedule()
     if sched:
         return JSONResponse(sched.model_dump())
     return JSONResponse({"message": "No published schedule available yet"}, status_code=404)
 
 
-async def explain_conflict(request):
+@app.post("/solve")
+async def post_solve(minimal_change: bool = True):
     try:
-        data = await request.json()
-        conflict = Conflict.model_validate(data)
+        result = api.solve(minimal_change=minimal_change)
+        return JSONResponse(result.model_dump())
+    except Exception as exc:
+        return JSONResponse({"error": str(exc)}, status_code=500)
+
+
+@app.post("/conflicts/explain")
+async def explain_conflict(conflict_data: dict):
+    try:
+        conflict = Conflict.model_validate(conflict_data)
         explanation = api.explain_conflict(conflict)
         return JSONResponse(explanation.model_dump())
     except Exception as exc:
         return JSONResponse({"error": str(exc)}, status_code=400)
 
 
-async def approve_option(request):
-    option_id = request.path_params["id"]
+@app.post("/options/{id}/approve")
+async def approve_option(id: str, body: dict):
     try:
-        data = await request.json()
-        as_user = data.get("as_user", "")
-        result = api.approve_option(option_id, as_user=as_user)
+        as_user = body.get("as_user", "")
+        result = api.approve_option(id, as_user=as_user)
         return JSONResponse(result.model_dump())
     except Exception as exc:
         return JSONResponse({"error": str(exc)}, status_code=400)
 
 
-async def apply_option(request):
-    option_id = request.path_params["id"]
+@app.post("/options/{id}/apply")
+async def apply_option(id: str):
     try:
-        rule = api.apply_option(option_id)
+        rule = api.apply_option(id)
         return JSONResponse(rule.model_dump())
     except Exception as exc:
         return JSONResponse({"error": str(exc)}, status_code=400)
 
 
-async def get_why(request):
-    session_id = request.path_params["session_id"]
+@app.get("/why/{session_id}")
+async def get_why(session_id: str):
     try:
         rules = api.why_cell(session_id)
         return JSONResponse({"session_id": session_id, "rules": [r.model_dump() for r in rules]})
@@ -254,7 +206,8 @@ async def get_why(request):
         return JSONResponse({"error": str(exc)}, status_code=500)
 
 
-async def post_publish(request):
+@app.post("/publish")
+async def post_publish():
     try:
         pub = api.publish()
         return JSONResponse({
@@ -268,7 +221,8 @@ async def post_publish(request):
         return JSONResponse({"error": str(exc)}, status_code=400)
 
 
-async def post_verify(request):
+@app.post("/verify")
+async def post_verify(request: Request):
     try:
         body = await request.body()
         result = api.verify_file(body)
@@ -277,23 +231,33 @@ async def post_verify(request):
         return JSONResponse({"error": str(exc)}, status_code=400)
 
 
-async def get_events(request):
+@app.get("/events")
+async def get_events():
     try:
         return JSONResponse({"events": api.chain_events()})
     except Exception as exc:
         return JSONResponse({"error": str(exc)}, status_code=500)
 
 
-async def get_scoreboard(request):
+@app.get("/audit")
+async def get_audit():
     try:
-        runs = int(request.query_params.get("runs", 3))
+        return JSONResponse({"events": api.audit_events()})
+    except Exception as exc:
+        return JSONResponse({"error": str(exc)}, status_code=500)
+
+
+@app.get("/scoreboard")
+async def get_scoreboard(runs: int = 3):
+    try:
         res = api.run_scoreboard(runs)
         return JSONResponse(res.model_dump())
     except Exception as exc:
         return JSONResponse({"error": str(exc)}, status_code=500)
 
 
-async def post_seed(request):
+@app.post("/demo/seed")
+async def post_seed():
     try:
         api.seed_demo()
         return JSONResponse({"status": "seeded", "ok": True})
@@ -301,7 +265,8 @@ async def post_seed(request):
         return JSONResponse({"error": str(exc)}, status_code=500)
 
 
-async def post_reset(request):
+@app.post("/demo/reset")
+async def post_reset():
     try:
         api.reset_demo()
         return JSONResponse({"status": "reset", "ok": True})
@@ -309,8 +274,9 @@ async def post_reset(request):
         return JSONResponse({"error": str(exc)}, status_code=500)
 
 
-async def export_format(request):
-    fmt = request.path_params.get("format", "json").lower()
+@app.get("/export/{format}")
+async def export_format(format: str):
+    fmt = format.lower()
     sched = api.db.latest_schedule()
     if not sched:
         return JSONResponse({"error": "No schedule to export"}, status_code=404)
@@ -327,55 +293,12 @@ async def export_format(request):
         return Response(json_bytes(sched), media_type="application/json", headers={"Content-Disposition": "attachment; filename=schedule.json"})
 
 
-async def get_upload(request):
-    filename = request.path_params["filename"]
+@app.get("/uploads/{filename}")
+async def get_upload(filename: str):
     data = api.get_upload(filename)
     if data is None:
         return JSONResponse({"error": "Upload not found"}, status_code=404)
     return Response(data, media_type="application/octet-stream")
-
-
-routes = [
-    Route("/", index, methods=["GET"]),
-    Route("/health", get_health, methods=["GET"]),
-    Route("/roster", get_roster, methods=["GET"]),
-    Route("/rules", get_rules, methods=["GET"]),
-    Route("/rules", post_rule, methods=["POST"]),
-    Route("/rules/{id}", edit_rule, methods=["POST"]),
-    Route("/rules/{id}/confirm", confirm_rule, methods=["POST"]),
-    Route("/rules/{id}/reject", reject_rule, methods=["POST"]),
-    Route("/intake/text", intake_text, methods=["POST"]),
-    Route("/intake/sheet", intake_sheet, methods=["POST"]),
-    Route("/intake/audio", intake_audio, methods=["POST"]),
-    Route("/intake/image", intake_image, methods=["POST"]),
-    Route("/schedule", get_schedule, methods=["GET"]),
-    Route("/solve", post_solve, methods=["POST"]),
-    Route("/conflicts/explain", explain_conflict, methods=["POST"]),
-    Route("/options/{id}/approve", approve_option, methods=["POST"]),
-    Route("/options/{id}/apply", apply_option, methods=["POST"]),
-    Route("/why/{session_id}", get_why, methods=["GET"]),
-    Route("/publish", post_publish, methods=["POST"]),
-    Route("/verify", post_verify, methods=["POST"]),
-    Route("/events", get_events, methods=["GET"]),
-    Route("/audit", get_events, methods=["GET"]),
-    Route("/scoreboard", get_scoreboard, methods=["GET"]),
-    Route("/export/{format}", export_format, methods=["GET"]),
-    Route("/uploads/{filename}", get_upload, methods=["GET"]),
-    Route("/demo/seed", post_seed, methods=["POST"]),
-    Route("/demo/reset", post_reset, methods=["POST"]),
-]
-
-middleware = [
-    Middleware(
-        CORSMiddleware,
-        allow_origins=["*"],
-        allow_methods=["*"],
-        allow_headers=["*"],
-        allow_credentials=True,
-    )
-]
-
-app = Starlette(routes=routes, middleware=middleware)
 
 
 def run():

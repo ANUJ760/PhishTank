@@ -4,7 +4,7 @@ import json, logging, shutil, threading, time
 from pathlib import Path
 from typing import Literal
 from pydantic import BaseModel
-from backend import config, hashing
+from backend import config, export, hashing
 from backend.export import csv_bytes,ics_bytes,json_bytes
 from backend.intake import sheet_parser,voice_photo
 from backend.llm.client import call_json
@@ -31,6 +31,8 @@ def health()->Health:
     from backend.healthcheck import inspect
     return Health(items=inspect())
 def get_roster()->Roster:return db.get_roster()
+def get_pending_schedule()->Schedule|None:return _pending
+def get_latest_schedule()->Schedule|None:return db.latest_schedule()
 def ingest_audio(wav:bytes,filename:str)->list[Rule]:return voice_photo.ingest_audio(wav,filename)
 def ingest_image(img:bytes,filename:str)->list[Rule]:return voice_photo.ingest_image(img,filename)
 def ingest_text(text:str)->list[Rule]:return voice_photo.ingest_text(text)
