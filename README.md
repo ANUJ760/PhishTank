@@ -474,6 +474,57 @@ When a schedule is infeasible, GeCompose searches for valid alternative schedule
 - **Optimization**: CP-SAT minimizes the total relaxation penalty (e.g. preferring slot moves over teacher swaps).
 - **Independent Double-Check**: Every synthesized alternative is independently verified against `verify_schedule` before being returned.
 
+### Disruption Impact Analysis & Minimal-Change Recovery (Phase 4)
+
+When unexpected operational events occur (e.g. computer lab water leak, facility closure, equipment failure), GeCompose provides **Campus Operations Intelligence** to analyze disruption impact and generate a solver-verified replacement schedule that changes as little as possible:
+
+1. **Disruption Modeling**:
+   - [`DisruptionEvent`](file:///home/blxnk/agy-workspace/PhishTank/gecompose/models.py): Structured real-world events specifying affected resources (`ResourceType.ROOM` or `ResourceType.TEACHER`) and unavailable time windows (via slot IDs or `day` + `start_time` + `end_time` intervals).
+2. **Impact Analysis**:
+   - [`analyze_impact`](file:///home/blxnk/agy-workspace/PhishTank/gecompose/api.py): Scans the active schedule, directly identifying invalidated assignments while isolating unaffected sessions without assuming artificial cascades.
+3. **Minimal-Change Recovery Optimization**:
+   - [`recover_schedule`](file:///home/blxnk/agy-workspace/PhishTank/gecompose/api.py): Reuses the CP-SAT engine to strictly satisfy all hard physical invariants (qualifications, capacity, availability, room/teacher non-overlap) alongside the new disruption.
+   - **Explicit Objective Function**: Minimizes total weighted schedule disruption:
+     $$\min \sum_{s} \sum_{t, r, k} \Big( w_{\text{room}}\cdot \mathbb{I}(r \ne r_0) + w_{\text{slot}}\cdot \mathbb{I}(k \ne k_0) + w_{\text{teacher}}\cdot \mathbb{I}(t \ne t_0) + w_{\text{displacement}}\cdot \mathbb{I}(s \notin \text{impacted} \land \text{moved}) \Big) x_{s,t,r,k}$$
+   - **Unaffected Session Protection**: A high displacement penalty ($w_{\text{displacement}} = 25$) prevents unnecessary schedule churn; unaffected sessions are only moved if mathematically required to avoid clashing.
+   - **Honest Infeasibility Reporting**: If no feasible recovery exists within resource limits, GeCompose returns `INFEASIBLE` with clear error explanations rather than silently dropping constraints.
+
+#### Recovery Workflow Example
+
+```python
+from gecompose import GeComposeEngine, DisruptionEvent, ResourceType, RecoveryPolicy
+
+engine = GeComposeEngine()
+
+# 1. Define real-world disruption event
+disruption = DisruptionEvent(
+    id="lab_closure",
+    resource_type=ResourceType.ROOM,
+    resource_id="lab_101",
+    slot_ids={"mon_0900"},
+    reason="Emergency maintenance",
+)
+
+# 2. Analyze impact on active schedule
+impact = engine.analyze_disruption_impact(problem, current_assignments, disruption)
+print(f"Directly affected sessions: {impact.directly_affected_session_ids}")
+
+# 3. Solve minimal-change recovery schedule
+recovery = engine.recover_schedule(problem, current_assignments, disruption)
+
+if recovery.is_success:
+    print(f"Recovery succeeded with {recovery.total_changes} change(s)!")
+    for change in recovery.changes:
+        print(f"  * {change.session_id}: {change.reason}")
+else:
+    print(f"Recovery impossible: {recovery.message}")
+```
+
+Run the Phase 4 runnable demo:
+```bash
+.venv/bin/python examples/demo_disruption_recovery.py
+```
+
 ### Installation & Test Suite
 
 ```bash
@@ -481,7 +532,7 @@ When a schedule is infeasible, GeCompose searches for valid alternative schedule
 python3 -m venv .venv
 .venv/bin/pip install -e .
 
-# Run the complete test suite (71 passing tests)
+# Run the complete test suite (93 passing tests)
 .venv/bin/pytest -v
 ```
 
