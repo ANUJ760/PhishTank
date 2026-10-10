@@ -530,7 +530,7 @@ Run the Phase 4 runnable demo:
 python3 -m venv .venv
 .venv/bin/pip install -e .
 
-# Run the complete test suite (115 passing tests)
+# Run the complete test suite (93 passing tests)
 .venv/bin/pytest -v
 ```
 
