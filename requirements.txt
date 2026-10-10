@@ -1,6 +1,5 @@
 ortools>=9.11
 pydantic>=2.7
-web3>=7
 streamlit>=1.40
 pandas>=2.2
 openpyxl>=3.1

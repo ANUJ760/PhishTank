@@ -29,17 +29,6 @@ def inspect()->dict[str,dict]:
     else:
         ok,detail=_command([docker,"info"]); image_ok,image_detail=_command([docker,"image","inspect",config.SANDBOX_IMAGE])
         items["docker"]={"ok":ok and image_ok,"detail":detail if not ok else image_detail if not image_ok else "Docker and sandbox image available"}
-    try:
-        from web3 import Web3
-        w3=Web3(Web3.HTTPProvider(config.RPC_URL,request_kwargs={"timeout":3}));connected=w3.is_connected()
-        items["anvil"]={"ok":connected,"detail":config.RPC_URL if connected else "RPC connection failed"}
-        artifact=Path("contracts/out/ConsentLedger.sol/ConsentLedger.json"); deployment=Path("data/deployment.json")
-        if connected and artifact.is_file() and deployment.is_file():
-            address=json.loads(deployment.read_text(encoding="utf-8"))["address"]; code=w3.eth.get_code(address)
-            items["contract"]={"ok":len(code)>0,"detail":address if code else "No code at deployment address; chain may have restarted"}
-        else:items["contract"]={"ok":False,"detail":"Contract artifact or deployment file is missing"}
-    except Exception as exc:
-        items["anvil"]={"ok":False,"detail":str(exc)};items["contract"]={"ok":False,"detail":"Could not check deployment"}
     return items
 def main()->int:
     parser=argparse.ArgumentParser();parser.add_argument("--audio");args=parser.parse_args()

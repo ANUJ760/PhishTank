@@ -29,7 +29,7 @@ async def index(request):
     </head>
     <body>
         <h1>GeCompose Backend Engine</h1>
-        <p>Constraint-Satisfaction Timetable Scheduling with Multi-Party Consent & Blockchain Verification.</p>
+        <p>Constraint-Satisfaction Timetable Scheduling with Multi-Party Consent & Deterministic Verification.</p>
         
         <div class="card">
             <h3>System Status</h3>
@@ -46,10 +46,10 @@ async def index(request):
                 <li><a href="/roster"><code>GET /roster</code></a> - Active university department roster</li>
                 <li><a href="/rules"><code>GET /rules</code></a> - List active constraints and rules</li>
                 <li><a href="/schedule"><code>GET /schedule</code></a> - Current solver-generated timetable schedule</li>
-                <li><a href="/events"><code>GET /events</code></a> - Smart contract events on Anvil ledger</li>
+                <li><a href="/events"><code>GET /events</code></a> - Consent ledger and system audit events</li>
                 <li><a href="/scoreboard"><code>GET /scoreboard</code></a> - Constraint violation benchmarks</li>
                 <li><code>POST /solve</code> - Trigger CP-SAT solver</li>
-                <li><code>POST /publish</code> - Publish & anchor schedule on blockchain</li>
+                <li><code>POST /publish</code> - Publish verified schedule to registry</li>
                 <li><code>POST /demo/seed</code> - Seed initial demonstration rules and schedule</li>
                 <li><code>POST /demo/reset</code> - Reset demo environment</li>
             </ul>
@@ -90,6 +90,7 @@ async def post_publish(request):
             "hash": pub.hash,
             "tx_hash": pub.tx_hash,
             "version": pub.version,
+            "published": True,
             "anchored": True
         })
     except Exception as e:
