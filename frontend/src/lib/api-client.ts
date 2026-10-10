@@ -34,8 +34,34 @@ import {
   VerifyResult,
 } from "@/types/api";
 
-const API_ROOT = import.meta.env.VITE_API_URL ? String(import.meta.env.VITE_API_URL).replace(/\/+$/, "") : "";
+const rawApiUrl = (
+  import.meta.env.VITE_API_URL ||
+  (import.meta.env as any).NEXT_PUBLIC_API_URL ||
+  import.meta.env.VITE_API_BASE_URL ||
+  ""
+);
+export const API_ROOT = String(rawApiUrl).replace(/\/+$/, "").replace(/\/api\/v1$/, "");
 const BASE_URL = `${API_ROOT}/api/v1`;
+
+export interface ChatMessagePayload {
+  role: "user" | "model" | "assistant";
+  content: string;
+}
+
+export interface ChatResponsePayload {
+  role: string;
+  content: string;
+  model: string;
+}
+
+export interface StreamChatOptions {
+  messages: ChatMessagePayload[];
+  system_prompt?: string;
+  onChunk: (delta: string) => void;
+  onDone?: (fullText: string) => void;
+  onError?: (error: Error) => void;
+  signal?: AbortSignal;
+}
 
 export class ApiError extends Error {
   status: number;
@@ -331,6 +357,126 @@ export const api = {
   demo: {
     seed: () => request<{ ok: boolean; message: string }>("/demo/seed", { method: "POST" }),
     reset: () => request<{ ok: boolean; message: string }>("/demo/reset", { method: "POST" }),
+  },
+
+  // Gemma 4 via Gemini API Chat Client
+  chat: {
+    send: async (
+      messages: ChatMessagePayload[],
+      system_prompt?: string
+    ): Promise<ChatResponsePayload> => {
+      const url = `${API_ROOT}/api/chat`;
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ messages, stream: false, system_prompt }),
+      });
+      if (!res.ok) {
+        let errData: any = null;
+        try {
+          errData = await res.json();
+        } catch {
+          // ignore non-json error responses
+        }
+        const msg =
+          (errData && (errData.detail || errData.error || errData.message)) ||
+          res.statusText ||
+          `Chat request failed (${res.status})`;
+        throw new ApiError(res.status, msg, errData);
+      }
+      return res.json();
+    },
+
+    stream: async ({
+      messages,
+      system_prompt,
+      onChunk,
+      onDone,
+      onError,
+      signal,
+    }: StreamChatOptions): Promise<string> => {
+      const url = `${API_ROOT}/api/chat`;
+      let accumulatedText = "";
+      try {
+        const res = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ messages, stream: true, system_prompt }),
+          signal,
+        });
+
+        if (!res.ok) {
+          let errData: any = null;
+          try {
+            errData = await res.json();
+          } catch {
+            // ignore non-json error responses
+          }
+          const msg =
+            (errData && (errData.detail || errData.error || errData.message)) ||
+            res.statusText ||
+            `Streaming failed (${res.status})`;
+          const err = new ApiError(res.status, msg, errData);
+          if (onError) onError(err);
+          throw err;
+        }
+
+        if (!res.body) {
+          throw new Error("Streaming is not supported in this browser environment.");
+        }
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder("utf-8");
+        let buffer = "";
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() || "";
+
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed || trimmed.startsWith(":")) continue;
+
+            if (trimmed.startsWith("data: ")) {
+              const dataStr = trimmed.slice(6).trim();
+              if (dataStr === "[DONE]") {
+                continue;
+              }
+              try {
+                const parsed = JSON.parse(dataStr);
+                if (parsed.delta) {
+                  accumulatedText += parsed.delta;
+                  onChunk(parsed.delta);
+                } else if (parsed.error) {
+                  const err = new Error(parsed.detail || parsed.error);
+                  if (onError) onError(err);
+                  throw err;
+                }
+              } catch {
+                // Ignore SSE framing json parse errors
+              }
+            } else if (trimmed.startsWith("event: error")) {
+              // Handled by inner JSON data error chunk
+            }
+          }
+        }
+
+        if (onDone) onDone(accumulatedText);
+        return accumulatedText;
+      } catch (err: any) {
+        if (err.name === "AbortError") {
+          return accumulatedText;
+        }
+        if (onError) onError(err);
+        throw err;
+      }
+    },
   },
 };
 

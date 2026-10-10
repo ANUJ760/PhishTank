@@ -102,22 +102,43 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS setup for Vite frontend (http://localhost:5173 and others)
+from backend.chat.router import router as chat_router
+
+# Build allowed CORS origins from default dev ports and configured FRONTEND_URL
+cors_origins = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
+    "http://localhost:8501",
+    "https://d2327vtp9wi2bc.cloudfront.net",
+    "http://gecompose-frontend-030933799922.s3-website.ap-south-1.amazonaws.com",
+]
+if getattr(config, "FRONTEND_URL", None):
+    for origin in config.FRONTEND_URL.split(","):
+        clean_origin = origin.strip().rstrip("/")
+        if clean_origin and clean_origin not in cors_origins:
+            cors_origins.append(clean_origin)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        "http://localhost:8000",
-        "http://127.0.0.1:8000",
-        "http://localhost:8501",
-    ],
+    allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Include Gemma 4 / Gemini API Chat Router
+app.include_router(chat_router)
+
+
+# AWS Health Check endpoint
+@app.get("/health", tags=["system"], summary="AWS Health Check")
+def aws_health():
+    """AWS health check returning { 'status': 'ok' }."""
+    return {"status": "ok"}
 
 
 # =========================================================================

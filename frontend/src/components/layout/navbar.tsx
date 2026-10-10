@@ -20,6 +20,7 @@ import {
   Activity,
   Cpu,
   ShieldCheck,
+  Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
@@ -28,6 +29,7 @@ import { useQueryClient } from "@tanstack/react-query";
 
 const primaryNav = [
   { label: "Dashboard", to: "/app/dashboard", icon: LayoutDashboard },
+  { label: "Gemma AI", to: "/app/chat", icon: Sparkles },
   { label: "Schedule", to: "/app/schedule", icon: Calendar },
   { label: "ReliefOps", to: "/app/reliefops", icon: LifeBuoy },
   { label: "MedOps", to: "/app/medops", icon: Activity },

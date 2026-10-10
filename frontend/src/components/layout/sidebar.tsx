@@ -13,6 +13,7 @@ import {
   Settings,
   ChevronLeft,
   ChevronRight,
+  Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
@@ -32,6 +33,7 @@ export function Sidebar({ isCollapsed, setIsCollapsed }: SidebarProps) {
 
   const navItems = [
     { label: "Dashboard", to: "/app/dashboard", icon: LayoutDashboard },
+    { label: "Gemma AI", to: "/app/chat", icon: Sparkles },
     { label: "Intake", to: "/app/intake", icon: Inbox },
     { label: "Constraints", to: "/app/rules", icon: Sliders },
     { label: "Schedule", to: "/app/schedule", icon: Calendar },

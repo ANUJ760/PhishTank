@@ -326,8 +326,11 @@ async def get_upload(filename: str):
 
 
 def run():
+    import os
     import uvicorn
-    uvicorn.run("backend.server:app", host="127.0.0.1", port=8000, reload=False)
+    host = os.getenv("HOST", "0.0.0.0")
+    port = getattr(config, "PORT", 8000)
+    uvicorn.run("backend.server:app", host=host, port=port, reload=False)
 
 
 if __name__ == "__main__":

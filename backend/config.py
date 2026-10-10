@@ -28,10 +28,23 @@ def _float(name: str, default: float) -> float:
 
 MOCK_LLM = os.getenv("MOCK_LLM", "0") == "1"
 LLM_FALLBACK_TO_MOCK = os.getenv("LLM_FALLBACK_TO_MOCK", "1") == "1"
-LLM_PROVIDER = os.getenv("LLM_PROVIDER", "ollama").lower()
+LLM_PROVIDER = os.getenv("LLM_PROVIDER", "gemini").lower()
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434").rstrip("/")
 INTAKE_MODEL = os.getenv("INTAKE_MODEL", "gemma:4b")
 REASON_MODEL = os.getenv("REASON_MODEL", "gemma:12b")
+
+# Official Google Gemini API & Gemma Cloud Model Configuration
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+MODEL_NAME = os.getenv("MODEL_NAME", "gemma-4-26b-a4b-it")
+FRONTEND_URL = os.getenv(
+    "FRONTEND_URL",
+    "https://d2327vtp9wi2bc.cloudfront.net,http://gecompose-frontend-030933799922.s3-website.ap-south-1.amazonaws.com,http://localhost:5173,http://127.0.0.1:5173",
+)
+PORT = _int("PORT", 8000)
+SYSTEM_PROMPT = os.getenv(
+    "SYSTEM_PROMPT",
+    "You are the GeCompose AI Intelligence Assistant powered by Google Gemma 4. You assist users with timetable generation, constraint solving, conflict explanation, and operational logistics.",
+)
 
 default_v1 = f"{OLLAMA_BASE_URL}/v1" if LLM_PROVIDER == "ollama" else "http://127.0.0.1:8080/v1"
 INTAKE_URL = os.getenv("INTAKE_URL", default_v1)

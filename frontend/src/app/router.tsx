@@ -23,6 +23,7 @@ import { SettingsPage } from "@/features/settings/settings-page";
 import { ReliefOpsPage } from "@/features/reliefops/reliefops-page";
 import { MedOpsPage } from "@/features/medops/medops-page";
 import { UniversalSolverPage } from "@/features/universal/universal-page";
+import { ChatPage } from "@/features/chat/chat-page";
 
 export const router = createBrowserRouter([
   {
@@ -52,6 +53,10 @@ export const router = createBrowserRouter([
       {
         path: "dashboard",
         element: <DashboardPage />,
+      },
+      {
+        path: "chat",
+        element: <ChatPage />,
       },
       {
         path: "reliefops",
