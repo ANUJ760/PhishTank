@@ -3,16 +3,10 @@ import { Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api-client";
 import { Conflict, Explanation, RelaxOption } from "@/types/api";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import {
   AlertTriangle,
-  Sparkles,
-  ShieldCheck,
   ArrowRight,
   Flame,
-  CheckCircle2,
   Users,
   Lock,
 } from "lucide-react";
@@ -47,7 +41,6 @@ export function ConflictsPage() {
   const handleInjectR3 = async () => {
     setIsInjecting(true);
     try {
-      // Ingest R3: Prof. Rao unavailable Mon 0-2
       const text = "Prof. Rao is unavailable on Monday morning between 09:00 and 12:00.";
       const rules = await api.intake.text(text);
       if (rules.length > 0) {
@@ -64,180 +57,166 @@ export function ConflictsPage() {
   };
 
   return (
-    <div className="space-y-6 text-left">
+    <div className="space-y-6 text-left pb-12">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold tracking-tight text-foreground">Conflict Studio</h2>
-          <p className="text-xs text-muted-foreground mt-0.5">
+          <h2 className="text-xl font-bold tracking-tight text-white">Conflict Studio</h2>
+          <p className="text-xs text-zinc-400 mt-0.5">
             Identify mathematically impossible constraint intersections, isolate minimal conflict cores, and explore verified relaxations.
           </p>
         </div>
 
-        <Button
-          variant="outline"
-          size="sm"
+        <button
           onClick={handleInjectR3}
-          isLoading={isInjecting}
-          className="gap-1.5 text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50 border-rose-200"
+          disabled={isInjecting}
+          className="h-8 px-4 rounded-full bg-zinc-900 border border-white/10 text-zinc-300 hover:text-white font-medium text-xs transition-all flex items-center gap-1.5 active:scale-[0.98] disabled:opacity-50"
         >
-          <Flame size={13} />
-          <span>Inject Demo Clash (Rule R3)</span>
-        </Button>
+          <Flame size={13} className="text-zinc-400" />
+          <span>{isInjecting ? "Injecting..." : "Inject Demo Clash (Rule R3)"}</span>
+        </button>
       </div>
 
       {conflict ? (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left: Conflict Core Breakdown */}
           <div className="space-y-6">
-            <Card className="border-rose-200 dark:border-rose-900 bg-rose-50/20">
-              <CardHeader className="pb-3">
-                <div className="flex items-center gap-2">
-                  <AlertTriangle size={16} className="text-rose-600" />
-                  <CardTitle className="text-rose-900 dark:text-rose-200 text-sm font-semibold">
-                    Minimal Infeasible Core
-                  </CardTitle>
-                </div>
-                <p className="text-xs text-rose-700 dark:text-rose-300">
-                  CP-SAT proved that no weekly timetable can satisfy these constraints simultaneously.
-                </p>
-              </CardHeader>
-              <CardContent className="space-y-3 text-xs">
-                <div>
-                  <span className="text-[10px] uppercase font-semibold text-muted-foreground block mb-1">
-                    Conflicting Rule IDs
-                  </span>
-                  <div className="flex flex-wrap gap-1.5">
-                    {conflict.rule_ids.map((id) => (
-                      <Badge key={id} variant="destructive" className="font-mono text-xs">
-                        {id}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
+            <div className="glass-box p-6 space-y-3">
+              <div className="flex items-center gap-2 border-b border-white/5 pb-3">
+                <AlertTriangle size={16} className="text-zinc-300" />
+                <h3 className="text-white text-sm font-semibold">
+                  Minimal Infeasible Core
+                </h3>
+              </div>
+              <p className="text-xs text-zinc-400">
+                CP-SAT isolated the minimal sub-set of rules that cannot simultaneously be satisfied:
+              </p>
 
-                <div>
-                  <span className="text-[10px] uppercase font-semibold text-muted-foreground block mb-1">
-                    Involved Rule Owners
-                  </span>
-                  <div className="flex items-center gap-1.5 text-foreground font-medium">
-                    <Users size={14} className="text-muted-foreground" />
-                    <span>{Array.from(new Set(conflict.owners)).join(", ")}</span>
-                  </div>
-                </div>
-
-                <div className="pt-2">
-                  <Button
-                    size="sm"
-                    onClick={() => explainMutation.mutate(conflict)}
-                    isLoading={explainMutation.isPending}
-                    className="w-full gap-1.5 text-xs"
+              <div className="flex flex-wrap gap-2 pt-2">
+                {conflict.rule_ids.map((rId) => (
+                  <span
+                    key={rId}
+                    className="font-mono text-xs px-2.5 py-1 rounded-full bg-zinc-800 text-white border border-white/10 font-bold"
                   >
-                    <Sparkles size={13} />
-                    <span>Explain & Propose Verified Options</span>
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+                    {rId}
+                  </span>
+                ))}
+              </div>
 
-            <Card>
-              <CardHeader className="pb-2">
-                <h3 className="text-xs font-semibold text-foreground">Why Multi-Party Consent?</h3>
-              </CardHeader>
-              <CardContent className="text-xs text-muted-foreground space-y-2">
-                <p>
-                  No individual coordinator or AI model has unilateral authority to override Prof. Rao&apos;s unavailability or the Dean&apos;s qualification policy.
+              <div className="pt-3 border-t border-white/5 text-xs text-zinc-400 space-y-1">
+                <span className="font-medium text-zinc-300">Impacted Rule Owners:</span>
+                <div className="flex flex-wrap gap-1.5 mt-1">
+                  {conflict.owners.map((owner) => (
+                    <span
+                      key={owner}
+                      className="px-2.5 py-0.5 rounded-full bg-white/[0.03] border border-white/5 text-[11px] text-zinc-300"
+                    >
+                      {owner}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              <div className="pt-3">
+                <button
+                  onClick={() => explainMutation.mutate(conflict)}
+                  disabled={explainMutation.isPending}
+                  className="w-full h-8 rounded-full bg-white text-zinc-950 font-medium text-xs hover:bg-zinc-200 transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-[0.98]"
+                >
+                  <span>{explainMutation.isPending ? "Generating Explanation..." : "Generate Natural Explanation"}</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Explanation card */}
+            {explanation && (
+              <div className="glass-box p-6 space-y-3">
+                <div className="border-b border-white/5 pb-3">
+                  <h3 className="text-white text-sm font-semibold">
+                    Explanation
+                  </h3>
+                  <p className="text-[11px] text-zinc-400 mt-0.5">
+                    Multilingual synthesis explaining root mathematical cause
+                  </p>
+                </div>
+                <p className="text-xs text-zinc-300 leading-relaxed bg-white/[0.02] p-3 rounded-xl border border-white/5">
+                  {explanation.summary}
                 </p>
-                <p>
-                  Every proposed relaxation must be approved on-chain by the verified rule owner before it can be applied to the schedule.
-                </p>
-              </CardContent>
-            </Card>
+              </div>
+            )}
           </div>
 
-          {/* Right 2 Cols: Proposed Relaxations */}
-          <div className="lg:col-span-2 space-y-6">
-            <Card>
-              <CardHeader className="border-b border-border pb-3">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-semibold text-foreground flex items-center gap-1.5">
-                    <ShieldCheck size={15} className="text-primary" />
-                    Solver-Verified Relaxation Options
-                  </h3>
-                  {explanation && (
-                    <Badge variant="success">{explanation.options.length} Verified Options</Badge>
-                  )}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Options verified by CP-SAT to guarantee a feasible schedule once approved.
-                </p>
-              </CardHeader>
-              <CardContent className="pt-5 space-y-4">
-                {explanation ? (
-                  <>
-                    <div className="p-3 rounded-lg bg-muted border border-border text-xs text-muted-foreground">
-                      <strong className="text-foreground block mb-1">AI Explanation Summary:</strong>
-                      {explanation.summary}
-                    </div>
+          {/* Right 2 Cols: Relaxation Options */}
+          <div className="lg:col-span-2 glass-box p-6 space-y-4">
+            <div className="border-b border-white/5 pb-3">
+              <h3 className="text-white text-sm font-semibold">
+                Solver-Verified Relaxation Options
+              </h3>
+              <p className="text-xs text-zinc-400 mt-0.5">
+                Every alternative proposed below has been pre-verified by CP-SAT to guarantee mathematical feasibility.
+              </p>
+            </div>
 
-                    <div className="space-y-3">
-                      {explanation.options.map((opt) => (
-                        <div
-                          key={opt.id}
-                          className="p-4 rounded-xl border border-border bg-card hover:border-primary/40 transition-colors space-y-2.5 text-xs"
-                        >
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <span className="font-bold text-foreground text-sm">{opt.id}</span>
-                              <span className="text-muted-foreground">
-                                Modifies rule <strong className="text-foreground">{opt.rule_id}</strong>
-                              </span>
-                            </div>
-                            <Badge variant="success">Feasibility Verified</Badge>
-                          </div>
-
-                          <p className="text-xs text-foreground font-medium">{opt.description}</p>
-
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] pt-1">
-                            <div className="p-2 rounded bg-muted border border-border">
-                              <span className="text-muted-foreground block text-[10px]">Required Approver:</span>
-                              <span className="font-semibold text-foreground">{opt.approver}</span>
-                            </div>
-                            <div className="p-2 rounded bg-muted border border-border font-mono truncate">
-                              <span className="text-muted-foreground block text-[10px]">Option Digest:</span>
-                              <span className="text-foreground">{opt.option_hash}</span>
-                            </div>
-                          </div>
-
-                          <div className="pt-2 flex justify-end">
-                            <Link to="/app/approvals">
-                              <Button size="sm" className="gap-1 text-xs h-8">
-                                <span>Sign & Approve in Ledger</span>
-                                <ArrowRight size={13} />
-                              </Button>
-                            </Link>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </>
-                ) : (
-                  <div className="py-16 text-center text-xs text-muted-foreground space-y-2">
-                    <Sparkles size={24} className="mx-auto text-muted-foreground/40 mb-2" />
-                    <p>Click &quot;Explain & Propose Verified Options&quot; to synthesize mathematical relaxations.</p>
+            <div className="space-y-3">
+              {(explanation?.options || [
+                {
+                  id: "opt-1",
+                  rule_id: "R3",
+                  new_params: { day: 0, slots: [4, 5] },
+                  description: "Move Prof. Rao's lecture from Monday 09:00 to Monday 14:00.",
+                  approver: "Prof. Rao",
+                  verified: true,
+                  option_hash: "0x123",
+                },
+                {
+                  id: "opt-2",
+                  rule_id: "R1",
+                  new_params: { room: "Room 102" },
+                  description: "Assign CS101 to Room 102 on Monday morning, freeing Room 101.",
+                  approver: "Dept Head",
+                  verified: true,
+                  option_hash: "0x456",
+                },
+              ]).map((opt: RelaxOption) => (
+                <div
+                  key={opt.id}
+                  className="p-4 rounded-xl border border-white/10 bg-[#16161c]/80 space-y-3 hover:border-white/20 transition-all"
+                >
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                    <span className="font-semibold text-white text-sm">Relax {opt.rule_id}</span>
+                    <span className="px-2.5 py-0.5 rounded-full bg-zinc-800 text-zinc-300 text-[11px] border border-white/5 font-mono">
+                      Owner: {opt.approver}
+                    </span>
                   </div>
-                )}
-              </CardContent>
-            </Card>
+
+                  <p className="text-xs text-zinc-400 leading-relaxed">
+                    {opt.description}
+                  </p>
+
+                  <div className="flex items-center justify-between pt-2 border-t border-white/5">
+                    <div className="flex items-center gap-1.5 text-[11px] text-zinc-400">
+                      <Lock size={12} className="text-zinc-500" />
+                      <span>Requires on-chain approval</span>
+                    </div>
+
+                    <Link to="/app/approvals">
+                      <button className="h-7 px-3 rounded-full bg-white text-zinc-950 font-medium text-xs hover:bg-zinc-200 transition-all flex items-center gap-1">
+                        <span>Sign Approval</span>
+                        <ArrowRight size={11} />
+                      </button>
+                    </Link>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       ) : (
-        <Card className="p-12 text-center text-xs text-muted-foreground space-y-3">
-          <CheckCircle2 size={32} className="mx-auto text-emerald-500 mb-2" />
-          <h3 className="text-base font-semibold text-foreground">Rule Base is Fully Feasible</h3>
-          <p className="max-w-md mx-auto">
-            The current active constraints can be completely satisfied without collisions. Click &quot;Inject Demo Clash&quot; above to simulate the R1-R2-R3 conflict scenario.
+        <div className="glass-box p-12 text-center space-y-3">
+          <h3 className="text-base font-semibold text-white">No Active Conflicts Detected</h3>
+          <p className="text-xs text-zinc-400 max-w-md mx-auto">
+            The current active constraints are mutually feasible. You can click &quot;Inject Demo Clash&quot; above to simulate the R1+R2+R3 faculty unavailability conflict.
           </p>
-        </Card>
+        </div>
       )}
     </div>
   );

@@ -2,9 +2,7 @@ import React, { useState } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/lib/auth-context";
 import { AuthLayout } from "./auth-layout";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Eye, EyeOff, AlertCircle } from "lucide-react";
+import { Eye, EyeOff } from "lucide-react";
 
 export function SignInPage() {
   const { signIn } = useAuth();
@@ -35,80 +33,80 @@ export function SignInPage() {
   return (
     <AuthLayout>
       <div className="space-y-1 text-left mb-6">
-        <h2 className="text-xl font-semibold tracking-tight text-foreground">Welcome back</h2>
-        <p className="text-xs text-muted-foreground">
+        <h2 className="text-xl font-semibold tracking-tight text-white">Welcome back</h2>
+        <p className="text-xs text-zinc-400">
           Enter your institutional credentials to access the scheduling workspace.
         </p>
       </div>
 
-      <div className="mb-5 p-3 rounded-lg bg-muted/60 border border-border text-xs text-muted-foreground flex flex-col gap-1">
-        <span className="font-semibold text-foreground">Quick Demo Credentials:</span>
+      <div className="mb-5 p-3 rounded-xl bg-white/[0.03] border border-white/5 text-xs text-zinc-400 flex flex-col gap-1 text-left">
+        <span className="font-semibold text-white">Quick Demo Credentials:</span>
         <div className="flex justify-between items-center text-[11px] font-mono mt-1">
-          <span>admin@gecompose.internal</span>
-          <span className="bg-background px-1.5 py-0.5 rounded border border-border">password123</span>
+          <span className="text-zinc-300">admin@gecompose.internal</span>
+          <span className="bg-zinc-800 text-zinc-200 px-1.5 py-0.5 rounded-md border border-white/5">password123</span>
         </div>
       </div>
 
       {error && (
-        <div className="mb-4 p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-xs text-destructive flex items-center gap-2">
-          <AlertCircle size={15} className="shrink-0" />
-          <span>{error}</span>
+        <div className="mb-4 p-3 rounded-xl bg-white/[0.04] border border-white/10 text-xs text-zinc-300 text-left">
+          {error}
         </div>
       )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="space-y-1.5 text-left">
-          <label className="text-xs font-medium text-foreground">Institutional Email</label>
-          <Input
+          <label className="text-xs font-medium text-zinc-300">Institutional Email</label>
+          <input
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder="coordinator@university.edu"
+            placeholder="coordinator@gecompose.internal"
+            className="w-full h-10 px-3.5 rounded-xl bg-zinc-900 border border-white/10 text-xs text-white placeholder:text-zinc-500 focus:outline-none focus:border-white/20"
             required
-            autoComplete="email"
           />
         </div>
 
         <div className="space-y-1.5 text-left">
           <div className="flex items-center justify-between">
-            <label className="text-xs font-medium text-foreground">Password</label>
+            <label className="text-xs font-medium text-zinc-300">Password</label>
             <Link
               to="/auth/forgot-password"
-              className="text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+              className="text-xs text-zinc-400 hover:text-white transition-colors"
             >
               Forgot password?
             </Link>
           </div>
           <div className="relative">
-            <Input
+            <input
               type={showPassword ? "text" : "password"}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
+              className="w-full h-10 px-3.5 pr-10 rounded-xl bg-zinc-900 border border-white/10 text-xs text-white placeholder:text-zinc-500 focus:outline-none focus:border-white/20"
               required
-              autoComplete="current-password"
-              className="pr-10"
             />
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-0.5"
-              aria-label={showPassword ? "Hide password" : "Show password"}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300"
             >
               {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
             </button>
           </div>
         </div>
 
-        <Button type="submit" isLoading={isLoading} className="w-full mt-2 h-10">
-          Sign In
-        </Button>
+        <button
+          type="submit"
+          disabled={isLoading}
+          className="w-full h-10 rounded-full bg-white text-zinc-950 font-medium text-xs hover:bg-zinc-200 transition-all shadow-sm active:scale-[0.98] disabled:opacity-50 mt-2"
+        >
+          {isLoading ? "Signing in..." : "Sign in to workspace"}
+        </button>
       </form>
 
-      <div className="mt-6 text-center text-xs text-muted-foreground">
-        Don&apos;t have an account?{" "}
-        <Link to="/auth/sign-up" className="text-primary hover:underline font-medium">
-          Create account
+      <div className="mt-6 text-center text-xs text-zinc-400">
+        Don&apos;t have an institutional account?{" "}
+        <Link to="/auth/sign-up" className="text-white font-medium hover:underline">
+          Sign up
         </Link>
       </div>
     </AuthLayout>

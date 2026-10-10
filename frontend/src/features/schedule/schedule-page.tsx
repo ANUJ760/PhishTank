@@ -3,17 +3,11 @@ import { Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api-client";
 import { Placement, Rule, SolveResult } from "@/types/api";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import {
   Zap,
   HelpCircle,
-  AlertTriangle,
-  CheckCircle2,
   Calendar,
   Layers,
-  Sparkles,
   ArrowRight,
   Info,
 } from "lucide-react";
@@ -29,7 +23,6 @@ export function SchedulePage() {
       try {
         return await api.schedules.latest();
       } catch {
-        // try pending if latest not yet published
         try {
           return await api.schedules.pending();
         } catch {
@@ -70,62 +63,49 @@ export function SchedulePage() {
   const lastSolveResult = solveMutation.data;
 
   return (
-    <div className="space-y-6 text-left">
+    <div className="space-y-6 text-left pb-12">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold tracking-tight text-foreground">Timetable Schedule Grid</h2>
-          <p className="text-xs text-muted-foreground mt-0.5">
+          <h2 className="text-xl font-bold tracking-tight text-white">Timetable Schedule Grid</h2>
+          <p className="text-xs text-zinc-400 mt-0.5">
             Synchronous constraint optimization grid across standard weekly academic slots.
           </p>
         </div>
 
         <div className="flex items-center gap-3">
-          <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer select-none">
+          <label className="flex items-center gap-2 text-xs text-zinc-400 cursor-pointer select-none">
             <input
               type="checkbox"
               checked={minimalChange}
               onChange={(e) => setMinimalChange(e.target.checked)}
-              className="rounded border-border text-primary focus:ring-primary h-3.5 w-3.5"
+              className="rounded bg-zinc-900 border-white/10 text-white focus:ring-0 h-3.5 w-3.5"
             />
             <span>Minimal Change Mode</span>
           </label>
 
-          <Button
-            size="sm"
+          <button
             onClick={() => solveMutation.mutate(minimalChange)}
-            isLoading={solveMutation.isPending}
-            className="gap-1.5 text-xs h-8"
+            disabled={solveMutation.isPending}
+            className="h-8 px-4 rounded-full bg-white text-zinc-950 font-medium text-xs hover:bg-zinc-200 transition-all flex items-center gap-1.5 shadow-sm active:scale-[0.98] disabled:opacity-50"
           >
-            <Zap size={13} className="text-amber-400" />
-            <span>Solve (CP-SAT)</span>
-          </Button>
+            <Zap size={13} className="text-zinc-950" />
+            <span>{solveMutation.isPending ? "Solving..." : "Solve (CP-SAT)"}</span>
+          </button>
 
           <Link to="/app/publish">
-            <Button variant="outline" size="sm" className="text-xs h-8 gap-1">
+            <button className="h-8 px-4 rounded-full bg-zinc-900 border border-white/10 text-zinc-300 hover:text-white font-medium text-xs transition-all flex items-center gap-1">
               <span>Publish</span>
-              <ArrowRight size={13} />
-            </Button>
+              <ArrowRight size={12} />
+            </button>
           </Link>
         </div>
       </div>
 
-      {/* Solver Feedback Banner */}
+      {/* Solver Feedback Banner (Clean dark glass, NO green/red boxes) */}
       {lastSolveResult && (
-        <div
-          className={`p-3 rounded-lg border text-xs flex items-center justify-between ${
-            lastSolveResult.status === "feasible"
-              ? "bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300 dark:border-emerald-800"
-              : lastSolveResult.status === "infeasible"
-              ? "bg-rose-50 text-rose-800 border-rose-200 dark:bg-rose-950/30 dark:text-rose-300 dark:border-rose-800"
-              : "bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-800"
-          }`}
-        >
-          <div className="flex items-center gap-2">
-            {lastSolveResult.status === "feasible" ? (
-              <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
-            ) : (
-              <AlertTriangle size={16} className="text-rose-600 shrink-0" />
-            )}
+        <div className="p-3.5 rounded-2xl border border-white/10 bg-zinc-900/80 backdrop-blur-xl text-xs flex items-center justify-between text-zinc-300">
+          <div className="flex items-center gap-2.5">
+            <span className="h-2 w-2 rounded-full bg-zinc-400" />
             <span>
               <strong>Status: {lastSolveResult.status.toUpperCase()}</strong> &bull; Solved in{" "}
               {lastSolveResult.solve_ms} ms &bull; {lastSolveResult.moved.length} session(s) moved
@@ -133,153 +113,136 @@ export function SchedulePage() {
           </div>
           {lastSolveResult.status === "infeasible" && (
             <Link to="/app/conflicts">
-              <Button size="sm" variant="destructive" className="h-6 text-[11px] px-2">
+              <button className="h-6 px-3 rounded-full bg-white text-zinc-950 font-medium text-[11px] hover:bg-zinc-200 transition-all">
                 Open Conflict Studio
-              </Button>
+              </button>
             </Link>
           )}
         </div>
       )}
 
-      {/* Interactive Grid and Cell Inspector */}
+      {/* Interactive Grid and Cell Inspector in Glass Boxes */}
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         {/* Schedule Table (3 Cols) */}
-        <div className="lg:col-span-3">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-3">
-              <div className="flex items-center gap-2">
-                <Calendar size={15} className="text-primary" />
-                <CardTitle className="text-foreground text-sm font-semibold">
-                  Schedule Grid {schedule?.version ? `(Version ${schedule.version})` : ""}
-                </CardTitle>
-              </div>
-              <span className="text-[11px] text-muted-foreground">Click any assigned cell to inspect constraints</span>
-            </CardHeader>
-            <CardContent className="p-0">
-              <div className="overflow-x-auto">
-                <table className="w-full border-collapse text-xs">
-                  <thead>
-                    <tr className="border-y border-border bg-muted/40">
-                      <th className="py-2.5 px-3 font-semibold text-muted-foreground w-20 text-center">Time</th>
-                      {days.map((day) => (
-                        <th key={day} className="py-2.5 px-3 font-semibold text-foreground text-center">
-                          {day}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border">
-                    {slotTimes.map((time, slotIdx) => (
-                      <tr key={time} className="h-20">
-                        <td className="py-2 px-3 text-center font-mono text-[11px] text-muted-foreground bg-muted/20 border-r border-border font-medium">
-                          {time}
+        <div className="lg:col-span-3 glass-box p-6 space-y-4">
+          <div className="flex flex-row items-center justify-between border-b border-white/5 pb-3">
+            <div className="flex items-center gap-2">
+              <Calendar size={15} className="text-zinc-400" />
+              <h3 className="text-white text-sm font-semibold">
+                Schedule Grid {schedule?.version ? `(Version ${schedule.version})` : ""}
+              </h3>
+            </div>
+            <span className="text-[11px] text-zinc-500">Click any assigned cell to inspect constraints</span>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse text-xs">
+              <thead>
+                <tr className="border-b border-white/5 text-zinc-400">
+                  <th className="py-2.5 px-3 font-semibold text-zinc-400 w-20 text-center">Time</th>
+                  {days.map((day) => (
+                    <th key={day} className="py-2.5 px-3 font-semibold text-zinc-300 text-center">
+                      {day}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/[0.04]">
+                {slotTimes.map((time, slotIdx) => (
+                  <tr key={time} className="h-20">
+                    <td className="py-2 px-3 text-center font-mono text-[11px] text-zinc-400 bg-white/[0.01] border-r border-white/5 font-medium">
+                      {time}
+                    </td>
+                    {days.map((_, dayIdx) => {
+                      const placement = grid[`${dayIdx}-${slotIdx}`];
+                      const isSelected = selectedSession && placement?.session_id === selectedSession;
+                      return (
+                        <td
+                          key={dayIdx}
+                          onClick={() => placement && setSelectedSession(placement.session_id)}
+                          className={`p-2 border-r border-white/5 last:border-r-0 align-top transition-colors ${
+                            placement
+                              ? isSelected
+                                ? "bg-white/[0.08]"
+                                : "hover:bg-white/[0.03] cursor-pointer"
+                              : "bg-transparent"
+                          }`}
+                        >
+                          {placement ? (
+                            <div className="h-full rounded-xl border border-white/10 bg-[#16161c]/90 p-2.5 shadow-sm flex flex-col justify-between hover:border-white/20 transition-all">
+                              <div className="flex items-center justify-between">
+                                <span className="font-bold text-white text-xs">{placement.session_id}</span>
+                                <span className="text-[10px] text-zinc-400 font-mono">{placement.room}</span>
+                              </div>
+                              <div className="text-[11px] text-zinc-400 mt-1 truncate">
+                                {placement.teacher}
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="h-full rounded-xl border border-dashed border-white/5 flex items-center justify-center text-zinc-600 text-[10px]">
+                              Free
+                            </div>
+                          )}
                         </td>
-                        {days.map((_, dayIdx) => {
-                          const placement = grid[`${dayIdx}-${slotIdx}`];
-                          const isSelected = selectedSession && placement?.session_id === selectedSession;
-                          return (
-                            <td
-                              key={dayIdx}
-                              onClick={() => placement && setSelectedSession(placement.session_id)}
-                              className={`p-2 border-r border-border last:border-r-0 align-top transition-colors ${
-                                placement
-                                  ? isSelected
-                                    ? "bg-primary/10 border-primary"
-                                    : "hover:bg-muted/50 cursor-pointer"
-                                  : "bg-background"
-                              }`}
-                            >
-                              {placement ? (
-                                <div className="h-full rounded-md border border-border bg-card p-2 shadow-xs flex flex-col justify-between">
-                                  <div className="flex items-center justify-between">
-                                    <span className="font-bold text-foreground text-xs">{placement.session_id}</span>
-                                    <span className="text-[10px] text-muted-foreground font-mono">{placement.room}</span>
-                                  </div>
-                                  <div className="text-[11px] text-muted-foreground mt-1 truncate">
-                                    👤 {placement.teacher}
-                                  </div>
-                                </div>
-                              ) : (
-                                <div className="h-full rounded-md border border-dashed border-border/40 flex items-center justify-center text-muted-foreground/30 text-[10px]">
-                                  Free
-                                </div>
-                              )}
-                            </td>
-                          );
-                        })}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
 
         {/* Cell Constraint Inspector (Right Col) */}
-        <div>
-          <Card className="sticky top-6">
-            <CardHeader className="border-b border-border pb-3">
-              <div className="flex items-center gap-1.5">
-                <HelpCircle size={15} className="text-primary" />
-                <h3 className="text-sm font-semibold text-foreground">Why This Slot?</h3>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Formal constraint explanations for cell placement.
-              </p>
-            </CardHeader>
-            <CardContent className="pt-4 space-y-4 text-xs">
-              {selectedSession ? (
-                <>
-                  <div className="p-3 rounded-lg bg-muted border border-border">
-                    <span className="text-[10px] uppercase font-semibold text-muted-foreground block">
-                      Active Session
-                    </span>
-                    <span className="font-bold text-base text-foreground">{selectedSession}</span>
-                  </div>
+        <div className="glass-box p-6 space-y-4">
+          <div className="border-b border-white/5 pb-3">
+            <h3 className="text-white text-sm font-semibold flex items-center gap-1.5">
+              <HelpCircle size={14} className="text-zinc-400" />
+              Constraint Inspector
+            </h3>
+            <p className="text-xs text-zinc-400 mt-0.5">
+              Rules locking the selected timetable cell
+            </p>
+          </div>
 
-                  <div>
-                    <span className="text-[10px] uppercase font-semibold text-muted-foreground block mb-2">
-                      Constraining Rules ({whyRules.length})
-                    </span>
-                    {isWhyLoading ? (
-                      <div className="text-muted-foreground py-4 text-center">Evaluating active rules...</div>
-                    ) : whyRules.length > 0 ? (
-                      <div className="space-y-2">
-                        {whyRules.map((rule) => (
-                          <div key={rule.id} className="p-2.5 rounded-lg border border-border bg-card space-y-1">
-                            <div className="flex items-center justify-between">
-                              <span className="font-bold text-foreground">{rule.id}</span>
-                              <Badge variant="outline" className="text-[10px] capitalize">
-                                {rule.type.replace("_", " ")}
-                              </Badge>
-                            </div>
-                            <div className="text-[11px] text-muted-foreground">
-                              Owner: <span className="text-foreground">{rule.owner}</span>
-                            </div>
-                            <pre className="text-[10px] font-mono bg-muted p-1 rounded border border-border truncate">
-                              {JSON.stringify(rule.params)}
-                            </pre>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="p-3 rounded-lg bg-muted/40 text-muted-foreground text-[11px] flex items-start gap-2">
-                        <Info size={14} className="shrink-0 mt-0.5 text-primary" />
-                        <span>
-                          Assigned to satisfy global room capacity and prevent double-booking collisions.
+          {selectedSession ? (
+            <div className="space-y-4">
+              <div className="p-3 rounded-xl bg-white/[0.02] border border-white/10">
+                <span className="text-[10px] text-zinc-400 uppercase tracking-wider block">Inspecting Session</span>
+                <span className="text-sm font-bold text-white font-mono mt-0.5 block">{selectedSession}</span>
+              </div>
+
+              <div className="space-y-2">
+                <span className="text-xs font-semibold text-zinc-300">Active Rules Driving Placement:</span>
+                {isWhyLoading ? (
+                  <p className="text-xs text-zinc-500">Querying registry rules...</p>
+                ) : whyRules.length === 0 ? (
+                  <p className="text-xs text-zinc-500">No explicit hard constraints pinned this specific session.</p>
+                ) : (
+                  whyRules.map((rule) => (
+                    <div key={rule.id} className="p-2.5 rounded-xl border border-white/5 bg-white/[0.02] text-xs space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="font-mono font-bold text-zinc-200">{rule.id}</span>
+                        <span className="px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-300 text-[10px]">
+                          {rule.type}
                         </span>
                       </div>
-                    )}
-                  </div>
-                </>
-              ) : (
-                <div className="py-12 text-center text-muted-foreground">
-                  Select any assigned timetable block on the grid to inspect its governing constraints.
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                      <p className="text-[11px] text-zinc-400">Owner: {rule.owner}</p>
+                      {rule.evidence && (
+                        <p className="text-[10px] text-zinc-400 italic bg-white/[0.02] p-1.5 rounded-lg border border-white/5">
+                          &quot;{rule.evidence}&quot;
+                        </p>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="py-12 text-center text-xs text-zinc-500">
+              Select any session cell on the grid to inspect the underlying verified constraints.
+            </div>
+          )}
         </div>
       </div>
     </div>

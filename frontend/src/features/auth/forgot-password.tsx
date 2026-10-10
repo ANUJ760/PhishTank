@@ -2,76 +2,85 @@ import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "@/lib/api-client";
 import { AuthLayout } from "./auth-layout";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { ArrowLeft, CheckCircle2 } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 
 export function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
-  const [submitted, setSubmitted] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
     setIsLoading(true);
     try {
       await api.auth.forgotPassword(email);
-    } catch {
-      // Intentionally generic
+      setSubmitted(true);
+    } catch (err: any) {
+      setError(err?.message || "Password reset request failed.");
     } finally {
       setIsLoading(false);
-      setSubmitted(true);
     }
   };
 
   return (
     <AuthLayout>
       <div className="space-y-1 text-left mb-6">
-        <h2 className="text-xl font-semibold tracking-tight text-foreground">Reset password</h2>
-        <p className="text-xs text-muted-foreground">
-          Enter your registered institutional email to receive reset instructions.
+        <h2 className="text-xl font-semibold tracking-tight text-white">Reset password</h2>
+        <p className="text-xs text-zinc-400">
+          Enter your email to receive recovery instructions.
         </p>
       </div>
 
       {submitted ? (
-        <div className="space-y-4">
-          <div className="p-4 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300 dark:border-emerald-800 text-xs flex items-start gap-2.5">
-            <CheckCircle2 size={16} className="shrink-0 text-emerald-600 mt-0.5" />
-            <div>
-              <span className="font-semibold block mb-0.5">Instructions Dispatched</span>
-              If an account with that email exists, password recovery details have been transmitted.
-            </div>
+        <div className="space-y-4 text-left">
+          <div className="p-3.5 rounded-xl border border-white/10 bg-white/[0.03] text-xs text-zinc-300">
+            If an account exists for <strong className="text-white">{email}</strong>, a reset link has been dispatched to your institutional inbox.
           </div>
           <Link
             to="/auth/sign-in"
-            className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline font-medium"
+            className="inline-flex items-center gap-1.5 text-xs text-white hover:underline pt-2 font-medium"
           >
-            <ArrowLeft size={13} /> Return to sign in
+            <ArrowLeft size={13} />
+            <span>Back to sign in</span>
           </Link>
         </div>
       ) : (
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-1.5 text-left">
-            <label className="text-xs font-medium text-foreground">Institutional Email</label>
-            <Input
+        <form onSubmit={handleSubmit} className="space-y-4 text-left">
+          {error && (
+            <div className="p-3 rounded-xl bg-white/[0.04] border border-white/10 text-xs text-zinc-300">
+              {error}
+            </div>
+          )}
+
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-zinc-300">Email Address</label>
+            <input
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="coordinator@university.edu"
+              placeholder="coordinator@gecompose.internal"
+              className="w-full h-10 px-3.5 rounded-xl bg-zinc-900 border border-white/10 text-xs text-white placeholder:text-zinc-500 focus:outline-none focus:border-white/20"
               required
             />
           </div>
 
-          <Button type="submit" isLoading={isLoading} className="w-full mt-2 h-10">
-            Send Reset Instructions
-          </Button>
+          <button
+            type="submit"
+            disabled={isLoading}
+            className="w-full h-10 rounded-full bg-white text-zinc-950 font-medium text-xs hover:bg-zinc-200 transition-all shadow-sm active:scale-[0.98] disabled:opacity-50 mt-2"
+          >
+            {isLoading ? "Sending..." : "Send Reset Instructions"}
+          </button>
 
-          <div className="pt-2 text-center">
+          <div className="text-center pt-2">
             <Link
               to="/auth/sign-in"
-              className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+              className="inline-flex items-center gap-1 text-xs text-zinc-400 hover:text-white transition-colors"
             >
-              <ArrowLeft size={13} /> Back to sign in
+              <ArrowLeft size={12} />
+              <span>Back to sign in</span>
             </Link>
           </div>
         </form>

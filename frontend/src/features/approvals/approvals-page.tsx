@@ -2,30 +2,21 @@ import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api-client";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import {
   CheckCheck,
-  ShieldAlert,
-  ShieldCheck,
   UserCheck,
   ArrowRight,
-  AlertCircle,
   FileKey,
-  CheckCircle2,
 } from "lucide-react";
 
 export function ApprovalsPage() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
-  // Try to load any active options or conflict
   const [selectedUser, setSelectedUser] = useState<string>("Coordinator");
   const [approvalResults, setApprovalResults] = useState<Record<string, { ok: boolean; tx?: string; error?: string }>>({});
   const [appliedSuccess, setAppliedSuccess] = useState<string | null>(null);
 
-  // We can query rules to see what options might be available
   const { data: conflictRes } = useQuery({
     queryKey: ["conflict-check"],
     queryFn: () => api.solve(true),
@@ -65,17 +56,17 @@ export function ApprovalsPage() {
   const demoUsers = ["Coordinator", "Prof. Rao", "Dean", "Dept Head", "Prof. Mehta"];
 
   return (
-    <div className="space-y-6 text-left">
+    <div className="space-y-6 text-left pb-12">
       <div>
-        <h2 className="text-xl font-bold tracking-tight text-foreground">On-Chain Multi-Party Approvals</h2>
-        <p className="text-xs text-muted-foreground mt-0.5">
+        <h2 className="text-xl font-bold tracking-tight text-white">On-Chain Multi-Party Approvals</h2>
+        <p className="text-xs text-zinc-400 mt-0.5">
           Two-step cryptographic consent pipeline: owner signs relaxation transaction &rarr; coordinator applies updated rule.
         </p>
       </div>
 
-      <div className="p-3 rounded-lg border border-border bg-muted/30 text-xs text-muted-foreground space-y-1">
-        <span className="font-semibold text-foreground flex items-center gap-1.5">
-          <FileKey size={14} className="text-primary" />
+      <div className="p-3.5 rounded-2xl border border-white/10 bg-zinc-900/80 backdrop-blur-xl text-xs text-zinc-400 space-y-1">
+        <span className="font-semibold text-white flex items-center gap-1.5">
+          <FileKey size={14} className="text-zinc-300" />
           Anvil Local Consensus Note
         </span>
         <p>
@@ -84,160 +75,133 @@ export function ApprovalsPage() {
       </div>
 
       {appliedSuccess && (
-        <div className="p-4 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300 dark:border-emerald-800 text-xs flex items-center justify-between">
+        <div className="p-4 rounded-2xl border border-white/10 bg-zinc-900/80 text-xs flex items-center justify-between text-zinc-200">
           <div className="flex items-center gap-2">
-            <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
+            <span className="h-2 w-2 rounded-full bg-zinc-300" />
             <span>{appliedSuccess}</span>
           </div>
           <Link to="/app/schedule">
-            <Button size="sm" className="h-7 text-xs">
+            <button className="h-7 px-3 rounded-full bg-white text-zinc-950 font-medium text-xs hover:bg-zinc-200 transition-all">
               View Updated Grid
-            </Button>
+            </button>
           </Link>
         </div>
       )}
 
       {options.length > 0 ? (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between text-xs">
-            <span className="font-semibold text-foreground">Pending Verified Relaxations ({options.length})</span>
-            <div className="flex items-center gap-2">
-              <span className="text-muted-foreground">Sign as Demo Identity:</span>
-              <select
-                value={selectedUser}
-                onChange={(e) => setSelectedUser(e.target.value)}
-                className="h-8 rounded-md border border-border bg-background px-2 text-xs font-medium text-foreground focus:ring-1 focus:ring-primary"
-              >
-                {demoUsers.map((u) => (
-                  <option key={u} value={u}>
-                    {u}
-                  </option>
-                ))}
-              </select>
+        <div className="space-y-6">
+          {/* Identity switcher */}
+          <div className="glass-box p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="space-y-0.5">
+              <span className="text-xs font-semibold text-white flex items-center gap-1.5">
+                <UserCheck size={14} className="text-zinc-300" />
+                Active On-Chain Signer Identity:
+              </span>
+              <p className="text-[11px] text-zinc-400">
+                Switch accounts to demonstrate non-owner revert vs owner success.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap gap-1.5">
+              {demoUsers.map((u) => (
+                <button
+                  key={u}
+                  onClick={() => setSelectedUser(u)}
+                  className={`px-3 py-1 rounded-full text-xs transition-all ${
+                    selectedUser === u
+                      ? "bg-white text-zinc-950 font-medium shadow-xs"
+                      : "bg-zinc-900 border border-white/5 text-zinc-400 hover:text-white"
+                  }`}
+                >
+                  {u}
+                </button>
+              ))}
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-4">
+          {/* Relaxation approval cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {options.map((opt) => {
-              const result = approvalResults[opt.id];
+              const res = approvalResults[opt.id];
               const isOwner = selectedUser === opt.approver;
 
               return (
-                <Card key={opt.id} className="p-5 space-y-3">
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-border pb-3">
+                <div key={opt.id} className="glass-box p-6 space-y-4">
+                  <div className="flex items-start justify-between gap-2 border-b border-white/5 pb-3">
                     <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-sm text-foreground">{opt.id}</span>
-                        <span className="text-xs text-muted-foreground">
-                          Target Rule: <strong className="text-foreground">{opt.rule_id}</strong>
-                        </span>
-                      </div>
-                      <p className="text-xs text-foreground font-medium mt-1">{opt.description}</p>
+                      <h3 className="font-semibold text-white text-sm">Relax {opt.rule_id}</h3>
+                      <p className="text-xs text-zinc-400 mt-0.5">Required Signer: <strong className="text-white font-mono">{opt.approver}</strong></p>
                     </div>
-                    <div className="text-right">
-                      <span className="text-[10px] text-muted-foreground block uppercase font-semibold">
-                        Authorized Approver
-                      </span>
-                      <Badge variant="outline" className="font-semibold text-xs mt-0.5">
-                        {opt.approver}
-                      </Badge>
-                    </div>
+                    <span className="px-2.5 py-0.5 rounded-full bg-zinc-800 text-zinc-300 text-[10px] font-mono">
+                      {opt.id}
+                    </span>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                    <div className="p-2.5 rounded-lg bg-muted border border-border">
-                      <span className="text-[10px] text-muted-foreground block">Proposed Parameters</span>
-                      <pre className="font-mono text-[11px] mt-0.5 whitespace-pre-wrap">
-                        {JSON.stringify(opt.new_params, null, 2)}
-                      </pre>
-                    </div>
-                    <div className="p-2.5 rounded-lg bg-muted border border-border">
-                      <span className="text-[10px] text-muted-foreground block">Cryptographic Digest</span>
-                      <span className="font-mono text-[10px] text-muted-foreground break-all mt-0.5 block">
-                        {opt.option_hash}
-                      </span>
-                    </div>
-                  </div>
+                  <p className="text-xs text-zinc-300 leading-relaxed bg-white/[0.02] p-3 rounded-xl border border-white/5">
+                    {opt.description}
+                  </p>
 
-                  {/* On-Chain Result Box */}
-                  {result && (
-                    <div
-                      className={`p-3 rounded-lg border text-xs ${
-                        result.ok
-                          ? "bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300 dark:border-emerald-800"
-                          : "bg-rose-50 text-rose-800 border-rose-200 dark:bg-rose-950/30 dark:text-rose-300 dark:border-rose-800"
-                      }`}
-                    >
-                      {result.ok ? (
-                        <div className="flex items-center justify-between">
-                          <span className="flex items-center gap-1.5 font-medium">
-                            <ShieldCheck size={14} className="text-emerald-600" />
-                            Approved on-chain by {selectedUser}! Tx: {result.tx?.slice(0, 18)}...
-                          </span>
-                          <Button
-                            size="sm"
-                            onClick={() => applyMutation.mutate(opt.id)}
-                            isLoading={applyMutation.isPending}
-                            className="h-7 text-xs"
-                          >
-                            Step 2: Apply to Schedule
-                          </Button>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-1.5">
-                          <ShieldAlert size={14} className="text-rose-600 shrink-0" />
-                          <span>
-                            <strong>On-Chain Revert:</strong> {result.error || "Not the rule owner."}
-                          </span>
-                        </div>
+                  {/* Step 1 & 2 actions */}
+                  <div className="space-y-3 pt-2">
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => approveMutation.mutate({ optionId: opt.id, asUser: selectedUser })}
+                        disabled={approveMutation.isPending}
+                        className="flex-1 h-8 rounded-full bg-white text-zinc-950 font-medium text-xs hover:bg-zinc-200 transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-[0.98] disabled:opacity-50"
+                      >
+                        <CheckCheck size={13} />
+                        <span>Sign as &quot;{selectedUser}&quot;</span>
+                      </button>
+
+                      {res?.ok && (
+                        <button
+                          onClick={() => applyMutation.mutate(opt.id)}
+                          disabled={applyMutation.isPending}
+                          className="h-8 px-4 rounded-full bg-zinc-900 border border-white/10 text-white font-medium text-xs hover:bg-zinc-800 transition-all flex items-center gap-1"
+                        >
+                          <span>Apply</span>
+                          <ArrowRight size={12} />
+                        </button>
                       )}
                     </div>
-                  )}
 
-                  {/* Step 1 Approval Action Buttons */}
-                  {!result?.ok && (
-                    <div className="flex items-center justify-between pt-2">
-                      <span className="text-[11px] text-muted-foreground">
-                        Signing as: <strong className="text-foreground">{selectedUser}</strong>{" "}
-                        {isOwner ? (
-                          <span className="text-emerald-600 font-medium">(Authorized Owner)</span>
-                        ) : (
-                          <span className="text-rose-600 font-medium">(Will Revert on Chain)</span>
+                    {res && (
+                      <div className="p-3 rounded-xl border border-white/10 bg-white/[0.02] text-xs space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className="font-semibold text-white">
+                            {res.ok ? "On-Chain Approval Verified" : "Transaction Reverted"}
+                          </span>
+                        </div>
+                        {res.tx && (
+                          <div className="font-mono text-[10px] text-zinc-400 truncate">
+                            Tx: {res.tx}
+                          </div>
                         )}
-                      </span>
-
-                      <Button
-                        size="sm"
-                        onClick={() => approveMutation.mutate({ optionId: opt.id, asUser: selectedUser })}
-                        isLoading={approveMutation.isPending}
-                        variant={isOwner ? "default" : "outline"}
-                        className="text-xs h-8 gap-1.5"
-                      >
-                        <UserCheck size={13} />
-                        <span>Sign as {selectedUser}</span>
-                      </Button>
-                    </div>
-                  )}
-                </Card>
+                        {res.error && (
+                          <p className="text-[11px] text-zinc-400">{res.error}</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
               );
             })}
           </div>
         </div>
       ) : (
-        <Card className="p-12 text-center text-xs text-muted-foreground space-y-3">
-          <CheckCheck size={32} className="mx-auto text-muted-foreground/40 mb-2" />
-          <h3 className="text-base font-semibold text-foreground">No Pending Approvals</h3>
-          <p className="max-w-md mx-auto">
-            When conflicts arise and verified options are synthesized in Conflict Studio, they will appear here for cryptographic owner sign-off.
+        <div className="glass-box p-12 text-center space-y-3">
+          <h3 className="text-base font-semibold text-white">No Pending Relaxation Proposals</h3>
+          <p className="text-xs text-zinc-400 max-w-md mx-auto">
+            To view and test on-chain consent workflows, visit Conflict Studio and generate a conflict explanation.
           </p>
           <div className="pt-2">
             <Link to="/app/conflicts">
-              <Button variant="outline" size="sm" className="text-xs">
+              <button className="h-8 px-4 rounded-full bg-white text-zinc-950 font-medium text-xs hover:bg-zinc-200 transition-all">
                 Go to Conflict Studio
-              </Button>
+              </button>
             </Link>
           </div>
-        </Card>
+        </div>
       )}
     </div>
   );

@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/auth-context";
 import { api } from "@/lib/api-client";
 import { useQueryClient } from "@tanstack/react-query";
-import { LogOut, RefreshCw, Sun, Moon, Database } from "lucide-react";
+import { LogOut, RefreshCw, Database } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface TopbarProps {
@@ -50,54 +50,46 @@ export function Topbar({ darkMode, setDarkMode }: TopbarProps) {
   };
 
   return (
-    <header className="h-14 border-b border-border bg-card/80 backdrop-blur-md px-6 flex items-center justify-between z-10 select-none">
+    <header className="h-14 border-b border-white/[0.08] bg-[#0c0c0f]/80 backdrop-blur-xl px-6 flex items-center justify-between z-10 select-none text-zinc-300">
       <div className="flex items-center gap-3">
-        <h1 className="text-sm font-semibold text-foreground tracking-tight">{title}</h1>
-        <span className="text-muted-foreground/40 text-xs">/</span>
-        <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-muted border border-border text-[11px] font-medium text-muted-foreground">
-          <Database size={11} className="text-primary" />
+        <h1 className="text-sm font-semibold text-white tracking-tight">{title}</h1>
+        <span className="text-zinc-600 text-xs">/</span>
+        <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white/[0.04] border border-white/10 text-[11px] font-medium text-zinc-400">
+          <Database size={11} className="text-zinc-300" />
           <span>College Demo v1</span>
         </div>
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2.5">
         <Button
           variant="outline"
           size="sm"
           onClick={handleSeedDemo}
           isLoading={isSeeding}
-          className="text-xs h-8 gap-1.5"
+          className="text-xs h-8 rounded-full border-white/10 bg-white/[0.04] text-zinc-300 hover:bg-white/10 hover:text-white gap-1.5"
           title="Seed baseline demo rules and schedule"
         >
           <RefreshCw size={13} className={isSeeding ? "animate-spin" : ""} />
           <span>Seed Demo</span>
         </Button>
 
-        <button
-          onClick={() => setDarkMode(!darkMode)}
-          className="h-8 w-8 rounded-lg border border-border flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-          title={darkMode ? "Switch to light mode" : "Switch to dark mode"}
-        >
-          {darkMode ? <Sun size={15} /> : <Moon size={15} />}
-        </button>
-
-        <div className="h-4 w-[1px] bg-border mx-1" />
+        <div className="h-4 w-[1px] bg-white/10 mx-1" />
 
         {user && (
-          <div className="flex items-center gap-2 text-xs">
-            <div className="h-7 w-7 rounded-full bg-primary/10 text-primary font-semibold flex items-center justify-center border border-primary/20">
+          <div className="flex items-center gap-2.5 text-xs bg-white/[0.03] border border-white/[0.08] rounded-full px-2.5 py-1">
+            <div className="h-6 w-6 rounded-full bg-zinc-800 text-white font-semibold flex items-center justify-center text-[11px]">
               {user.name.charAt(0)}
             </div>
             <div className="hidden sm:flex flex-col text-left">
-              <span className="font-medium text-foreground leading-none">{user.name}</span>
-              <span className="text-[10px] text-muted-foreground capitalize mt-0.5">{user.role}</span>
+              <span className="font-medium text-zinc-200 leading-none text-xs">{user.name}</span>
+              <span className="text-[10px] text-zinc-400 capitalize mt-0.5">{user.role}</span>
             </div>
             <button
               onClick={handleSignOut}
-              className="text-muted-foreground hover:text-destructive p-1.5 rounded-md hover:bg-muted transition-colors ml-1"
+              className="text-zinc-400 hover:text-white p-1 rounded-full hover:bg-white/10 transition-colors ml-1"
               title="Sign out"
             >
-              <LogOut size={15} />
+              <LogOut size={13} />
             </button>
           </div>
         )}

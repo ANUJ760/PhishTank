@@ -2,9 +2,6 @@ import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api-client";
 import { PublishResult, VerifyResult } from "@/types/api";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import {
   FileCheck,
   ShieldCheck,
@@ -15,7 +12,6 @@ import {
   FileCode,
   Calendar,
   Layers,
-  AlertTriangle,
   Lock,
 } from "lucide-react";
 
@@ -62,11 +58,9 @@ export function PublishPage() {
     if (!schedule) return;
     setIsVerifying(true);
     try {
-      // 1. Verify original schedule JSON
       const originalJson = JSON.stringify(schedule);
       const originalRes = await api.verify(undefined, originalJson);
 
-      // 2. Create tampered copy: alter first placement slot
       const tamperedObj = JSON.parse(originalJson);
       if (tamperedObj.placements && tamperedObj.placements.length > 0) {
         tamperedObj.placements[0].slot = (tamperedObj.placements[0].slot + 1) % 6;
@@ -99,218 +93,147 @@ export function PublishPage() {
   };
 
   return (
-    <div className="space-y-6 text-left">
+    <div className="space-y-6 text-left pb-12">
       <div>
-        <h2 className="text-xl font-bold tracking-tight text-foreground">Publication & Public Proof Portal</h2>
-        <p className="text-xs text-muted-foreground mt-0.5">
-          Cryptographically anchor feasible timetables on Ethereum and independently verify schedule authenticity.
+        <h2 className="text-xl font-bold tracking-tight text-white">Schedule Publication & Proof Portal</h2>
+        <p className="text-xs text-zinc-400 mt-0.5">
+          Immutable on-chain anchoring, cryptographic receipt generation, multi-format export, and zero-knowledge verification.
         </p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Left: Publication Section */}
-        <div className="space-y-6">
-          <Card>
-            <CardHeader className="pb-3">
-              <div className="flex items-center gap-2">
-                <FileCheck size={16} className="text-primary" />
-                <CardTitle className="text-foreground text-sm font-semibold">
-                  Publish to Ethereum Ledger
-                </CardTitle>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Before publishing, independent checker rules verify that zero collisions exist.
+        {/* Step 1: On-Chain Anchoring */}
+        <div className="glass-box p-6 space-y-4">
+          <div className="flex items-center justify-between border-b border-white/5 pb-3">
+            <div>
+              <h3 className="text-white text-sm font-semibold flex items-center gap-1.5">
+                <Lock size={15} className="text-zinc-300" />
+                Step 1: Anchor on ConsentLedger
+              </h3>
+              <p className="text-xs text-zinc-400 mt-0.5">
+                Commit canonical SHA-256 hash to local Anvil smart contract
               </p>
-            </CardHeader>
-            <CardContent className="space-y-4 text-xs">
-              <div className="p-3 rounded-lg bg-muted border border-border space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Current Status:</span>
-                  <Badge variant={schedule ? "success" : "warning"}>
-                    {schedule ? `Version ${schedule.version} Available` : "Solve Required"}
-                  </Badge>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Consensus Target:</span>
-                  <span className="font-mono text-[11px] text-foreground">ConsentLedger (0x5FbD...)</span>
-                </div>
+            </div>
+            {schedule && (
+              <span className="px-2.5 py-0.5 rounded-full bg-zinc-800 text-zinc-300 text-[10px]">
+                Active v{schedule.version}
+              </span>
+            )}
+          </div>
+
+          <p className="text-xs text-zinc-400 leading-relaxed">
+            Publication computes the canonical schedule hash and submits a transaction to <code className="text-white font-mono">anchorSchedule(hash)</code> on Ethereum.
+          </p>
+
+          <button
+            onClick={() => publishMutation.mutate()}
+            disabled={publishMutation.isPending}
+            className="w-full h-8 rounded-full bg-white text-zinc-950 font-medium text-xs hover:bg-zinc-200 transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-[0.98] disabled:opacity-50"
+          >
+            <ShieldCheck size={14} />
+            <span>{publishMutation.isPending ? "Anchoring on Chain..." : "Anchor Current Schedule On-Chain"}</span>
+          </button>
+
+          {/* Receipt details */}
+          {publishResult && (
+            <div className="p-4 rounded-xl border border-white/10 bg-white/[0.02] text-xs space-y-2 mt-3">
+              <span className="font-semibold text-white block">Anchoring Receipt:</span>
+              <div className="space-y-1 font-mono text-[11px] text-zinc-400">
+                <div className="truncate">Tx: <span className="text-zinc-200">{publishResult.tx_hash}</span></div>
+                <div>Version: <span className="text-zinc-200">v{publishResult.version}</span></div>
+                <div className="truncate">Schedule Hash: <span className="text-zinc-200">{publishResult.hash}</span></div>
               </div>
 
-              <Button
-                onClick={() => publishMutation.mutate()}
-                isLoading={publishMutation.isPending}
-                className="w-full gap-1.5 text-xs h-9"
-              >
-                <Lock size={13} />
-                <span>Anchor & Publish Schedule</span>
-              </Button>
-
-              {publishMutation.error && (
-                <div className="p-3 rounded-lg bg-destructive/10 text-destructive text-xs">
-                  Publish error: {(publishMutation.error as any).message}
-                </div>
-              )}
-
-              {/* Published Result Box */}
-              {publishResult && (
-                <div className="p-4 rounded-xl border border-emerald-200 bg-emerald-50/40 dark:bg-emerald-950/20 dark:border-emerald-800 space-y-3">
-                  <div className="flex items-center gap-2 text-emerald-800 dark:text-emerald-300 font-semibold">
-                    <CheckCircle2 size={16} className="text-emerald-600" />
-                    <span>Successfully Anchored Version {publishResult.version}!</span>
-                  </div>
-
-                  <div className="space-y-1 font-mono text-[11px]">
-                    <div className="text-muted-foreground truncate">
-                      Schedule Hash: <span className="text-foreground">{publishResult.hash}</span>
-                    </div>
-                    <div className="text-muted-foreground truncate">
-                      Transaction: <span className="text-foreground">{publishResult.tx_hash}</span>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-wrap gap-2 pt-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() =>
-                        downloadFile(
-                          publishResult.json_bytes_b64,
-                          `schedule_v${publishResult.version}.json`,
-                          "application/json"
-                        )
-                      }
-                      className="text-xs h-7 gap-1"
-                    >
-                      <Download size={12} /> JSON
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() =>
-                        downloadFile(
-                          publishResult.csv_bytes_b64,
-                          `schedule_v${publishResult.version}.csv`,
-                          "text/csv"
-                        )
-                      }
-                      className="text-xs h-7 gap-1"
-                    >
-                      <Download size={12} /> CSV
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() =>
-                        downloadFile(
-                          publishResult.ics_bytes_b64,
-                          `schedule_v${publishResult.version}.ics`,
-                          "text/calendar"
-                        )
-                      }
-                      className="text-xs h-7 gap-1"
-                    >
-                      <Download size={12} /> ICS Calendar
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+              {/* Downloads */}
+              <div className="pt-2 border-t border-white/5 flex flex-wrap gap-2">
+                <button
+                  onClick={() => downloadFile(publishResult.json_bytes_b64, "timetable.json", "application/json")}
+                  className="h-7 px-3 rounded-full bg-zinc-900 border border-white/10 text-zinc-300 hover:text-white text-xs flex items-center gap-1"
+                >
+                  <Download size={11} /> JSON
+                </button>
+                <button
+                  onClick={() => downloadFile(publishResult.csv_bytes_b64, "timetable.csv", "text/csv")}
+                  className="h-7 px-3 rounded-full bg-zinc-900 border border-white/10 text-zinc-300 hover:text-white text-xs flex items-center gap-1"
+                >
+                  <Download size={11} /> CSV
+                </button>
+                <button
+                  onClick={() => downloadFile(publishResult.ics_bytes_b64, "timetable.ics", "text/calendar")}
+                  className="h-7 px-3 rounded-full bg-zinc-900 border border-white/10 text-zinc-300 hover:text-white text-xs flex items-center gap-1"
+                >
+                  <Download size={11} /> iCal (.ics)
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* Right: Public Proof Portal & Tamper Demonstration */}
-        <div className="space-y-6">
-          <Card>
-            <CardHeader className="pb-3">
-              <div className="flex items-center gap-2">
-                <ShieldCheck size={16} className="text-primary" />
-                <CardTitle className="text-foreground text-sm font-semibold">
-                  Independent Verification Portal
-                </CardTitle>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Verify any schedule JSON against the immutable on-chain hash.
+        {/* Step 2: Verification Portal */}
+        <div className="glass-box p-6 space-y-4">
+          <div className="border-b border-white/5 pb-3">
+            <h3 className="text-white text-sm font-semibold flex items-center gap-1.5">
+              <FileCheck size={15} className="text-zinc-300" />
+              Step 2: Independent Proof Verification
+            </h3>
+            <p className="text-xs text-zinc-400 mt-0.5">
+              Verify any exported timetable against on-chain consensus commitments
+            </p>
+          </div>
+
+          <form onSubmit={handleVerifyUpload} className="space-y-3">
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-zinc-300">Upload Timetable File (JSON)</label>
+              <input
+                type="file"
+                accept=".json"
+                onChange={(e) => setVerifyFile(e.target.files?.[0] || null)}
+                className="w-full p-2 rounded-xl bg-zinc-900 border border-white/10 text-xs text-zinc-300 file:mr-3 file:py-1 file:px-3 file:rounded-full file:border-0 file:bg-white file:text-zinc-950 file:text-xs file:font-medium"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={isVerifying || !verifyFile}
+              className="h-8 px-4 rounded-full bg-white text-zinc-950 font-medium text-xs hover:bg-zinc-200 transition-all shadow-sm disabled:opacity-50"
+            >
+              Verify Cryptographic Authenticity
+            </button>
+          </form>
+
+          {verifyResult && (
+            <div className="p-3.5 rounded-xl border border-white/10 bg-white/[0.02] text-xs space-y-1.5">
+              <span className="font-semibold text-white">
+                {verifyResult.match && verifyResult.anchored ? "Cryptographic Authenticity Verified" : "Verification Failed"}
+              </span>
+              <p className="text-[11px] text-zinc-400 font-mono truncate">
+                Hash: {verifyResult.recomputed_hash}
               </p>
-            </CardHeader>
-            <CardContent className="space-y-4 text-xs">
-              <form onSubmit={handleVerifyUpload} className="space-y-3">
-                <div className="space-y-1">
-                  <label className="text-[11px] font-medium text-foreground">Upload Schedule JSON</label>
-                  <input
-                    type="file"
-                    accept=".json"
-                    onChange={(e) => setVerifyFile(e.target.files?.[0] || null)}
-                    className="w-full text-xs text-muted-foreground file:mr-3 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-primary file:text-primary-foreground hover:file:bg-primary/90"
-                  />
+            </div>
+          )}
+
+          {/* Automated Tamper Test */}
+          <div className="pt-3 border-t border-white/5 space-y-2">
+            <span className="text-xs font-semibold text-white block">Security Demonstration:</span>
+            <button
+              onClick={handleTamperTest}
+              disabled={isVerifying || !schedule}
+              className="h-7 px-3.5 rounded-full bg-zinc-900 border border-white/10 text-zinc-300 hover:text-white text-xs transition-all"
+            >
+              Run Automated 1-Byte Tamper Test
+            </button>
+
+            {tamperDemoResult && (
+              <div className="p-3 rounded-xl border border-white/5 bg-white/[0.02] text-xs space-y-1">
+                <div className="flex items-center gap-1.5 text-zinc-300">
+                  <span>&bull; Original Schedule Hash matches on-chain: <strong>Yes</strong></span>
                 </div>
-                <Button type="submit" size="sm" isLoading={isVerifying} disabled={!verifyFile} className="w-full h-8">
-                  Verify File Against Blockchain
-                </Button>
-              </form>
-
-              {verifyResult && (
-                <div
-                  className={`p-3 rounded-lg border text-xs ${
-                    verifyResult.match && verifyResult.anchored
-                      ? "bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300"
-                      : "bg-rose-50 text-rose-800 border-rose-200 dark:bg-rose-950/30 dark:text-rose-300"
-                  }`}
-                >
-                  <div className="flex items-center gap-2 font-semibold">
-                    {verifyResult.match && verifyResult.anchored ? (
-                      <>
-                        <CheckCircle2 size={15} className="text-emerald-600" />
-                        <span>AUTHENTIC & ANCHORED ON ETHEREUM</span>
-                      </>
-                    ) : (
-                      <>
-                        <XCircle size={15} className="text-rose-600" />
-                        <span>INTEGRITY CHECK FAILED: UNANCHORED / ALTERED</span>
-                      </>
-                    )}
-                  </div>
-                  <div className="font-mono text-[10px] mt-1 break-all">
-                    Recomputed Hash: {verifyResult.recomputed_hash}
-                  </div>
+                <div className="flex items-center gap-1.5 text-zinc-300">
+                  <span>&bull; Tampered 1-Slot Modification rejected: <strong>Yes</strong></span>
                 </div>
-              )}
-
-              {/* Tamper Demonstration Card */}
-              <div className="pt-2 border-t border-border space-y-2">
-                <span className="font-semibold text-foreground block text-xs">
-                  Automated Tamper-Detection Demonstration
-                </span>
-                <p className="text-[11px] text-muted-foreground">
-                  Simulate modifying a single session slot in the published timetable to prove mathematical immutability.
-                </p>
-
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleTamperTest}
-                  isLoading={isVerifying}
-                  disabled={!schedule}
-                  className="w-full text-xs h-8 gap-1.5"
-                >
-                  <AlertTriangle size={13} className="text-amber-500" />
-                  <span>Execute Tamper Detection Test</span>
-                </Button>
-
-                {tamperDemoResult && (
-                  <div className="p-3 rounded-lg bg-muted border border-border text-xs space-y-1.5">
-                    <div className="flex items-center gap-1.5 text-emerald-600">
-                      <CheckCircle2 size={14} />
-                      <span>Original Schedule: Validated as authentic & anchored</span>
-                    </div>
-                    <div className="flex items-center gap-1.5 text-rose-600">
-                      <XCircle size={14} />
-                      <span>Tampered Copy (1 Slot Changed): Rejected & flagged as unanchored</span>
-                    </div>
-                  </div>
-                )}
               </div>
-            </CardContent>
-          </Card>
+            )}
+          </div>
         </div>
       </div>
     </div>
