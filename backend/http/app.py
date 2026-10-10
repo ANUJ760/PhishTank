@@ -4,7 +4,7 @@ import base64
 import json
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 from pydantic import BaseModel
 
 from fastapi import (
@@ -293,6 +293,9 @@ class RuleConfirmBody(BaseModel):
     owner: Optional[str] = None
     params: Optional[dict[str, Any]] = None
     evidence_ref: Optional[str] = None
+
+
+RuleConfirmBody.model_rebuild()
 
 
 @app.post("/api/v1/rules/{rule_id}/confirm")
