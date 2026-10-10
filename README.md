@@ -16,7 +16,7 @@
 ---
 
 
-## 1. Project Name
+## 1. GeCompose
 
 **GeCompose** (derived from *Gemma* and *composition*) is a smart scheduling system that coordinates three dedicated tools for what they do best:
 
