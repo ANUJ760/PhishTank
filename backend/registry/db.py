@@ -1,16 +1,22 @@
 """SQLite registry with short-lived connections and parameterized queries."""
 from __future__ import annotations
 import json, re, sqlite3, time
+from contextlib import contextmanager
 from pathlib import Path
 from backend import config
 from backend.models import RelaxOption, Rule, Roster, Schedule
 
-def _connect() -> sqlite3.Connection:
+@contextmanager
+def _connect():
     path = config.DB_PATH
     path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(path, timeout=10)
     conn.row_factory = sqlite3.Row
-    return conn
+    try:
+        with conn:
+            yield conn
+    finally:
+        conn.close()
 
 def init_db() -> None:
     with _connect() as c:
@@ -38,7 +44,7 @@ def get_roster() -> Roster:
 def next_rule_id() -> str:
     init_db()
     with _connect() as c: rows = c.execute("SELECT id FROM rules").fetchall()
-    return f"R{max((int(m.group(1)) for r in rows if (m := re.fullmatch(r'R(\\d+)', r[0]))), default=0)+1}"
+    return f"R{max((int(m.group(1)) for r in rows if (m := re.fullmatch(r'R(\d+)', r[0]))), default=0)+1}"
 def save_rule(rule: Rule, salt: bytes | None = None, rule_hash: str | None = None) -> None:
     with _connect() as c:
         c.execute("INSERT INTO rules(id,json,salt,rule_hash,status) VALUES(?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET json=excluded.json,salt=COALESCE(excluded.salt,rules.salt),rule_hash=COALESCE(excluded.rule_hash,rules.rule_hash),status=excluded.status", (rule.id,rule.model_dump_json(),salt,rule_hash,rule.status))
@@ -77,7 +83,7 @@ def get_option(option_id: str) -> RelaxOption:
     return RelaxOption.model_validate_json(row[0])
 def next_option_id() -> str:
     with _connect() as c: rows=c.execute("SELECT id FROM options").fetchall()
-    return f"O{max((int(m.group(1)) for r in rows if (m:=re.fullmatch(r'O(\\d+)',r[0]))),default=0)+1}"
+    return f"O{max((int(m.group(1)) for r in rows if (m:=re.fullmatch(r'O(\d+)',r[0]))),default=0)+1}"
 def log_llm_call(fn: str, model: str, tokens_in: int, tokens_out: int, ms: int, mock: bool) -> None:
     with _connect() as c: c.execute("INSERT INTO llm_calls(fn,model,tokens_in,tokens_out,ms,mock,ts) VALUES(?,?,?,?,?,?,?)",(fn,model,tokens_in,tokens_out,ms,int(mock),time.time()))
 def tokens_since(ts: float) -> int:
