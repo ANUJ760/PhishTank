@@ -283,6 +283,29 @@ class CPSATScheduler:
             )
 
 
+    def diagnose(
+        self,
+        problem: SchedulingProblem,
+        timeout_seconds: float | None = None,
+        minimize_core: bool = True,
+    ):
+        """Diagnose infeasibility in the given problem and extract the conflict core.
+
+        Args:
+            problem: Validated SchedulingProblem instance.
+            timeout_seconds: Timeout for diagnosis (defaults to solver's time_limit_seconds).
+            minimize_core: Whether to reduce the core to a minimal unsatisfiable subset.
+
+        Returns:
+            ConflictDiagnosis with status, conflict core, and explanation.
+        """
+        from gecompose.diagnostics import ConflictDiagnoser
+
+        timeout = timeout_seconds or self.time_limit_seconds
+        diagnoser = ConflictDiagnoser(timeout_seconds=timeout, minimize_core=minimize_core)
+        return diagnoser.diagnose(problem)
+
+
 def solve_schedule(
     problem: SchedulingProblem,
     time_limit_seconds: float = 10.0,
@@ -306,3 +329,4 @@ def solve_schedule(
         log_search_progress=log_search_progress,
     )
     return scheduler.solve(problem)
+
