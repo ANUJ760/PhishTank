@@ -54,6 +54,9 @@ from gecompose.api import (
     DisruptionRecoverer,
     to_timetable_grid,
     serialize_result,
+    investigate_incident,
+    IncidentInvestigator,
+    evaluate_hypothesis,
 )
 
 __all__ = [
@@ -113,4 +116,7 @@ __all__ = [
     "IncidentSeverity",
     "IncidentStatus",
     "InvestigationReport",
+    "investigate_incident",
+    "IncidentInvestigator",
+    "evaluate_hypothesis",
 ]

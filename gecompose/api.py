@@ -48,6 +48,23 @@ from gecompose.models import (
     Teacher,
     TimeSlot,
 )
+from gecompose.investigation_models import (
+    DiagnosticTest,
+    Evidence,
+    EvidenceLink,
+    EvidenceRelationshipType,
+    EvidenceSourceType,
+    Hypothesis,
+    HypothesisStatus,
+    Incident,
+    IncidentSeverity,
+    IncidentStatus,
+    InvestigationReport,
+)
+from gecompose.investigation import (
+    IncidentInvestigator,
+    evaluate_hypothesis,
+)
 from gecompose.recovery import (
     DisruptionRecoverer,
     analyze_disruption_impact,
@@ -68,6 +85,10 @@ __all__ = [
     "DisruptionRecoverer",
     "to_timetable_grid",
     "serialize_result",
+    # Incident investigation
+    "investigate_incident",
+    "IncidentInvestigator",
+    "evaluate_hypothesis",
 ]
 
 # ---------------------------------------------------------------------------
@@ -148,6 +169,60 @@ def _coerce_assignments(
     raise TypeError(
         f"Expected Sequence[ScheduledAssignment] or ScheduleResult, got {type(assignments).__name__!r}"
     )
+
+
+def _coerce_incident(incident: Union[Incident, dict[str, Any]]) -> Incident:
+    """Return a validated ``Incident``, accepting dicts as input."""
+    if isinstance(incident, Incident):
+        return incident
+    if isinstance(incident, dict):
+        try:
+            return Incident.model_validate(incident)
+        except pydantic.ValidationError as exc:
+            raise ValidationError(f"Invalid incident data: {exc}") from exc
+    raise TypeError(f"Expected Incident or dict, got {type(incident).__name__!r}")
+
+
+def _coerce_evidence_list(
+    evidence: Sequence[Union[Evidence, dict[str, Any]]],
+) -> list[Evidence]:
+    """Return a list of validated ``Evidence`` objects, accepting dicts as input."""
+    if not isinstance(evidence, (list, tuple)):
+        raise TypeError(f"Expected sequence of Evidence or dict, got {type(evidence).__name__!r}")
+    result: list[Evidence] = []
+    for item in evidence:
+        if isinstance(item, Evidence):
+            result.append(item)
+        elif isinstance(item, dict):
+            try:
+                result.append(Evidence.model_validate(item))
+            except pydantic.ValidationError as exc:
+                raise ValidationError(f"Invalid evidence data: {exc}") from exc
+        else:
+            raise TypeError(f"Expected Evidence or dict in evidence list, got {type(item).__name__!r}")
+    return result
+
+
+def _coerce_hypotheses_list(
+    hypotheses: Sequence[Union[Hypothesis, dict[str, Any]]] | None,
+) -> list[Hypothesis] | None:
+    """Return a list of validated ``Hypothesis`` objects, or None."""
+    if hypotheses is None:
+        return None
+    if not isinstance(hypotheses, (list, tuple)):
+        raise TypeError(f"Expected sequence of Hypothesis or dict, got {type(hypotheses).__name__!r}")
+    result: list[Hypothesis] = []
+    for item in hypotheses:
+        if isinstance(item, Hypothesis):
+            result.append(item)
+        elif isinstance(item, dict):
+            try:
+                result.append(Hypothesis.model_validate(item))
+            except pydantic.ValidationError as exc:
+                raise ValidationError(f"Invalid hypothesis data: {exc}") from exc
+        else:
+            raise TypeError(f"Expected Hypothesis or dict in hypotheses list, got {type(item).__name__!r}")
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -397,6 +472,42 @@ def to_timetable_grid(
     return grid
 
 
+def investigate_incident(
+    incident: Union[Incident, dict[str, Any]],
+    evidence: Sequence[Union[Evidence, dict[str, Any]]],
+    hypotheses: Sequence[Union[Hypothesis, dict[str, Any]]] | None = None,
+) -> InvestigationReport:
+    """Investigate an incident against distributed empirical evidence.
+
+    Evaluates competing hypotheses, tracks supporting/contradicting evidence,
+    detects knowledge gaps, proposes discriminating diagnostic tests, and
+    produces a structured InvestigationReport.
+
+    Args:
+        incident: ``Incident`` object or equivalent dict.
+        evidence: Sequence of ``Evidence`` objects or equivalent dicts.
+        hypotheses: Optional sequence of candidate ``Hypothesis`` objects or dicts.
+            If None, domain heuristics synthesize baseline competing hypotheses.
+
+    Returns:
+        Structured ``InvestigationReport``.
+
+    Raises:
+        ValidationError: If input schemas or evidence references are invalid.
+        SolverError: If unexpected internal errors occur.
+    """
+    inc = _coerce_incident(incident)
+    ev_list = _coerce_evidence_list(evidence)
+    hyp_list = _coerce_hypotheses_list(hypotheses)
+    try:
+        investigator = IncidentInvestigator()
+        return investigator.investigate(inc, ev_list, hyp_list)
+    except GeComposeError:
+        raise
+    except Exception as exc:  # pragma: no cover
+        raise SolverError(f"Unexpected error during incident investigation: {exc}") from exc
+
+
 def serialize_result(
     result: Union[
         ScheduleResult,
@@ -405,6 +516,11 @@ def serialize_result(
         ImpactReport,
         DisruptionRecoveryResult,
         AssignmentChange,
+        InvestigationReport,
+        Hypothesis,
+        Evidence,
+        Incident,
+        DiagnosticTest,
     ],
 ) -> dict[str, Any]:
     """Serialize a result object to a JSON-serialisable plain dict.
@@ -413,7 +529,7 @@ def serialize_result(
     become strings, sets become lists, and all types are JSON-native.
 
     Args:
-        result: Any supported GeCompose result model.
+        result: Any supported GeCompose result or domain model.
 
     Returns:
         A plain ``dict`` that can be passed directly to ``json.dumps()``.
@@ -430,6 +546,11 @@ def serialize_result(
             ImpactReport,
             DisruptionRecoveryResult,
             AssignmentChange,
+            InvestigationReport,
+            Hypothesis,
+            Evidence,
+            Incident,
+            DiagnosticTest,
         ),
     ):
         raise TypeError(
@@ -709,3 +830,29 @@ class GeComposeEngine:
         """
         validated = _coerce_problem(problem)
         return verify_schedule(validated, assignments)
+
+    # ------------------------------------------------------------------
+    # Incident Investigation
+    # ------------------------------------------------------------------
+
+    def investigate_incident(
+        self,
+        incident: Union[Incident, dict[str, Any]],
+        evidence: Sequence[Union[Evidence, dict[str, Any]]],
+        hypotheses: Sequence[Union[Hypothesis, dict[str, Any]]] | None = None,
+    ) -> InvestigationReport:
+        """Investigate an incident against distributed empirical evidence.
+
+        Evaluates competing hypotheses, tracks supporting/contradicting evidence,
+        detects knowledge gaps, proposes discriminating diagnostic tests, and
+        produces a structured InvestigationReport.
+
+        Args:
+            incident: ``Incident`` object or equivalent dict.
+            evidence: Sequence of ``Evidence`` objects or equivalent dicts.
+            hypotheses: Optional candidate hypotheses. If None, archetypes are synthesized.
+
+        Returns:
+            Structured ``InvestigationReport``.
+        """
+        return investigate_incident(incident, evidence, hypotheses=hypotheses)
