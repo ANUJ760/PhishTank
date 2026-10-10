@@ -11,6 +11,48 @@ import {
   ExternalLink,
 } from "lucide-react";
 
+const DAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
+const SLOT_WINDOWS: Record<number, string> = {
+  0: "09:00 - 10:00",
+  1: "10:00 - 11:00",
+  2: "11:00 - 12:00",
+  3: "13:00 - 14:00",
+  4: "14:00 - 15:00",
+  5: "15:00 - 16:00",
+};
+
+function formatSlots(slots: number[] = []): string {
+  if (!slots || slots.length === 0) return "Unspecified";
+  const sorted = [...slots].sort((a, b) => a - b);
+  if (sorted.length === 3 && sorted[0] === 0 && sorted[2] === 2) return "Morning (09:00 - 12:00)";
+  if (sorted.length === 3 && sorted[0] === 3 && sorted[2] === 5) return "Afternoon (13:00 - 16:00)";
+  if (sorted.length === 6) return "Full Day (09:00 - 16:00)";
+  if (sorted.length === 1) return SLOT_WINDOWS[sorted[0]] || `Slot ${sorted[0]}`;
+  const start = (SLOT_WINDOWS[sorted[0]] || `Slot ${sorted[0]}`).split(" - ")[0];
+  const end = (SLOT_WINDOWS[sorted[sorted.length - 1]] || `Slot ${sorted[sorted.length - 1]}`).split(" - ")[1] || "";
+  return `${start} - ${end} (Slots ${sorted.join(", ")})`;
+}
+
+function formatRuleHumanSummary(rule: Rule): string {
+  const p = rule.params || {};
+  const dayName = typeof p.day === "number" ? (DAY_NAMES[p.day] || `Day ${p.day}`) : "All Days";
+  const timeWin = p.slots ? formatSlots(p.slots) : "All Hours";
+
+  if (rule.type === "teacher_unavailable") {
+    return `${p.teacher || "Faculty"} cannot be scheduled on ${dayName} during ${timeWin}.`;
+  }
+  if (rule.type === "room_unavailable") {
+    return `${p.room || "Room"} is offline for maintenance on ${dayName} during ${timeWin}.`;
+  }
+  if (rule.type === "pin_session") {
+    return `Locks session ${p.session_id || "Course"} to ${dayName} during ${timeWin}.`;
+  }
+  if (rule.type === "only_qualified") {
+    return `Session ${p.session_id || "Course"} must only be instructed by certified faculty: ${(p.teachers || []).join(", ") || "Qualified instructor"}.`;
+  }
+  return Object.entries(p).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(", ") : v}`).join(" • ") || "Operational constraint.";
+}
+
 export function RulesPage() {
   const queryClient = useQueryClient();
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
@@ -202,15 +244,55 @@ export function RulesPage() {
               <div className="space-y-1">
                 <span className="text-[11px] text-zinc-400 font-medium">Extracted Natural Evidence</span>
                 <div className="p-3 rounded-md bg-white/[0.02] border border-white/5 text-zinc-300 italic text-[11px] leading-relaxed">
-                  &quot;{Array.isArray(activeRule.evidence) ? activeRule.evidence.map((e: any) => e.ref || e.kind || JSON.stringify(e)).join(", ") : String(activeRule.evidence || "No natural evidence recorded")}&quot;
+                  &quot;{Array.isArray(activeRule.evidence) ? activeRule.evidence.map((e: any) => e.ref || e.kind || "Evidence record").join(", ") : String(activeRule.evidence || "No natural evidence recorded")}&quot;
                 </div>
               </div>
 
-              <div className="space-y-1">
-                <span className="text-[11px] text-zinc-400 font-medium">Parsed Parameters (JSON)</span>
-                <pre className="p-3 rounded-md bg-black border border-white/10 text-zinc-300 font-mono text-[11px] overflow-x-auto">
-                  {JSON.stringify(activeRule.params, null, 2)}
-                </pre>
+              <div className="space-y-2">
+                <span className="text-[11px] text-zinc-400 font-medium">Constraint Parameters</span>
+                <div className="p-3.5 rounded-lg bg-zinc-900 border border-white/10 space-y-3">
+                  <div className="text-xs font-semibold text-white leading-relaxed">
+                    {formatRuleHumanSummary(activeRule)}
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 pt-1 border-t border-white/5 text-[11px]">
+                    {activeRule.params.teacher && (
+                      <div className="p-2 rounded bg-black/50 border border-white/5">
+                        <span className="text-zinc-500 block text-[10px]">Faculty</span>
+                        <span className="font-semibold text-zinc-200">{activeRule.params.teacher}</span>
+                      </div>
+                    )}
+                    {activeRule.params.room && (
+                      <div className="p-2 rounded bg-black/50 border border-white/5">
+                        <span className="text-zinc-500 block text-[10px]">Facility</span>
+                        <span className="font-semibold text-zinc-200">{activeRule.params.room}</span>
+                      </div>
+                    )}
+                    {activeRule.params.session_id && (
+                      <div className="p-2 rounded bg-black/50 border border-white/5">
+                        <span className="text-zinc-500 block text-[10px]">Session</span>
+                        <span className="font-semibold text-zinc-200">{activeRule.params.session_id}</span>
+                      </div>
+                    )}
+                    {typeof activeRule.params.day === "number" && (
+                      <div className="p-2 rounded bg-black/50 border border-white/5">
+                        <span className="text-zinc-500 block text-[10px]">Day</span>
+                        <span className="font-semibold text-zinc-200">{DAY_NAMES[activeRule.params.day] || `Day ${activeRule.params.day}`}</span>
+                      </div>
+                    )}
+                    {activeRule.params.slots && (
+                      <div className="p-2 rounded bg-black/50 border border-white/5 col-span-2">
+                        <span className="text-zinc-500 block text-[10px]">Time Window</span>
+                        <span className="font-semibold text-zinc-200">{formatSlots(activeRule.params.slots)}</span>
+                      </div>
+                    )}
+                    {activeRule.params.teachers && (
+                      <div className="p-2 rounded bg-black/50 border border-white/5 col-span-2">
+                        <span className="text-zinc-500 block text-[10px]">Certified Faculty</span>
+                        <span className="font-semibold text-zinc-200">{activeRule.params.teachers.join(", ")}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
 
               {activeRule.status === "draft" && (

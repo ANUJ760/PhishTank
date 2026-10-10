@@ -22,7 +22,7 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, PlainTextResponse, Response
 
-from backend import api, config
+from backend import api, config, hashing
 from backend.models import Conflict, Roster, Rule, Schedule
 from backend.http.auth import (
     SESSION_COOKIE_NAME,
@@ -146,6 +146,7 @@ def aws_health():
 # =========================================================================
 
 @app.post("/api/v1/auth/sign-up", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+@app.post("/auth/sign-up", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 async def sign_up(body: UserSignUpRequest, response: Response):
     try:
         user = await run_in_threadpool(create_user, body.name, body.email, body.password)
@@ -158,12 +159,19 @@ async def sign_up(body: UserSignUpRequest, response: Response):
             secure=False,  # Set True in production HTTPS
             max_age=7 * 24 * 3600,
         )
-        return UserResponse(**user)
+        return UserResponse(
+            id=user["id"],
+            email=user["email"],
+            name=user["name"],
+            role=user["role"],
+            token=session_id,
+        )
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
 @app.post("/api/v1/auth/sign-in", response_model=UserResponse)
+@app.post("/auth/sign-in", response_model=UserResponse)
 async def sign_in(body: UserSignInRequest, response: Response):
     user = await run_in_threadpool(get_user_by_email, body.email)
     if not user or not verify_password(body.password, user["password_hash"]):
@@ -185,17 +193,24 @@ async def sign_in(body: UserSignInRequest, response: Response):
         email=user["email"],
         name=user["name"],
         role=user["role"],
+        token=session_id,
     )
 
 
 @app.get("/api/v1/auth/me", response_model=UserResponse)
+@app.get("/auth/me", response_model=UserResponse)
 async def get_me(user: UserResponse = Depends(require_user)):
     return user
 
 
 @app.post("/api/v1/auth/sign-out", status_code=status.HTTP_204_NO_CONTENT)
+@app.post("/auth/sign-out", status_code=status.HTTP_204_NO_CONTENT)
 async def sign_out(request: Request, response: Response):
     session_id = request.cookies.get(SESSION_COOKIE_NAME)
+    if not session_id:
+        auth_header = request.headers.get("Authorization", "")
+        if auth_header.startswith("Bearer "):
+            session_id = auth_header[7:].strip()
     if session_id:
         await run_in_threadpool(delete_session, session_id)
     response.delete_cookie(key=SESSION_COOKIE_NAME)
@@ -203,6 +218,7 @@ async def sign_out(request: Request, response: Response):
 
 
 @app.post("/api/v1/auth/forgot-password")
+@app.post("/auth/forgot-password")
 async def forgot_password(body: ForgotPasswordRequest):
     # Generic response non-enumerating whether email exists
     return {"message": "If this email is registered, instructions will be delivered."}
@@ -369,6 +385,8 @@ async def intake_sheet(
 
 @app.post("/api/v1/intake/dump")
 @app.post("/intake/dump")
+@app.post("/api/v1/intake/data-dump")
+@app.post("/intake/data-dump")
 async def intake_data_dump(
     files: list[UploadFile] = File(default=[]),
     instructions: str = Form(default=""),

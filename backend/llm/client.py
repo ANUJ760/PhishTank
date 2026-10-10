@@ -41,9 +41,20 @@ def _run_mock(fn: str, schema: type[T]) -> T:
         raise LLMError(f"Mock fixture {fn} failed schema validation: {exc}") from exc
 
 
-def call_json(fn: str, tier: str, messages: list[dict], schema: type[T], retries: int = 2) -> T:
+def call_json(
+    fn: str,
+    tier: str,
+    messages: list[dict],
+    schema: type[T],
+    retries: int = 2,
+    timeout_s: float | None = None,
+    options: dict[str, Any] | None = None,
+    fallback_to_mock: bool = True,
+) -> T:
     """Call language model (Gemma 4B intake or 12B reason) returning validated schema object."""
     if config.MOCK_LLM:
+        if not fallback_to_mock:
+            raise LLMError(f"{fn} requires source-grounded extraction; mock responses are disabled")
         return _run_mock(fn, schema)
 
     # If configured for Ollama provider
@@ -51,7 +62,14 @@ def call_json(fn: str, tier: str, messages: list[dict], schema: type[T], retries
         gemma = get_gemma_service()
         model = gemma.model_for_tier(tier)
         try:
-            parsed, usage = gemma.generate_json(tier=tier, messages=messages, schema=schema, retries=retries)
+            parsed, usage = gemma.generate_json(
+                tier=tier,
+                messages=messages,
+                schema=schema,
+                retries=retries,
+                options=options,
+                timeout_s=timeout_s,
+            )
             db.log_llm_call(
                 fn,
                 model,
@@ -62,7 +80,7 @@ def call_json(fn: str, tier: str, messages: list[dict], schema: type[T], retries
             )
             return parsed
         except Exception as exc:
-            if config.LLM_FALLBACK_TO_MOCK:
+            if fallback_to_mock and config.LLM_FALLBACK_TO_MOCK:
                 log.warning(
                     "Ollama inference for %s (%s) failed (%s); falling back to typed mock fixture",
                     fn,
@@ -116,12 +134,12 @@ def call_json(fn: str, tier: str, messages: list[dict], schema: type[T], retries
                     {"role": "user", "content": f"Correct the JSON to match the required schema. Validation error: {exc}"},
                 ])
         except Exception as exc:
-            if config.LLM_FALLBACK_TO_MOCK:
+            if fallback_to_mock and config.LLM_FALLBACK_TO_MOCK:
                 log.warning("OpenAI inference for %s failed (%s); falling back to mock fixture", fn, exc)
                 return _run_mock(fn, schema)
             raise LLMError(f"{fn} inference failed: {exc}") from exc
 
-    if config.LLM_FALLBACK_TO_MOCK:
+    if fallback_to_mock and config.LLM_FALLBACK_TO_MOCK:
         log.warning("Inference output did not match schema after retries; falling back to mock fixture")
         return _run_mock(fn, schema)
     raise LLMError(f"{fn} output did not match schema after {retries + 1} attempts: {last_error}")

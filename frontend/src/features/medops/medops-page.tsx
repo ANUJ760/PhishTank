@@ -699,8 +699,18 @@ export function MedOpsPage() {
                 </div>
               )}
               {explainMutation.data?.case_rationales && (
-                <div className="mt-3 p-3 rounded-md bg-muted/30 border border-border/40 font-mono text-[11px] whitespace-pre-wrap">
-                  {JSON.stringify(explainMutation.data.case_rationales, null, 2)}
+                <div className="mt-3 p-3 rounded-md bg-muted/30 border border-border/40 space-y-2 text-xs">
+                  <div className="font-semibold text-foreground mb-1">Case Allocations &amp; Rationales:</div>
+                  {typeof explainMutation.data.case_rationales === "object" ? (
+                    Object.entries(explainMutation.data.case_rationales).map(([caseKey, rationale]) => (
+                      <div key={caseKey} className="p-2 rounded bg-background/50 border border-border/30 text-xs flex flex-col sm:flex-row sm:items-baseline gap-1.5">
+                        <span className="font-semibold text-foreground shrink-0">{caseKey}:</span>
+                        <span className="text-muted-foreground">{String(rationale)}</span>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-muted-foreground">{String(explainMutation.data.case_rationales)}</div>
+                  )}
                 </div>
               )}
             </div>

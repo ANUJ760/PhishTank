@@ -5,11 +5,13 @@ from pathlib import Path
 from backend import config
 
 class SandboxError(RuntimeError): pass
-RUNNER='''import sys,json,importlib.util\nd=sys.argv[1]\nspec=importlib.util.spec_from_file_location("parser",f"{d}/parser.py")\nm=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)\nprint(json.dumps(m.parse(f"{d}/input.xlsx")))\n'''
+RUNNER='''import sys,json,importlib.util\nd=sys.argv[1]\nin_file=sys.argv[2] if len(sys.argv)>2 else f"{d}/input.xlsx"\nspec=importlib.util.spec_from_file_location("parser",f"{d}/parser.py")\nm=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)\nprint(json.dumps(m.parse(in_file)))\n'''
 def run_parser(code: str, xlsx: Path, timeout_s: int=15) -> list[dict]:
     if not xlsx.is_file(): raise SandboxError("spreadsheet file does not exist")
+    ext = xlsx.suffix.lower() if xlsx.suffix else ".xlsx"
+    input_name = f"input{ext}"
     with tempfile.TemporaryDirectory(prefix="gecompose-parser-") as temp:
-        folder=Path(temp); (folder/"parser.py").write_text(code,encoding="utf-8"); (folder/"runner.py").write_text(RUNNER,encoding="utf-8"); shutil.copyfile(xlsx,folder/"input.xlsx")
+        folder=Path(temp); (folder/"parser.py").write_text(code,encoding="utf-8"); (folder/"runner.py").write_text(RUNNER,encoding="utf-8"); shutil.copyfile(xlsx,folder/input_name)
         name=f"gc-{uuid.uuid4().hex[:12]}"
         can_docker = (
             config.SANDBOX_MODE == "docker"
@@ -32,10 +34,10 @@ def run_parser(code: str, xlsx: Path, timeout_s: int=15) -> list[dict]:
                 "--memory", "256m", "--cpus", "1", "--pids-limit", "64",
                 "--cap-drop", "ALL", "--security-opt", "no-new-privileges",
                 "-v", f"{folder}:/work:ro", config.SANDBOX_IMAGE,
-                "python", "/work/runner.py", "/work"
+                "python", "/work/runner.py", "/work", f"/work/{input_name}"
             ]
         elif config.MOCK_LLM or config.ALLOW_LOCAL_SANDBOX or config.SANDBOX_MODE == "local":
-            cmd = [sys.executable, str(folder / "runner.py"), str(folder)]
+            cmd = [sys.executable, str(folder / "runner.py"), str(folder), str(folder / input_name)]
         else:
             raise SandboxError("Sandbox docker image not found and local execution is disabled")
         try: result=subprocess.run(cmd,capture_output=True,text=True,timeout=timeout_s,check=False)

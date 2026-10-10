@@ -68,11 +68,11 @@ class GemmaService:
 
             # Model tags may include ':latest' or specific tag
             intake_ready = any(
-                m == self.intake_model or m.startswith(f"{self.intake_model}:") or self.intake_model.startswith(m)
+                m == self.intake_model or m == f"{self.intake_model}:latest"
                 for m in installed_models
             )
             reason_ready = any(
-                m == self.reason_model or m.startswith(f"{self.reason_model}:") or self.reason_model.startswith(m)
+                m == self.reason_model or m == f"{self.reason_model}:latest"
                 for m in installed_models
             )
 
@@ -149,21 +149,35 @@ class GemmaService:
         self,
         model: str,
         messages: list[dict],
-        format_json: bool = True,
+        format_json: bool | dict[str, Any] = True,
         temperature: float = 0.0,
+        options: dict[str, Any] | None = None,
+        timeout_s: float | None = None,
     ) -> tuple[str, dict[str, Any]]:
         """Execute chat completion via Ollama native API."""
         url = f"{self.base_url}/api/chat"
         ollama_messages = self._convert_openai_messages_to_ollama(messages)
 
+        merged_options = {"temperature": temperature}
+        think_flag = False
+        if options:
+            merged_options.update(options)
+            if "think" in merged_options:
+                think_flag = bool(merged_options.pop("think"))
+            elif not format_json:
+                think_flag = True
+
         payload: dict[str, Any] = {
             "model": model,
             "messages": ollama_messages,
             "stream": False,
-            "options": {"temperature": temperature},
+            "options": merged_options,
         }
         if format_json:
-            payload["format"] = "json"
+            payload["format"] = format_json if isinstance(format_json, dict) else "json"
+            payload["think"] = think_flag
+        elif "think" in (options or {}):
+            payload["think"] = think_flag
 
         data_bytes = json.dumps(payload).encode("utf-8")
         req = urllib.request.Request(
@@ -175,10 +189,14 @@ class GemmaService:
             },
         )
 
+        effective_timeout = timeout_s if timeout_s is not None else self.timeout_s
         start = time.monotonic()
         try:
-            with urllib.request.urlopen(req, timeout=self.timeout_s) as resp:
+            with urllib.request.urlopen(req, timeout=effective_timeout) as resp:
                 result = json.loads(resp.read().decode("utf-8"))
+        except urllib.error.HTTPError as exc:
+            detail = exc.read().decode("utf-8", errors="replace")[:1000]
+            raise GemmaServiceError(f"Ollama rejected {model} (HTTP {exc.code}): {detail}") from exc
         except urllib.error.URLError as exc:
             raise GemmaServiceError(
                 f"Failed to communicate with Ollama service at {url}: {exc}. "
@@ -190,6 +208,11 @@ class GemmaService:
         elapsed_ms = int((time.monotonic() - start) * 1000)
         message_obj = result.get("message", {})
         content = message_obj.get("content", "")
+        if not content and message_obj.get("thinking"):
+            thinking_str = message_obj.get("thinking", "")
+            extracted = clean_json_str(thinking_str)
+            if extracted.startswith("{") or extracted.startswith("["):
+                content = extracted
 
         usage = {
             "prompt_tokens": result.get("prompt_eval_count", 0),
@@ -205,6 +228,8 @@ class GemmaService:
         messages: list[dict],
         schema: type[T],
         retries: int = 2,
+        options: dict[str, Any] | None = None,
+        timeout_s: float | None = None,
     ) -> tuple[T, dict[str, Any]]:
         """Call Gemma 4B or 12B model with schema validation and retry loop."""
         model = self.model_for_tier(tier)
@@ -215,8 +240,10 @@ class GemmaService:
             raw_text, usage = self.chat_complete(
                 model=model,
                 messages=conversation,
-                format_json=True,
+                format_json=schema.model_json_schema(),
                 temperature=0.0,
+                options=options,
+                timeout_s=timeout_s,
             )
             cleaned = clean_json_str(raw_text)
             try:

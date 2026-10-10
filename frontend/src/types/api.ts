@@ -5,6 +5,7 @@ export interface User {
   email: string;
   name: string;
   role: UserRole;
+  token?: string;
 }
 
 export type RuleType = "teacher_unavailable" | "room_unavailable" | "pin_session" | "only_qualified";
@@ -102,10 +103,31 @@ export interface DataDumpFileSummary {
   preview: string;
 }
 
+export interface ExtractedRuleCard {
+  id: string;
+  type: string;
+  owner: string;
+  params: Record<string, any>;
+  status: string;
+  category: string;
+  headline: string;
+  plain_description: string;
+  target_entity: string;
+  day_name: string;
+  time_window: string;
+  slots_display: string;
+  timetable_impact: string;
+  has_conflict: boolean;
+  evidence_ref: string;
+}
+
 export interface DataDumpResult {
+  timetable_classes?: Array<{day: string; start: string; end: string; course_code: string; teachers: string[]; room: string}>;
+  processing?: Array<{stage: string; status: string; model: string}>;
   summary: string;
   instructions_executed: string;
   rules: Rule[];
+  rule_cards?: ExtractedRuleCard[];
   entities: Array<{ name: string; kind: string; details?: string }>;
   insights: string[];
   warnings: string[];
