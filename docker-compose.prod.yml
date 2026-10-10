@@ -1,0 +1,57 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: always
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-gecompose}
+      POSTGRES_USER: ${POSTGRES_USER:-gecompose}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-gecompose_prod_secret}
+    volumes:
+      - gecompose_postgres_prod:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+    networks:
+      - gecompose_net
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: always
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-gecompose}
+      POSTGRES_USER: ${POSTGRES_USER:-gecompose}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-gecompose_prod_secret}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      DATABASE_URL: postgresql://${POSTGRES_USER:-gecompose}:${POSTGRES_PASSWORD:-gecompose_prod_secret}@postgres:5432/${POSTGRES_DB:-gecompose}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - gecompose_net
+    expose:
+      - "8000"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    restart: always
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - gecompose_net
+
+volumes:
+  gecompose_postgres_prod:
+
+networks:
+  gecompose_net:
+    driver: bridge
