@@ -305,6 +305,26 @@ class CPSATScheduler:
         diagnoser = ConflictDiagnoser(timeout_seconds=timeout, minimize_core=minimize_core)
         return diagnoser.diagnose(problem)
 
+    def generate_alternatives(
+        self,
+        problem: SchedulingProblem,
+        policy: RelaxationPolicy | None = None,
+    ):
+        """Generate solver-verified alternative schedules by relaxing user constraints.
+
+        Args:
+            problem: Infeasible SchedulingProblem instance.
+            policy: Optional RelaxationPolicy specifying relaxation allowances.
+
+        Returns:
+            AlternativeSearchResult with verified alternative schedules.
+        """
+        from gecompose.alternatives import AlternativeGenerator
+
+        generator = AlternativeGenerator(policy=policy)
+        return generator.generate(problem)
+
+
 
 def solve_schedule(
     problem: SchedulingProblem,

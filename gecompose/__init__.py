@@ -20,10 +20,12 @@ from gecompose.models import (
 )
 from gecompose.solver import CPSATScheduler, solve_schedule
 from gecompose.diagnostics import ConflictDiagnoser, diagnose_conflicts
+from gecompose.alternatives import AlternativeGenerator, generate_alternatives
 from gecompose.validator import verify_schedule
 from gecompose.exceptions import GeComposeError, ValidationError, SolverError
 
 __all__ = [
+    "AlternativeGenerator",
     "AlternativeSearchResult",
     "ConflictConstraint",
     "ConflictDiagnosis",
@@ -44,6 +46,7 @@ __all__ = [
     "ConflictDiagnoser",
     "solve_schedule",
     "diagnose_conflicts",
+    "generate_alternatives",
     "verify_schedule",
     "GeComposeError",
     "ValidationError",
