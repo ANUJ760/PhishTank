@@ -40,6 +40,11 @@ from backend.http.schemas import (
     EditRuleRequest,
     ExplainConflictRequest,
     ForgotPasswordRequest,
+    ReliefApproveRequest,
+    ReliefDispatchIntakeRequest,
+    ReliefExplainRequest,
+    ReliefOptimizeRequest,
+    ReliefSimulateRequest,
     ResetPasswordRequest,
     ScoreboardRequest,
     SolveRequest,
@@ -48,6 +53,18 @@ from backend.http.schemas import (
     UserSignInRequest,
     UserSignUpRequest,
 )
+from backend.reliefops import (
+    AllocationPlan,
+    DisasterIncident,
+    PlanExplanation,
+    ReliefCamp,
+    ReliefRequest,
+    ScenarioComparison,
+    WhatIfDelta,
+    get_reliefops_service,
+    validate_allocation_plan,
+)
+
 
 
 @asynccontextmanager
@@ -471,3 +488,152 @@ async def export_ics():
     roster = await run_in_threadpool(api.get_roster)
     data = api.export.ics_bytes(sched, roster)
     return Response(content=data, media_type="text/calendar", headers={"Content-Disposition": f"attachment; filename=schedule_v{sched.version}.ics"})
+
+
+# =========================================================================
+# GeCompose ReliefOps — Disaster Relief Supply Allocation Engine Endpoints
+# =========================================================================
+
+@app.get("/api/v1/reliefops/overview")
+async def reliefops_overview():
+    srv = get_reliefops_service()
+    return await run_in_threadpool(srv.get_overview)
+
+
+@app.get("/api/v1/reliefops/camps")
+async def reliefops_list_camps():
+    srv = get_reliefops_service()
+    camps = await run_in_threadpool(srv.registry.get_camps)
+    return [c.model_dump() for c in camps]
+
+
+@app.get("/api/v1/reliefops/inventory")
+async def reliefops_list_inventory():
+    srv = get_reliefops_service()
+    inv = await run_in_threadpool(srv.registry.get_inventory)
+    return [i.model_dump() for i in inv]
+
+
+@app.get("/api/v1/reliefops/warehouses")
+async def reliefops_list_warehouses():
+    srv = get_reliefops_service()
+    wh = await run_in_threadpool(srv.registry.get_warehouses)
+    return [w.model_dump() for w in wh]
+
+
+@app.get("/api/v1/reliefops/vehicles")
+async def reliefops_list_vehicles():
+    srv = get_reliefops_service()
+    v = await run_in_threadpool(srv.registry.get_vehicles)
+    return [veh.model_dump() for veh in v]
+
+
+@app.get("/api/v1/reliefops/resources")
+async def reliefops_list_resources():
+    srv = get_reliefops_service()
+    res = await run_in_threadpool(srv.registry.get_resources)
+    return [r.model_dump() for r in res]
+
+
+@app.get("/api/v1/reliefops/requests")
+async def reliefops_list_requests():
+    srv = get_reliefops_service()
+    reqs = await run_in_threadpool(srv.registry.get_requests)
+    return [r.model_dump() for r in reqs]
+
+
+@app.post("/api/v1/reliefops/intake/csv")
+async def reliefops_intake_csv(file: UploadFile = File(...)):
+    content = await file.read()
+    srv = get_reliefops_service()
+    reqs = await run_in_threadpool(srv.intake_csv, content)
+    return [r.model_dump() for r in reqs]
+
+
+@app.post("/api/v1/reliefops/intake/dispatch")
+async def reliefops_intake_dispatch(body: ReliefDispatchIntakeRequest):
+    srv = get_reliefops_service()
+    reqs = await run_in_threadpool(srv.intake_dispatch_report, body.text)
+    return [r.model_dump() for r in reqs]
+
+
+@app.post("/api/v1/reliefops/optimize")
+async def reliefops_optimize(body: ReliefOptimizeRequest | None = None):
+    scenario_id = body.scenario_id if body else "SCENARIO-MAIN"
+    scenario_name = body.scenario_name if body else "Optimal Relief Allocation"
+    srv = get_reliefops_service()
+    plan = await run_in_threadpool(srv.optimize_allocation, scenario_id, scenario_name)
+    return plan.model_dump()
+
+
+@app.get("/api/v1/reliefops/plan/latest")
+async def reliefops_latest_plan():
+    srv = get_reliefops_service()
+    plan = await run_in_threadpool(srv.registry.get_latest_plan)
+    if not plan:
+        raise HTTPException(status_code=404, detail="No allocation plan generated yet")
+    return plan.model_dump()
+
+
+@app.get("/api/v1/reliefops/plan/{plan_id}")
+async def reliefops_get_plan(plan_id: str):
+    srv = get_reliefops_service()
+    plan = await run_in_threadpool(srv.registry.get_plan, plan_id)
+    if not plan:
+        raise HTTPException(status_code=404, detail=f"Plan '{plan_id}' not found")
+    return plan.model_dump()
+
+
+@app.post("/api/v1/reliefops/simulate")
+async def reliefops_simulate(body: ReliefSimulateRequest):
+    srv = get_reliefops_service()
+    delta = WhatIfDelta.model_validate(body.delta)
+    sim_plan, comparison = await run_in_threadpool(
+        srv.run_simulation, delta, body.scenario_id, body.scenario_name
+    )
+    return {
+        "simulation_plan": sim_plan.model_dump(),
+        "comparison": comparison.model_dump(),
+    }
+
+
+@app.post("/api/v1/reliefops/explain")
+async def reliefops_explain(body: ReliefExplainRequest | None = None):
+    plan_id = body.plan_id if body else None
+    srv = get_reliefops_service()
+    explanation = await run_in_threadpool(srv.explain_plan, plan_id)
+    return explanation.model_dump()
+
+
+@app.post("/api/v1/reliefops/approve")
+async def reliefops_approve(body: ReliefApproveRequest):
+    srv = get_reliefops_service()
+    try:
+        record = await run_in_threadpool(
+            srv.approve_plan, body.plan_id, body.approved_by, body.notes
+        )
+        return record.model_dump()
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.get("/api/v1/reliefops/audit")
+async def reliefops_audit(plan_id: Optional[str] = Query(None)):
+    srv = get_reliefops_service()
+    records = await run_in_threadpool(srv.audit.get_records, plan_id)
+    is_valid, msg = await run_in_threadpool(srv.audit.verify_chain_integrity)
+    return {
+        "verified": is_valid,
+        "message": msg,
+        "records": [r.model_dump() for r in records],
+    }
+
+
+@app.post("/api/v1/reliefops/demo/seed")
+async def reliefops_demo_seed():
+    srv = get_reliefops_service()
+    await run_in_threadpool(srv.registry.seed_cyclone_disaster_demo)
+    return {"ok": True, "message": "Disaster relief demo environment seeded"}
+

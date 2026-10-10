@@ -82,6 +82,12 @@ async def index():
                 <li><code>POST /options/{{id}}/apply</code> - Apply approved option</li>
                 <li><code>POST /demo/seed</code> - Seed baseline demo environment</li>
                 <li><code>POST /demo/reset</code> - Reset database to clean state</li>
+                <li><a href="/api/v1/reliefops/overview"><code>GET /api/v1/reliefops/overview</code></a> - ReliefOps disaster status</li>
+                <li><a href="/api/v1/reliefops/camps"><code>GET /api/v1/reliefops/camps</code></a> - Relief camps and access</li>
+                <li><code>POST /api/v1/reliefops/optimize</code> - CP-SAT supply allocation</li>
+                <li><code>POST /api/v1/reliefops/simulate</code> - What-If counterfactual simulation</li>
+                <li><code>POST /api/v1/reliefops/explain</code> - Gemma 12B plan rationale</li>
+                <li><a href="/api/v1/reliefops/audit"><code>GET /api/v1/reliefops/audit</code></a> - SHA-256 audit ledger</li>
             </ul>
         </div>
     </body>

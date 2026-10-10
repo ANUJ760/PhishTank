@@ -479,9 +479,74 @@ When a schedule is infeasible, GeCompose searches for valid alternative schedule
 python3 -m venv .venv
 .venv/bin/pip install -e .
 
-# Run the complete test suite (71 passing tests)
+# Run the complete test suite (115 passing tests)
 .venv/bin/pytest -v
 ```
+
+---
+
+## 8. GeCompose ReliefOps — Disaster Relief Supply Allocation Engine
+
+**GeCompose ReliefOps** is an AI-powered disaster logistics and emergency supply allocation engine that optimally distributes scarce life-saving supplies across multiple relief camps during natural disasters such as cyclones, floods, and earthquakes.
+
+### Core Workflow & Architecture
+
+```mermaid
+flowchart TD
+    A["Field Reports\n(CSV, Radio Dispatches, Audio)"] --> B["Request Intake Service\n(Gemma 4B Extraction & Normalization)"]
+    B --> C["ReliefOps Registry\n(Incidents, Camps, Warehouses, Vehicles)"]
+    C --> D["Allocation Optimizer\n(Google OR-Tools CP-SAT)"]
+    D --> E["Independent Validator\n(Physical Invariant Check)"]
+    E --> F["Explanation Service\n(Gemma 12B Shortage & Trade-off Rationale)"]
+    E --> G["Audit Ledger\n(Cryptographic SHA-256 Chain)"]
+    C --> H["What-If Scenario Simulator\n(Counterfactual Influx/Loss Simulation)"]
+    H --> D
+```
+
+### Key Modules
+
+1. **CP-SAT Discrete Allocation Optimizer (`backend.reliefops.optimizer`)**:
+   - Strictly enforces inventory capacity upper bounds ($\sum x_{c,r} \le I_r$).
+   - Respects camp demand ceilings ($0 \le x_{c,r} \le D_{c,r}$).
+   - Enforces camp physical storage volume ($m^3$) and structural load ($kg$) constraints.
+   - Enforces vehicle terrain accessibility (`open`, `restricted_road`, `air_only`, `boat_only`).
+   - Lexicographic multi-objective prioritizing life-critical supplies (water, trauma kits) and populations with high vulnerability ratios (children, elderly).
+
+2. **Independent Allocation Validator (`backend.reliefops.validator`)**:
+   - Physical invariant checker verifying zero inventory overdrafts, zero demand overflows, non-negativity, and transportation accessibility before any plan can be approved.
+
+3. **What-If Scenario Simulator (`backend.reliefops.simulator`)**:
+   - Executes isolated counterfactual simulations (e.g. +5000L water donation, offline warehouse, disabled vehicle) without mutating live state.
+   - Returns side-by-side comparative diagnostics (`fulfillment_diff`, `allocated_diff`, `camps_improved`, `camps_degraded`).
+
+4. **Explainable Decisions (`backend.reliefops.explainer`)**:
+   - Powered by **Gemma 12B** reasoning to articulate why specific camps were rationed, which hard physical bottlenecks triggered shortages, and recommendations for operational commanders.
+
+5. **Request Intake & Consolidation (`backend.reliefops.intake`)**:
+   - Ingests structured CSV reports and parses messy unstructured radio/dispatch field reports using **Gemma 4B**.
+
+6. **Cryptographic Audit Ledger (`backend.reliefops.audit`)**:
+   - Maintains an immutable, tamper-evident SHA-256 event chain recording every plan creation, validation, simulation, and commander sign-off.
+
+### ReliefOps REST API Endpoints
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/api/v1/reliefops/overview` | Active disaster overview, camp metrics, and latest plan status |
+| `GET` | `/api/v1/reliefops/camps` | List relief camps, populations, vulnerabilities, and access modes |
+| `GET` | `/api/v1/reliefops/inventory` | Live inventory across operational warehouses |
+| `GET` | `/api/v1/reliefops/vehicles` | Transport fleet capacities and supported access types |
+| `GET` | `/api/v1/reliefops/requests` | Pending camp resource requests |
+| `POST` | `/api/v1/reliefops/intake/csv` | Ingest camp requests via CSV upload |
+| `POST` | `/api/v1/reliefops/intake/dispatch` | Ingest unstructured radio transcripts using Gemma 4B |
+| `POST` | `/api/v1/reliefops/optimize` | Run Google OR-Tools CP-SAT supply allocation |
+| `GET` | `/api/v1/reliefops/plan/latest` | Retrieve latest verified allocation plan |
+| `POST` | `/api/v1/reliefops/simulate` | Run what-if scenario counterfactuals against baseline |
+| `POST` | `/api/v1/reliefops/explain` | Generate Gemma 12B decision rationale and commander advice |
+| `POST` | `/api/v1/reliefops/approve` | Authorize allocation plan and record in cryptographic ledger |
+| `GET` | `/api/v1/reliefops/audit` | Retrieve verified SHA-256 audit ledger |
+| `POST` | `/api/v1/reliefops/demo/seed` | Reset operational state to coastal cyclone benchmark scenario |
+
 
 ---
 

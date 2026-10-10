@@ -54,3 +54,33 @@ class DashboardSummaryResponse(BaseModel):
     published_version: int | None
     latest_schedule_hash: str | None
     system_healthy: bool
+
+
+# -------------------------------------------------------------------------
+# ReliefOps Request Schemas
+# -------------------------------------------------------------------------
+
+class ReliefOptimizeRequest(BaseModel):
+    scenario_id: str = "SCENARIO-MAIN"
+    scenario_name: str = "Optimal CP-SAT Disaster Allocation"
+
+
+class ReliefSimulateRequest(BaseModel):
+    delta: dict = Field(default_factory=dict)
+    scenario_id: str | None = None
+    scenario_name: str = "What-If Counterfactual"
+
+
+class ReliefApproveRequest(BaseModel):
+    plan_id: str
+    approved_by: str
+    notes: str = "Approved by commander"
+
+
+class ReliefDispatchIntakeRequest(BaseModel):
+    text: str = Field(..., min_length=5)
+
+
+class ReliefExplainRequest(BaseModel):
+    plan_id: str | None = None
+
