@@ -102,10 +102,29 @@ export interface DataDumpFileSummary {
   preview: string;
 }
 
+export interface ExtractedRuleCard {
+  id: string;
+  type: string;
+  owner: string;
+  params: Record<string, any>;
+  status: string;
+  category: string;
+  headline: string;
+  plain_description: string;
+  target_entity: string;
+  day_name: string;
+  time_window: string;
+  slots_display: string;
+  timetable_impact: string;
+  has_conflict: boolean;
+  evidence_ref: string;
+}
+
 export interface DataDumpResult {
   summary: string;
   instructions_executed: string;
   rules: Rule[];
+  rule_cards?: ExtractedRuleCard[];
   entities: Array<{ name: string; kind: string; details?: string }>;
   insights: string[];
   warnings: string[];

@@ -151,16 +151,22 @@ class GemmaService:
         messages: list[dict],
         format_json: bool = True,
         temperature: float = 0.0,
+        options: dict[str, Any] | None = None,
+        timeout_s: float | None = None,
     ) -> tuple[str, dict[str, Any]]:
         """Execute chat completion via Ollama native API."""
         url = f"{self.base_url}/api/chat"
         ollama_messages = self._convert_openai_messages_to_ollama(messages)
 
+        merged_options = {"temperature": temperature}
+        if options:
+            merged_options.update(options)
+
         payload: dict[str, Any] = {
             "model": model,
             "messages": ollama_messages,
             "stream": False,
-            "options": {"temperature": temperature},
+            "options": merged_options,
         }
         if format_json:
             payload["format"] = "json"
@@ -175,9 +181,10 @@ class GemmaService:
             },
         )
 
+        effective_timeout = timeout_s if timeout_s is not None else self.timeout_s
         start = time.monotonic()
         try:
-            with urllib.request.urlopen(req, timeout=self.timeout_s) as resp:
+            with urllib.request.urlopen(req, timeout=effective_timeout) as resp:
                 result = json.loads(resp.read().decode("utf-8"))
         except urllib.error.URLError as exc:
             raise GemmaServiceError(
@@ -205,6 +212,8 @@ class GemmaService:
         messages: list[dict],
         schema: type[T],
         retries: int = 2,
+        options: dict[str, Any] | None = None,
+        timeout_s: float | None = None,
     ) -> tuple[T, dict[str, Any]]:
         """Call Gemma 4B or 12B model with schema validation and retry loop."""
         model = self.model_for_tier(tier)
@@ -217,6 +226,8 @@ class GemmaService:
                 messages=conversation,
                 format_json=True,
                 temperature=0.0,
+                options=options,
+                timeout_s=timeout_s,
             )
             cleaned = clean_json_str(raw_text)
             try:
