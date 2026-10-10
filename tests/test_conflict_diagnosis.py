@@ -168,3 +168,74 @@ class TestConflictDiagnosis:
         # Either the raw core was size 1 or it is labeled with its verified status
         if len(diag.conflicting_constraints) > 1:
             assert diag.is_minimal is False
+
+    def test_allowed_slots_conflict_diagnosed(self):
+        """Diagnose conflict when allowed slots are completely unavailable to the teacher."""
+        problem = SchedulingProblem(
+            teachers=[
+                Teacher(
+                    id="t1",
+                    name="Prof. Rao",
+                    qualifications={"Math"},
+                    unavailable_slots={"s1"},
+                )
+            ],
+            rooms=[Room(id="r1", name="Room 1", capacity=50)],
+            slots=[
+                TimeSlot(id="s1", day="Monday", start_time="09:00", end_time="10:00"),
+                TimeSlot(id="s2", day="Monday", start_time="10:00", end_time="11:00"),
+            ],
+            sessions=[
+                Session(
+                    id="c1",
+                    subject="Math",
+                    pinned_teacher_id="t1",
+                    allowed_slot_ids={"s1"},  # Only allowed at s1, but t1 is unavailable at s1
+                )
+            ],
+        )
+
+        diag = diagnose_conflicts(problem)
+        assert diag.is_infeasible is True
+        assert diag.is_minimal is True
+        c_types = {c.constraint_type for c in diag.conflicting_constraints}
+        assert ConstraintType.ALLOWED_SLOTS in c_types
+        assert ConstraintType.TEACHER_UNAVAILABLE in c_types
+
+    def test_timeout_diagnosis_does_not_fabricate_conflict(self):
+        """Verify that when diagnosis times out, it does not invent/fabricate a conflict core."""
+        teachers = [
+            Teacher(id=f"t{i}", name=f"Prof {i}", qualifications={"Math"})
+            for i in range(3)
+        ]
+        rooms = [Room(id=f"r{i}", name=f"Room {i}", capacity=50) for i in range(2)]
+        slots = [
+            TimeSlot(
+                id=f"s_{i}",
+                day=f"Day_{i%2}",
+                start_time=f"{(i%3)+9:02d}:00",
+                end_time=f"{(i%3)+10:02d}:00",
+            )
+            for i in range(4)
+        ]
+        sessions = [
+            Session(id=f"sess_{i}", subject="Math", expected_students=30)
+            for i in range(6)
+        ]
+
+        problem = SchedulingProblem(
+            teachers=teachers,
+            rooms=rooms,
+            slots=slots,
+            sessions=sessions,
+        )
+
+        diagnoser = ConflictDiagnoser(timeout_seconds=0.0001)
+        diag = diagnoser.diagnose(problem)
+
+        if diag.status in (SolverStatus.TIMEOUT, SolverStatus.UNKNOWN):
+            assert diag.is_infeasible is False
+            assert diag.is_minimal is False
+            assert len(diag.conflicting_constraints) == 0
+            assert "timed out" in diag.explanation.lower() or "unknown" in diag.explanation.lower()
+

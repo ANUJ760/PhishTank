@@ -322,8 +322,14 @@ class ConflictDiagnoser:
                     )
                     model.Add(sum(r_unavail_vars) == 0).OnlyEnforceIf(a_r_unavail)
 
+        # Precalculate distinct overlapping slot pairs (i < j)
+        overlapping_slot_pairs: list[tuple[TimeSlot, TimeSlot]] = []
+        for i, s1 in enumerate(problem.slots):
+            for s2 in problem.slots[i + 1 :]:
+                if s1.overlaps(s2):
+                    overlapping_slot_pairs.append((s1, s2))
+
         # 9. Teacher Non-Overlap
-        slot_map = {slot.id: slot for slot in problem.slots}
         for t in problem.teachers:
             a_t_no_overlap = add_assumption(
                 f"req_t_no_overlap_{t.id}",
@@ -331,19 +337,22 @@ class ConflictDiagnoser:
                 f"Teacher '{t.id}' ({t.name}) cannot teach overlapping sessions",
                 teacher_id=t.id,
             )
-            # Add pairwise non-overlap across overlapping slots
-            for i, s1 in enumerate(problem.sessions):
-                for s2 in problem.sessions[i + 1 :]:
-                    for k1_id, slot1 in slot_map.items():
-                        for k2_id, slot2 in slot_map.items():
-                            if slot1.overlaps(slot2):
-                                for r1 in problem.rooms:
-                                    for r2 in problem.rooms:
-                                        model.Add(
-                                            x_vars[(s1.id, t.id, r1.id, k1_id)]
-                                            + x_vars[(s2.id, t.id, r2.id, k2_id)]
-                                            <= 1
-                                        ).OnlyEnforceIf(a_t_no_overlap)
+            teacher_slot_vars: dict[str, list[cp_model.IntVar]] = {}
+            for slot in problem.slots:
+                vars_for_slot = [
+                    x_vars[(s.id, t.id, r.id, slot.id)]
+                    for s in problem.sessions
+                    for r in problem.rooms
+                ]
+                teacher_slot_vars[slot.id] = vars_for_slot
+                if len(vars_for_slot) > 1:
+                    model.Add(sum(vars_for_slot) <= 1).OnlyEnforceIf(a_t_no_overlap)
+
+            for slot1, slot2 in overlapping_slot_pairs:
+                v1 = teacher_slot_vars[slot1.id]
+                v2 = teacher_slot_vars[slot2.id]
+                if v1 and v2:
+                    model.Add(sum(v1) + sum(v2) <= 1).OnlyEnforceIf(a_t_no_overlap)
 
         # 10. Room Non-Overlap
         for r in problem.rooms:
@@ -353,18 +362,22 @@ class ConflictDiagnoser:
                 f"Room '{r.id}' ({r.name}) cannot host overlapping sessions",
                 room_id=r.id,
             )
-            for i, s1 in enumerate(problem.sessions):
-                for s2 in problem.sessions[i + 1 :]:
-                    for k1_id, slot1 in slot_map.items():
-                        for k2_id, slot2 in slot_map.items():
-                            if slot1.overlaps(slot2):
-                                for t1 in problem.teachers:
-                                    for t2 in problem.teachers:
-                                        model.Add(
-                                            x_vars[(s1.id, t1.id, r.id, k1_id)]
-                                            + x_vars[(s2.id, t2.id, r.id, k2_id)]
-                                            <= 1
-                                        ).OnlyEnforceIf(a_r_no_overlap)
+            room_slot_vars: dict[str, list[cp_model.IntVar]] = {}
+            for slot in problem.slots:
+                vars_for_slot = [
+                    x_vars[(s.id, t.id, r.id, slot.id)]
+                    for s in problem.sessions
+                    for t in problem.teachers
+                ]
+                room_slot_vars[slot.id] = vars_for_slot
+                if len(vars_for_slot) > 1:
+                    model.Add(sum(vars_for_slot) <= 1).OnlyEnforceIf(a_r_no_overlap)
+
+            for slot1, slot2 in overlapping_slot_pairs:
+                v1 = room_slot_vars[slot1.id]
+                v2 = room_slot_vars[slot2.id]
+                if v1 and v2:
+                    model.Add(sum(v1) + sum(v2) <= 1).OnlyEnforceIf(a_r_no_overlap)
 
         # Solve with full assumptions
         solver = cp_model.CpSolver()

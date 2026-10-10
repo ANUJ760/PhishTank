@@ -183,3 +183,68 @@ class TestAlternativeGeneration:
         result = generate_alternatives(problem)
         assert result.status == SolverStatus.INFEASIBLE
         assert len(result.alternatives) == 0
+
+    def test_room_change_alternative_found(self):
+        """When pinned room has insufficient capacity, alternative generator relaxes room to a capable room."""
+        problem = SchedulingProblem(
+            teachers=[Teacher(id="t1", name="Prof. Rao", qualifications={"Math"})],
+            rooms=[
+                Room(id="r_small", name="Small Room", capacity=20),
+                Room(id="r_large", name="Large Room", capacity=80),
+            ],
+            slots=[TimeSlot(id="s1", day="Monday", start_time="09:00", end_time="10:00")],
+            sessions=[
+                Session(
+                    id="sess_math",
+                    subject="Math",
+                    expected_students=50,
+                    pinned_room_id="r_small",  # Conflict: 50 students in capacity 20 room
+                )
+            ],
+        )
+
+        result = generate_alternatives(problem)
+        assert result.status == SolverStatus.FEASIBLE
+        assert len(result.alternatives) >= 1
+        alt = result.alternatives[0]
+        assert alt.validation_passed is True
+        assert alt.assignments[0].room_id == "r_large"
+        assert alt.relaxed_requirements[0].constraint_type == ConstraintType.PINNED_ROOM
+        assert alt.relaxed_requirements[0].original_value == "r_small"
+        assert alt.relaxed_requirements[0].relaxed_value == "r_large"
+
+    def test_alternative_search_timeout_safely_handled(self):
+        """When alternative search times out, it safely reports status without returning unverified schedules."""
+        teachers = [
+            Teacher(id=f"t{i}", name=f"Prof {i}", qualifications={"Math"})
+            for i in range(3)
+        ]
+        rooms = [Room(id=f"r{i}", name=f"Room {i}", capacity=50) for i in range(2)]
+        slots = [
+            TimeSlot(
+                id=f"s_{i}",
+                day=f"Day_{i%2}",
+                start_time=f"{(i%3)+9:02d}:00",
+                end_time=f"{(i%3)+10:02d}:00",
+            )
+            for i in range(4)
+        ]
+        sessions = [
+            Session(id=f"sess_{i}", subject="Math", expected_students=30)
+            for i in range(6)
+        ]
+
+        problem = SchedulingProblem(
+            teachers=teachers,
+            rooms=rooms,
+            slots=slots,
+            sessions=sessions,
+        )
+
+        policy = RelaxationPolicy(timeout_seconds=0.0001)
+        generator = AlternativeGenerator(policy=policy)
+        result = generator.generate(problem)
+        assert isinstance(result.status, SolverStatus)
+        for alt in result.alternatives:
+            assert alt.validation_passed is True
+
