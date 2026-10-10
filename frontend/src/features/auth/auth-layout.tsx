@@ -7,7 +7,7 @@ export function AuthLayout({ children }: { children: React.ReactNode }) {
       <AmbientBackground />
       <div className="w-full max-w-[420px] z-10">
         <div className="flex items-center justify-center gap-2.5 mb-8 select-none">
-          <div className="h-9 w-9 rounded-2xl bg-white text-zinc-950 flex items-center justify-center font-bold text-sm shadow-md">
+          <div className="h-9 w-9 rounded-lg bg-white text-zinc-950 flex items-center justify-center font-bold text-sm shadow-md">
             GC
           </div>
           <div className="flex flex-col text-left">

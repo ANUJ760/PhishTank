@@ -10,19 +10,19 @@ export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className, variant = "default", size = "default", isLoading, children, disabled, ...props }, ref) => {
     const variants = {
-      default: "bg-white text-zinc-950 hover:bg-zinc-200 font-medium shadow-sm active:scale-[0.99]",
-      secondary: "bg-zinc-800/80 text-zinc-200 hover:bg-zinc-700/80 border border-white/10 active:scale-[0.99]",
-      outline: "border border-white/15 bg-transparent hover:bg-white/5 text-zinc-300 active:scale-[0.99]",
-      ghost: "text-zinc-400 hover:text-zinc-100 hover:bg-white/5",
-      destructive: "bg-zinc-900 border border-white/10 text-zinc-300 hover:bg-zinc-800",
+      default: "bg-white text-zinc-950 font-medium shadow-sm hover:bg-zinc-100 hover:shadow-[0_0_20px_rgba(255,255,255,0.2)] hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98]",
+      secondary: "bg-white/[0.05] text-zinc-200 border border-white/10 hover:bg-white/[0.09] hover:border-white/20 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/40 active:scale-[0.98]",
+      outline: "border border-white/12 bg-transparent text-zinc-300 hover:bg-white/[0.06] hover:border-white/25 hover:text-white hover:-translate-y-0.5 active:scale-[0.98]",
+      ghost: "text-zinc-400 hover:text-zinc-100 hover:bg-white/[0.06] active:scale-[0.98]",
+      destructive: "bg-red-950/40 border border-red-500/20 text-red-300 hover:bg-red-900/40 hover:border-red-500/40 active:scale-[0.98]",
       link: "text-zinc-300 underline-offset-4 hover:underline hover:text-white",
     };
 
     const sizes = {
-      default: "h-9 px-4 py-2 text-sm rounded-xl",
-      sm: "h-8 px-3 text-xs rounded-lg",
-      lg: "h-11 px-6 text-sm rounded-2xl",
-      icon: "h-9 w-9 rounded-xl",
+      default: "h-9 px-4 py-2 text-sm rounded-md",
+      sm: "h-8 px-3 text-xs rounded-md",
+      lg: "h-11 px-6 text-sm rounded-md",
+      icon: "h-9 w-9 rounded-md",
     };
 
     return (
@@ -30,7 +30,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         ref={ref}
         disabled={disabled || isLoading}
         className={cn(
-          "inline-flex items-center justify-center gap-2 font-medium transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/20 disabled:pointer-events-none disabled:opacity-50 select-none",
+          "inline-flex items-center justify-center gap-2 font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/20 disabled:pointer-events-none disabled:opacity-50 select-none",
           variants[variant],
           sizes[size],
           className

@@ -26,7 +26,7 @@ export function ScoreboardPage() {
         </div>
 
         <div className="flex items-center gap-3">
-          <span className="px-3 py-1 rounded-full bg-zinc-900 border border-white/10 text-xs text-zinc-300 flex items-center gap-1.5">
+          <span className="px-3 py-1 rounded-md bg-zinc-900 border border-white/10 text-xs text-zinc-300 flex items-center gap-1.5">
             <Sparkles size={12} className="text-zinc-400" />
             <span>Recorded Fixture (Mock LLM Mode)</span>
           </span>
@@ -34,7 +34,7 @@ export function ScoreboardPage() {
           <button
             onClick={() => scoreboardMutation.mutate(runs)}
             disabled={scoreboardMutation.isPending}
-            className="h-8 px-4 rounded-full bg-white text-zinc-950 font-medium text-xs hover:bg-zinc-200 transition-all flex items-center gap-1.5 shadow-sm active:scale-[0.98] disabled:opacity-50"
+            className="h-8 px-4 rounded-md bg-white text-zinc-950 font-medium text-xs hover:bg-zinc-200 transition-all flex items-center gap-1.5 shadow-sm active:scale-[0.98] disabled:opacity-50"
           >
             <BarChart3 size={13} />
             <span>{scoreboardMutation.isPending ? "Evaluating..." : `Run Benchmark (${runs} runs)`}</span>
@@ -49,7 +49,7 @@ export function ScoreboardPage() {
               <Trophy size={14} className="text-zinc-300" />
               GeCompose (CP-SAT Solver)
             </span>
-            <span className="px-2.5 py-0.5 rounded-full bg-zinc-800 text-zinc-200 border border-white/10 text-[11px] font-mono">
+            <span className="px-2.5 py-0.5 rounded-md bg-zinc-800 text-zinc-200 border border-white/10 text-[11px] font-mono">
               0 Violations
             </span>
           </div>
@@ -63,7 +63,7 @@ export function ScoreboardPage() {
             <span className="text-xs font-semibold text-white">
               Baseline Generative LLM
             </span>
-            <span className="px-2.5 py-0.5 rounded-full bg-zinc-800 text-zinc-300 border border-white/10 text-[11px] font-mono">
+            <span className="px-2.5 py-0.5 rounded-md bg-zinc-800 text-zinc-300 border border-white/10 text-[11px] font-mono">
               ~2-4 Violations / Run
             </span>
           </div>

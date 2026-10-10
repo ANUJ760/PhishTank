@@ -115,7 +115,7 @@ export function PublishPage() {
               </p>
             </div>
             {schedule && (
-              <span className="px-2.5 py-0.5 rounded-full bg-zinc-800 text-zinc-300 text-[10px]">
+              <span className="px-2.5 py-0.5 rounded-md bg-zinc-800 text-zinc-300 text-[10px]">
                 Active v{schedule.version}
               </span>
             )}
@@ -128,7 +128,7 @@ export function PublishPage() {
           <button
             onClick={() => publishMutation.mutate()}
             disabled={publishMutation.isPending}
-            className="w-full h-8 rounded-full bg-white text-zinc-950 font-medium text-xs hover:bg-zinc-200 transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-[0.98] disabled:opacity-50"
+            className="w-full h-8 rounded-md bg-white text-zinc-950 font-medium text-xs hover:bg-zinc-200 transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-[0.98] disabled:opacity-50"
           >
             <ShieldCheck size={14} />
             <span>{publishMutation.isPending ? "Anchoring on Chain..." : "Anchor Current Schedule On-Chain"}</span>
@@ -136,7 +136,7 @@ export function PublishPage() {
 
           {/* Receipt details */}
           {publishResult && (
-            <div className="p-4 rounded-xl border border-white/10 bg-white/[0.02] text-xs space-y-2 mt-3">
+            <div className="p-4 rounded-md border border-white/10 bg-white/[0.02] text-xs space-y-2 mt-3">
               <span className="font-semibold text-white block">Anchoring Receipt:</span>
               <div className="space-y-1 font-mono text-[11px] text-zinc-400">
                 <div className="truncate">Tx: <span className="text-zinc-200">{publishResult.tx_hash}</span></div>
@@ -148,19 +148,19 @@ export function PublishPage() {
               <div className="pt-2 border-t border-white/5 flex flex-wrap gap-2">
                 <button
                   onClick={() => downloadFile(publishResult.json_bytes_b64, "timetable.json", "application/json")}
-                  className="h-7 px-3 rounded-full bg-zinc-900 border border-white/10 text-zinc-300 hover:text-white text-xs flex items-center gap-1"
+                  className="h-7 px-3 rounded-md bg-zinc-900 border border-white/10 text-zinc-300 hover:text-white text-xs flex items-center gap-1"
                 >
                   <Download size={11} /> JSON
                 </button>
                 <button
                   onClick={() => downloadFile(publishResult.csv_bytes_b64, "timetable.csv", "text/csv")}
-                  className="h-7 px-3 rounded-full bg-zinc-900 border border-white/10 text-zinc-300 hover:text-white text-xs flex items-center gap-1"
+                  className="h-7 px-3 rounded-md bg-zinc-900 border border-white/10 text-zinc-300 hover:text-white text-xs flex items-center gap-1"
                 >
                   <Download size={11} /> CSV
                 </button>
                 <button
                   onClick={() => downloadFile(publishResult.ics_bytes_b64, "timetable.ics", "text/calendar")}
-                  className="h-7 px-3 rounded-full bg-zinc-900 border border-white/10 text-zinc-300 hover:text-white text-xs flex items-center gap-1"
+                  className="h-7 px-3 rounded-md bg-zinc-900 border border-white/10 text-zinc-300 hover:text-white text-xs flex items-center gap-1"
                 >
                   <Download size={11} /> iCal (.ics)
                 </button>
@@ -188,21 +188,21 @@ export function PublishPage() {
                 type="file"
                 accept=".json"
                 onChange={(e) => setVerifyFile(e.target.files?.[0] || null)}
-                className="w-full p-2 rounded-xl bg-zinc-900 border border-white/10 text-xs text-zinc-300 file:mr-3 file:py-1 file:px-3 file:rounded-full file:border-0 file:bg-white file:text-zinc-950 file:text-xs file:font-medium"
+                className="w-full p-2 rounded-md bg-zinc-900 border border-white/10 text-xs text-zinc-300 file:mr-3 file:py-1 file:px-3 file:rounded-md file:border-0 file:bg-white file:text-zinc-950 file:text-xs file:font-medium"
               />
             </div>
 
             <button
               type="submit"
               disabled={isVerifying || !verifyFile}
-              className="h-8 px-4 rounded-full bg-white text-zinc-950 font-medium text-xs hover:bg-zinc-200 transition-all shadow-sm disabled:opacity-50"
+              className="h-8 px-4 rounded-md bg-white text-zinc-950 font-medium text-xs hover:bg-zinc-200 transition-all shadow-sm disabled:opacity-50"
             >
               Verify Cryptographic Authenticity
             </button>
           </form>
 
           {verifyResult && (
-            <div className="p-3.5 rounded-xl border border-white/10 bg-white/[0.02] text-xs space-y-1.5">
+            <div className="p-3.5 rounded-md border border-white/10 bg-white/[0.02] text-xs space-y-1.5">
               <span className="font-semibold text-white">
                 {verifyResult.match && verifyResult.anchored ? "Cryptographic Authenticity Verified" : "Verification Failed"}
               </span>
@@ -218,13 +218,13 @@ export function PublishPage() {
             <button
               onClick={handleTamperTest}
               disabled={isVerifying || !schedule}
-              className="h-7 px-3.5 rounded-full bg-zinc-900 border border-white/10 text-zinc-300 hover:text-white text-xs transition-all"
+              className="h-7 px-3.5 rounded-md bg-zinc-900 border border-white/10 text-zinc-300 hover:text-white text-xs transition-all"
             >
               Run Automated 1-Byte Tamper Test
             </button>
 
             {tamperDemoResult && (
-              <div className="p-3 rounded-xl border border-white/5 bg-white/[0.02] text-xs space-y-1">
+              <div className="p-3 rounded-md border border-white/5 bg-white/[0.02] text-xs space-y-1">
                 <div className="flex items-center gap-1.5 text-zinc-300">
                   <span>&bull; Original Schedule Hash matches on-chain: <strong>Yes</strong></span>
                 </div>

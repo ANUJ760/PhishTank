@@ -2,29 +2,28 @@ import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api-client";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import {
-  Sliders,
-  Calendar,
   ArrowRight,
-  Link2,
   Search,
   Check,
   Copy,
-  Layers,
-  Sparkles,
+  Cpu,
+  Shield,
+  Mic,
+  FileSpreadsheet,
+  Camera,
+  Zap,
+  Calendar,
+  Lock,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
+import { cardMotionVariants } from "@/lib/motion";
 
 export function DashboardPage() {
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
-  const [searchFilter, setSearchFilter] = useState("");
-  const [minimalChange, setMinimalChange] = useState(true);
 
-  const { data: summary, isLoading: isSummaryLoading } = useQuery({
+  const { data: summary } = useQuery({
     queryKey: ["dashboard-summary"],
     queryFn: api.dashboardSummary,
     refetchInterval: 8000,
@@ -45,264 +44,170 @@ export function DashboardPage() {
   const handleCopy = (text: string, key: string) => {
     navigator.clipboard.writeText(text);
     setCopiedKey(key);
-    toast.success("Hash copied to clipboard");
+    toast.success("Copied to clipboard");
     setTimeout(() => setCopiedKey(null), 2000);
   };
 
+  const pipelineSteps = [
+    { icon: Mic, label: "Multimodal Intake", desc: "Voice, photo & spreadsheet constraint extraction via Gemma 4" },
+    { icon: Cpu, label: "CP-SAT Solver", desc: "Google OR-Tools guarantees zero double-bookings" },
+    { icon: Shield, label: "Consent Ledger", desc: "Cryptographic audit trail for every schedule change" },
+  ];
+
+  const capabilities = [
+    { icon: Mic, label: "Voice Rules", desc: "Hindi, Marathi, English" },
+    { icon: Camera, label: "Photo Scanning", desc: "Whiteboard & roster OCR" },
+    { icon: FileSpreadsheet, label: "Sheet Parsing", desc: "One-shot parser generation" },
+    { icon: Zap, label: "Conflict Core", desc: "Minimal unsatisfiable subset" },
+    { icon: Calendar, label: "Minimal Change", desc: "Fewest classes moved" },
+    { icon: Lock, label: "Tamper-Proof", desc: "SHA-256 schedule hashes" },
+  ];
+
   return (
-    <div className="space-y-12 text-left pb-16">
-      {/* Hero Section matching shadcn design showcase */}
-      <div className="text-center space-y-4 pt-4 pb-2 max-w-3xl mx-auto">
+    <div className="space-y-10 pb-16">
+      {/* ─── Hero ─── */}
+      <div className="text-center space-y-4 pt-2 pb-2 max-w-3xl mx-auto">
         <Link
           to="/app/conflicts"
-          className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-zinc-900 border border-white/10 text-xs text-zinc-300 hover:text-white hover:border-white/20 transition-all shadow-xs"
+          className="group inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/[0.04] border border-white/[0.09] text-[12px] text-zinc-300 hover:text-white hover:border-white/25 hover:bg-white/[0.08] transition-all duration-200 shadow-sm hover:shadow-[0_0_15px_rgba(255,255,255,0.06)]"
         >
+          <span className="h-1.5 w-1.5 rounded-full bg-emerald-400/80 shadow-[0_0_8px_rgba(52,211,153,0.8)]" />
           <span>New CP-SAT Conflict Core Isolated</span>
-          <ArrowRight size={12} className="text-zinc-400" />
+          <ArrowRight size={11} className="text-zinc-500 group-hover:text-white group-hover:translate-x-0.5 transition-all duration-200" />
         </Link>
 
-        <h1 className="text-4xl md:text-5xl font-bold tracking-tight text-white leading-tight">
-          The Foundation for your Design System
+        <h1 className="text-3xl md:text-[44px] font-bold tracking-tight text-white leading-[1.12]">
+          Smart Scheduling with<br />Mathematical Guarantees
         </h1>
 
-        <p className="text-zinc-400 text-sm md:text-base max-w-2xl mx-auto leading-relaxed">
-          Composable, accessible components with thoughtful defaults. Build your own
-          component library with code you can customize, extend, and make your own.
+        <p className="text-zinc-400 text-sm md:text-[15px] max-w-2xl mx-auto leading-relaxed">
+          GeCompose coordinates Gemma 4 multimodal intake, OR-Tools CP-SAT constraint solving, 
+          and a cryptographic consent ledger to produce 100% clash-free schedules.
         </p>
 
-        <div className="flex items-center justify-center gap-3 pt-2">
-          <Link to="/app/schedule">
-            <button className="h-10 px-6 rounded-full bg-white text-zinc-950 font-medium text-sm hover:bg-zinc-200 transition-all shadow-sm active:scale-[0.98]">
-              Get Started
+        <div className="flex items-center justify-center gap-3 pt-3">
+          <Link to="/app/intake">
+            <button className="h-9 px-5 rounded-md bg-white text-zinc-950 font-medium text-sm hover:bg-zinc-100 hover:shadow-[0_0_20px_rgba(255,255,255,0.25)] hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] transition-all duration-200">
+              Start Intake
             </button>
           </Link>
           <Link to="/app/rules">
-            <button className="h-10 px-6 rounded-full bg-zinc-900 text-zinc-300 font-medium text-sm border border-white/10 hover:bg-zinc-800 hover:text-white transition-all active:scale-[0.98]">
-              View Components
+            <button className="h-9 px-5 rounded-md bg-white/[0.04] text-zinc-200 font-medium text-sm border border-white/[0.1] hover:bg-white/[0.08] hover:border-white/20 hover:text-white hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] transition-all duration-200 backdrop-blur-md">
+              View Constraints
             </button>
           </Link>
         </div>
       </div>
 
-      {/* 4 Frosted Glass Boxes Grid matching the picture */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Card 1: Interactive Component Controls */}
-        <div className="glass-box p-5 flex flex-col justify-between space-y-4">
-          <div className="space-y-3">
-            <div className="flex items-center gap-2">
-              <button className="h-7 px-3 rounded-full bg-white text-zinc-950 font-medium text-xs flex items-center gap-1">
-                <span>Button</span>
-                <ArrowRight size={11} />
-              </button>
-              <button className="h-7 px-3 rounded-full bg-zinc-800/80 text-zinc-300 text-xs border border-white/5">
-                Secondary
-              </button>
-              <button className="h-7 px-3 rounded-full bg-transparent text-zinc-400 text-xs border border-white/10">
-                Outline
-              </button>
-            </div>
-
-            <div className="relative">
-              <input
-                type="text"
-                placeholder="Name"
-                value={searchFilter}
-                onChange={(e) => setSearchFilter(e.target.value)}
-                className="w-full h-8 px-3 pr-8 rounded-xl bg-zinc-900/90 border border-white/10 text-xs text-white placeholder:text-zinc-500 focus:outline-none focus:border-white/20"
-              />
-              <Search size={12} className="absolute right-2.5 top-2.5 text-zinc-500" />
-            </div>
-
-            <textarea
-              rows={2}
-              placeholder="Message"
-              defaultValue="CS101, Room 101 Monday Morning"
-              className="w-full p-2.5 rounded-xl bg-zinc-900/90 border border-white/10 text-xs text-zinc-300 placeholder:text-zinc-500 focus:outline-none focus:border-white/20 resize-none"
-            />
-
-            <div className="flex items-center gap-2">
-              <span className="px-2.5 py-0.5 rounded-full bg-white text-zinc-950 text-[11px] font-medium">
-                Badge
-              </span>
-              <span className="px-2.5 py-0.5 rounded-full bg-zinc-800 text-zinc-300 text-[11px] border border-white/5">
-                Secondary
-              </span>
-
-              <div className="ml-auto flex items-center gap-2 text-zinc-400">
-                <button
-                  type="button"
-                  onClick={() => setMinimalChange(!minimalChange)}
-                  className={`w-8 h-4 rounded-full transition-colors relative p-0.5 ${
-                    minimalChange ? "bg-white" : "bg-zinc-800"
-                  }`}
-                >
-                  <div
-                    className={`w-3 h-3 rounded-full transition-transform ${
-                      minimalChange ? "translate-x-4 bg-zinc-950" : "translate-x-0 bg-zinc-400"
-                    }`}
-                  />
-                </button>
+      {/* ─── Pipeline Overview (3 columns) ─── */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {pipelineSteps.map((step, i) => (
+          <motion.div
+            key={step.label}
+            custom={i}
+            variants={cardMotionVariants}
+            initial="initial"
+            animate="animate"
+            whileHover={{ y: -4, transition: { duration: 0.2 } }}
+            whileTap={{ scale: 0.99 }}
+            className="glass-box p-5 space-y-3 cursor-pointer group"
+          >
+            <div className="flex items-center gap-3">
+              <div className="h-8 w-8 rounded-md bg-white/[0.05] border border-white/[0.08] flex items-center justify-center group-hover:border-white/25 group-hover:bg-white/[0.1] group-hover:scale-105 transition-all duration-200">
+                <step.icon size={16} className="text-zinc-300 group-hover:text-white transition-colors" />
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold text-white tracking-tight group-hover:text-zinc-100 transition-colors">
+                  {step.label}
+                </h3>
+                <p className="text-[12px] text-zinc-500 mt-0.5">Step {i + 1} of 3</p>
               </div>
             </div>
-          </div>
-
-          <div className="flex items-center gap-2 pt-2 border-t border-white/5">
-            <Link to="/app/conflicts" className="flex-1">
-              <button className="w-full h-7 rounded-xl bg-zinc-900 border border-white/10 text-[11px] text-zinc-300 hover:text-white">
-                Alert Dialog
-              </button>
-            </Link>
-            <Link to="/app/schedule" className="flex-1">
-              <button className="w-full h-7 rounded-xl bg-zinc-900 border border-white/10 text-[11px] text-zinc-300 hover:text-white">
-                Button Group
-              </button>
-            </Link>
-          </div>
-        </div>
-
-        {/* Card 2: Contribution / Solver Activity (Rounded Vertical Bars) */}
-        <div className="glass-box p-5 flex flex-col justify-between space-y-4">
-          <div>
-            <h3 className="text-sm font-semibold text-white tracking-tight">Contribution History</h3>
-            <p className="text-xs text-zinc-400 mt-0.5">Last 6 months of activity</p>
-
-            {/* Vertical Activity Bars matching the screenshot */}
-            <div className="flex items-end justify-between gap-2.5 h-32 pt-4 px-1">
-              {[
-                { label: "Dec", height: "h-20", active: true },
-                { label: "Jan", height: "h-28", active: false },
-                { label: "Feb", height: "h-16", active: false },
-                { label: "Mar", height: "h-32", active: false },
-                { label: "Apr", height: "h-24", active: false },
-              ].map((bar, i) => (
-                <div key={bar.label} className="flex-1 flex flex-col items-center gap-2">
-                  <div className="w-full h-24 bg-zinc-900/50 rounded-xl relative flex items-end overflow-hidden">
-                    <div
-                      className={`w-full ${bar.height} rounded-xl transition-all ${
-                        bar.active ? "bg-zinc-200" : "bg-zinc-800/80 hover:bg-zinc-700"
-                      }`}
-                    />
-                  </div>
-                  <span className="text-[10px] text-zinc-500 font-medium">{bar.label}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="flex items-center justify-between text-[11px] text-zinc-400 border-t border-white/5 pt-3">
-            <span>UPCOMING</span>
-            <span className="text-zinc-300 font-medium">SAVINGS PLAN</span>
-          </div>
-        </div>
-
-        {/* Card 3: Milestone / Goal Setting Form */}
-        <div className="glass-box p-5 flex flex-col justify-between space-y-3">
-          <div className="space-y-3">
-            <div>
-              <h3 className="text-sm font-semibold text-white tracking-tight">Set a new milestone</h3>
-              <p className="text-xs text-zinc-400 mt-0.5 leading-snug">
-                Define your financial target and we'll help you pace your savings.
-              </p>
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-[11px] text-zinc-400 font-medium">Goal Name</label>
-              <input
-                type="text"
-                defaultValue="e.g. New Car, Home Downpayment"
-                className="w-full h-8 px-3 rounded-xl bg-zinc-900/90 border border-white/10 text-xs text-white placeholder:text-zinc-500 focus:outline-none focus:border-white/20"
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-2">
-              <div className="space-y-1">
-                <label className="text-[10px] text-zinc-400 font-medium">Target Amount</label>
-                <div className="h-8 px-2.5 rounded-xl bg-zinc-900/90 border border-white/10 text-xs text-zinc-200 flex items-center font-mono">
-                  $15,000
-                </div>
-              </div>
-              <div className="space-y-1">
-                <label className="text-[10px] text-zinc-400 font-medium">Target Date</label>
-                <div className="h-8 px-2.5 rounded-xl bg-zinc-900/90 border border-white/10 text-xs text-zinc-200 flex items-center">
-                  Dec 2025
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="space-y-1.5 pt-2">
-            <Link to="/app/publish">
-              <button className="w-full h-8 rounded-full bg-white text-zinc-950 font-medium text-xs hover:bg-zinc-200 transition-all shadow-sm">
-                Create Goal
-              </button>
-            </Link>
-          </div>
-        </div>
-
-        {/* Card 4: Mobile Device / QR Code Verification Card */}
-        <div className="glass-box p-5 flex flex-col items-center justify-between text-center space-y-3">
-          <div className="p-3 bg-white rounded-2xl w-32 h-32 flex items-center justify-center shadow-md">
-            {/* Crisp SVG QR code matching the screenshot */}
-            <svg viewBox="0 0 100 100" className="w-full h-full text-black" fill="currentColor">
-              {/* Outer corners */}
-              <rect x="10" y="10" width="24" height="24" rx="2" />
-              <rect x="14" y="14" width="16" height="16" fill="white" />
-              <rect x="18" y="18" width="8" height="8" rx="1" />
-
-              <rect x="66" y="10" width="24" height="24" rx="2" />
-              <rect x="70" y="14" width="16" height="16" fill="white" />
-              <rect x="74" y="18" width="8" height="8" rx="1" />
-
-              <rect x="10" y="66" width="24" height="24" rx="2" />
-              <rect x="14" y="70" width="16" height="16" fill="white" />
-              <rect x="18" y="74" width="8" height="8" rx="1" />
-
-              {/* Data blocks */}
-              <rect x="42" y="12" width="6" height="10" />
-              <rect x="52" y="16" width="6" height="6" />
-              <rect x="42" y="28" width="16" height="6" />
-              <rect x="12" y="42" width="10" height="6" />
-              <rect x="28" y="42" width="8" height="16" />
-              <rect x="42" y="42" width="16" height="16" />
-              <rect x="66" y="42" width="10" height="8" />
-              <rect x="80" y="46" width="8" height="12" />
-              <rect x="42" y="66" width="8" height="8" />
-              <rect x="54" y="66" width="8" height="18" />
-              <rect x="68" y="68" width="20" height="8" />
-              <rect x="72" y="80" width="16" height="8" />
-            </svg>
-          </div>
-
-          <div className="space-y-1">
-            <h4 className="text-xs font-semibold text-white tracking-tight">
-              Scan to connect your mobile device
-            </h4>
-            <p className="text-[11px] text-zinc-400 leading-tight">
-              Open the Ledger mobile app and scan this code to link your device.
+            <p className="text-[13px] text-zinc-400 leading-relaxed group-hover:text-zinc-300 transition-colors">
+              {step.desc}
             </p>
-          </div>
+          </motion.div>
+        ))}
+      </div>
 
-          <Link to="/app/publish" className="w-full">
-            <span className="text-[10px] text-zinc-500 hover:text-zinc-300 transition-colors">
-              ConsentLedger Anchor &bull; 0x5FbD...
-            </span>
-          </Link>
+      {/* ─── Capabilities Grid (6 items) ─── */}
+      <div>
+        <h2 className="text-sm font-semibold text-zinc-300 tracking-tight mb-4">Core Capabilities</h2>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+          {capabilities.map((cap, i) => (
+            <motion.div
+              key={cap.label}
+              custom={i}
+              variants={cardMotionVariants}
+              initial="initial"
+              animate="animate"
+              whileHover={{ y: -3, scale: 1.02, transition: { duration: 0.2 } }}
+              whileTap={{ scale: 0.98 }}
+              className="glass-box-subtle p-4 flex flex-col items-center text-center gap-2 cursor-pointer group"
+            >
+              <div className="h-8 w-8 rounded-md bg-white/[0.04] border border-white/[0.06] flex items-center justify-center group-hover:border-white/20 group-hover:bg-white/[0.08] group-hover:scale-110 transition-all duration-200">
+                <cap.icon size={15} className="text-zinc-400 group-hover:text-white transition-colors" />
+              </div>
+              <span className="text-[12px] font-medium text-zinc-200 group-hover:text-white transition-colors">{cap.label}</span>
+              <span className="text-[11px] text-zinc-500 leading-tight">{cap.desc}</span>
+            </motion.div>
+          ))}
         </div>
       </div>
 
-      {/* Main Bottom Section: Active Schedule & On-Chain Audit in Glass Boxes */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 pt-4">
+      {/* ─── System Status Row ─── */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {[
+          {
+            label: "Active Rules",
+            value: summary?.confirmed_rules_count ?? "—",
+            sub: `${summary?.draft_rules_count ?? 0} draft`,
+          },
+          {
+            label: "Schedule Placements",
+            value: schedule?.placements?.length ?? "—",
+            sub: schedule?.placements ? "active" : "none loaded",
+          },
+          {
+            label: "Chain Events",
+            value: eventsData?.events?.length ?? "—",
+            sub: "audit entries",
+          },
+          {
+            label: "Solver Status",
+            value: summary?.system_healthy !== false ? "Online" : "Offline",
+            sub: "OR-Tools CP-SAT",
+          },
+        ].map((stat, i) => (
+          <motion.div
+            key={stat.label}
+            custom={i}
+            variants={cardMotionVariants}
+            initial="initial"
+            animate="animate"
+            whileHover={{ y: -2, transition: { duration: 0.2 } }}
+            className="glass-box-subtle p-4 cursor-default"
+          >
+            <p className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider">{stat.label}</p>
+            <p className="text-2xl font-bold text-white mt-1 font-mono">{stat.value}</p>
+            <p className="text-[11px] text-zinc-500 mt-0.5">{stat.sub}</p>
+          </motion.div>
+        ))}
+      </div>
+
+      {/* ─── Active Schedule + Chain Audit ─── */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         {/* Current Active Timetable */}
-        <div className="lg:col-span-2 glass-box p-6 space-y-4">
-          <div className="flex items-center justify-between border-b border-white/5 pb-4">
+        <div className="lg:col-span-2 glass-box p-5 space-y-4">
+          <div className="flex items-center justify-between border-b border-white/[0.06] pb-3">
             <div>
-              <h3 className="text-sm font-semibold text-white">Current Active Timetable</h3>
-              <p className="text-xs text-zinc-400 mt-0.5">
-                Verified schedule placements generated by Google OR-Tools CP-SAT.
+              <h3 className="text-sm font-semibold text-white">Active Timetable</h3>
+              <p className="text-[12px] text-zinc-500 mt-0.5">
+                Schedule generated by Google OR-Tools CP-SAT solver
               </p>
             </div>
             <Link to="/app/schedule">
-              <button className="h-7 px-3 rounded-full bg-zinc-900 border border-white/10 text-xs text-zinc-300 hover:text-white flex items-center gap-1">
+              <button className="h-7 px-3 rounded-md bg-white/[0.04] border border-white/[0.08] text-[12px] text-zinc-400 hover:text-white hover:bg-white/[0.08] hover:border-white/15 transition-all duration-200 flex items-center gap-1.5">
                 <span>Full Grid</span>
                 <ArrowRight size={11} />
               </button>
@@ -313,12 +218,12 @@ export function DashboardPage() {
             <div className="overflow-x-auto">
               <table className="w-full text-xs text-left">
                 <thead>
-                  <tr className="border-b border-white/5 text-zinc-400">
-                    <th className="py-2.5 px-3 font-medium">Session ID</th>
-                    <th className="py-2.5 px-3 font-medium">Teacher</th>
-                    <th className="py-2.5 px-3 font-medium">Room</th>
-                    <th className="py-2.5 px-3 font-medium">Day</th>
-                    <th className="py-2.5 px-3 font-medium">Slot</th>
+                  <tr className="border-b border-white/[0.06] text-zinc-500 uppercase tracking-wider">
+                    <th className="py-2.5 px-3 font-medium text-[10px]">Session</th>
+                    <th className="py-2.5 px-3 font-medium text-[10px]">Teacher</th>
+                    <th className="py-2.5 px-3 font-medium text-[10px]">Room</th>
+                    <th className="py-2.5 px-3 font-medium text-[10px]">Day</th>
+                    <th className="py-2.5 px-3 font-medium text-[10px]">Slot</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/[0.04]">
@@ -326,12 +231,12 @@ export function DashboardPage() {
                     const dayNames = ["Mon", "Tue", "Wed", "Thu", "Fri"];
                     const slotTimes = ["09:00", "10:00", "11:00", "12:00", "14:00", "15:00"];
                     return (
-                      <tr key={p.session_id} className="hover:bg-white/[0.02] transition-colors">
-                        <td className="py-2.5 px-3 font-mono font-medium text-white">{p.session_id}</td>
+                      <tr key={p.session_id} className="table-row-hover">
+                        <td className="py-2.5 px-3 font-mono font-medium text-white text-[12px]">{p.session_id}</td>
                         <td className="py-2.5 px-3 text-zinc-300">{p.teacher}</td>
-                        <td className="py-2.5 px-3 text-zinc-400">{p.room}</td>
-                        <td className="py-2.5 px-3 text-zinc-400">{dayNames[p.day] || p.day}</td>
-                        <td className="py-2.5 px-3 text-zinc-400">{slotTimes[p.slot] || p.slot}</td>
+                        <td className="py-2.5 px-3 text-zinc-500">{p.room}</td>
+                        <td className="py-2.5 px-3 text-zinc-500">{dayNames[p.day] || p.day}</td>
+                        <td className="py-2.5 px-3 text-zinc-500">{slotTimes[p.slot] || p.slot}</td>
                       </tr>
                     );
                   })}
@@ -339,54 +244,54 @@ export function DashboardPage() {
               </table>
             </div>
           ) : (
-            <div className="py-8 text-center text-xs text-zinc-500">
-              No active schedule loaded. Click &quot;Seed Demo&quot; to populate.
+            <div className="py-10 text-center text-[13px] text-zinc-600">
+              No active schedule. Click <span className="text-zinc-400 font-medium">"Seed Demo Baseline"</span> in the navigation drawer to populate sample data.
             </div>
           )}
         </div>
 
-        {/* Recent Blockchain Events */}
-        <div className="glass-box p-6 space-y-4">
-          <div className="flex items-center justify-between border-b border-white/5 pb-4">
+        {/* ConsentLedger Audit */}
+        <div className="glass-box p-5 space-y-4">
+          <div className="flex items-center justify-between border-b border-white/[0.06] pb-3">
             <div>
-              <h3 className="text-sm font-semibold text-white">ConsentLedger Audit</h3>
-              <p className="text-xs text-zinc-400 mt-0.5">On-chain consensus events</p>
+              <h3 className="text-sm font-semibold text-white">ConsentLedger</h3>
+              <p className="text-[12px] text-zinc-500 mt-0.5">Audit trail</p>
             </div>
             <Link to="/app/chain-log">
-              <button className="h-7 px-3 rounded-full bg-zinc-900 border border-white/10 text-xs text-zinc-300 hover:text-white flex items-center gap-1">
-                <span>View Log</span>
+              <button className="h-7 px-3 rounded-md bg-white/[0.04] border border-white/[0.08] text-[12px] text-zinc-400 hover:text-white hover:bg-white/[0.08] hover:border-white/15 transition-all duration-200 flex items-center gap-1.5">
+                <span>Full Log</span>
                 <ArrowRight size={11} />
               </button>
             </Link>
           </div>
 
-          <div className="space-y-2.5">
+          <div className="space-y-2">
             {recentEvents.length === 0 ? (
-              <div className="py-8 text-center text-xs text-zinc-500">
-                No on-chain events yet.
+              <div className="py-10 text-center text-[13px] text-zinc-600">
+                No on-chain events recorded yet.
               </div>
             ) : (
               recentEvents.map((ev, i) => (
                 <div
                   key={`${ev.block}-${ev.idx}-${i}`}
-                  className="p-3 rounded-xl bg-white/[0.02] border border-white/5 space-y-1.5 text-xs"
+                  className="p-3 rounded-md bg-white/[0.02] border border-white/[0.05] space-y-1.5 text-xs transition-all duration-200 hover:border-white/[0.1] hover:bg-white/[0.04]"
                 >
                   <div className="flex items-center justify-between">
-                    <span className="font-medium text-zinc-200 text-xs">{ev.event}</span>
-                    <span className="font-mono text-[10px] text-zinc-500">Block #{ev.block}</span>
+                    <span className="font-medium text-zinc-200 text-[12px]">{ev.event}</span>
+                    <span className="font-mono text-[10px] text-zinc-600">Block #{ev.block}</span>
                   </div>
                   {ev.args?.rule_id && (
-                    <div className="text-[11px] text-zinc-400 flex items-center gap-1.5">
+                    <div className="text-[11px] text-zinc-500 flex items-center gap-1.5">
                       <span>Rule:</span>
-                      <span className="font-mono text-zinc-300">{ev.args.rule_id}</span>
+                      <span className="font-mono text-zinc-400">{ev.args.rule_id}</span>
                     </div>
                   )}
                   {ev.args?.schedule_hash && (
-                    <div className="flex items-center justify-between text-[11px] font-mono text-zinc-400">
+                    <div className="flex items-center justify-between text-[11px] font-mono text-zinc-500">
                       <span className="truncate max-w-[140px]">{ev.args.schedule_hash.slice(0, 14)}...</span>
                       <button
                         onClick={() => handleCopy(ev.args.schedule_hash, `dash_${i}`)}
-                        className="text-zinc-400 hover:text-white transition-colors"
+                        className="text-zinc-500 hover:text-white transition-colors"
                       >
                         {copiedKey === `dash_${i}` ? <Check size={12} className="text-white" /> : <Copy size={12} />}
                       </button>
@@ -396,6 +301,46 @@ export function DashboardPage() {
               ))
             )}
           </div>
+        </div>
+      </div>
+
+      {/* ─── Architecture Overview ─── */}
+      <div className="glass-box p-6 space-y-4">
+        <h3 className="text-sm font-semibold text-white">System Architecture</h3>
+        <p className="text-[13px] text-zinc-400 leading-relaxed max-w-4xl">
+          GeCompose separates concerns into three layers: <span className="text-zinc-300">Gemma 4</span> handles 
+          multimodal intake (voice, photos, spreadsheets) and conflict explanation. 
+          <span className="text-zinc-300"> OR-Tools CP-SAT</span> performs mathematical constraint solving 
+          with guaranteed feasibility. The <span className="text-zinc-300">Consent Ledger</span> records 
+          cryptographically signed approvals for every schedule modification.
+        </p>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-2">
+          {[
+            {
+              title: "Gemma 4 — Translator Layer",
+              items: ["Extracts rules from voice, photos & sheets", "Writes sandboxed Python parsers for Excel", "Explains conflicts in plain English"],
+            },
+            {
+              title: "CP-SAT — Solver Layer",
+              items: ["Boolean decision variables per session", "Hard constraints: no room/teacher overlap", "Minimal-change objective for re-solves"],
+            },
+            {
+              title: "Consent Ledger — Trust Layer",
+              items: ["SHA-256 hashed schedule records", "Rule-owner-only modification rights", "Immutable audit log with block indices"],
+            },
+          ].map((col) => (
+            <div key={col.title} className="glass-box-subtle p-4 space-y-2">
+              <h4 className="text-[12px] font-semibold text-zinc-200">{col.title}</h4>
+              <ul className="space-y-1.5">
+                {col.items.map((item) => (
+                  <li key={item} className="flex items-start gap-2 text-[12px] text-zinc-500">
+                    <span className="text-zinc-600 mt-0.5 shrink-0">›</span>
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
         </div>
       </div>
     </div>

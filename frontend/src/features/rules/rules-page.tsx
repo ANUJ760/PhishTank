@@ -60,12 +60,12 @@ export function RulesPage() {
 
       {/* Filter Tabs and Search Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div className="flex items-center gap-1.5 p-1 rounded-full bg-zinc-900 border border-white/10 text-xs select-none">
+        <div className="flex items-center gap-1.5 p-1 rounded-md bg-zinc-900 border border-white/10 text-xs select-none">
           {["all", "confirmed", "draft", "rejected"].map((st) => (
             <button
               key={st}
               onClick={() => setSelectedStatus(st)}
-              className={`px-3.5 py-1 rounded-full capitalize transition-all text-xs ${
+              className={`px-3.5 py-1 rounded-md capitalize transition-all text-xs ${
                 selectedStatus === st
                   ? "bg-white text-zinc-950 font-medium shadow-xs"
                   : "text-zinc-400 hover:text-white"
@@ -82,7 +82,7 @@ export function RulesPage() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search rules..."
-            className="w-full pl-9 pr-3 h-8 rounded-full bg-zinc-900 border border-white/10 text-xs text-white placeholder:text-zinc-500 focus:outline-none focus:border-white/20"
+            className="w-full pl-9 pr-3 h-8 rounded-md bg-zinc-900 border border-white/10 text-xs text-white placeholder:text-zinc-500 focus:outline-none focus:border-white/20"
           />
         </div>
       </div>
@@ -127,13 +127,13 @@ export function RulesPage() {
                       >
                         <td className="py-3 px-3 font-mono font-bold text-white">{rule.id}</td>
                         <td className="py-3 px-3">
-                          <span className="px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-300 text-[10px] font-mono">
+                          <span className="px-2 py-0.5 rounded-md bg-zinc-800 text-zinc-300 text-[10px] font-mono">
                             {rule.type}
                           </span>
                         </td>
                         <td className="py-3 px-3 text-zinc-300">{rule.owner}</td>
                         <td className="py-3 px-3">
-                          <span className="px-2.5 py-0.5 rounded-full bg-zinc-800 text-zinc-300 text-[10px] capitalize">
+                          <span className="px-2.5 py-0.5 rounded-md bg-zinc-800 text-zinc-300 text-[10px] capitalize">
                             {rule.status}
                           </span>
                         </td>
@@ -143,7 +143,7 @@ export function RulesPage() {
                               <>
                                 <button
                                   onClick={() => confirmMutation.mutate(rule.id)}
-                                  className="h-6 px-2.5 rounded-full bg-white text-zinc-950 font-medium text-[11px] hover:bg-zinc-200 transition-all flex items-center gap-1"
+                                  className="h-6 px-2.5 rounded-md bg-white text-zinc-950 font-medium text-[11px] hover:bg-zinc-200 transition-all flex items-center gap-1"
                                   title="Confirm and register on ConsentLedger"
                                 >
                                   <Check size={11} />
@@ -151,7 +151,7 @@ export function RulesPage() {
                                 </button>
                                 <button
                                   onClick={() => rejectMutation.mutate(rule.id)}
-                                  className="h-6 px-2.5 rounded-full bg-zinc-900 border border-white/10 text-zinc-400 hover:text-white text-[11px] transition-all flex items-center gap-1"
+                                  className="h-6 px-2.5 rounded-md bg-zinc-900 border border-white/10 text-zinc-400 hover:text-white text-[11px] transition-all flex items-center gap-1"
                                   title="Reject rule"
                                 >
                                   <X size={11} />
@@ -185,30 +185,30 @@ export function RulesPage() {
 
           {activeRule ? (
             <div className="space-y-4 text-xs">
-              <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.02] border border-white/10">
+              <div className="flex items-center justify-between p-3 rounded-md bg-white/[0.02] border border-white/10">
                 <span className="font-mono text-sm font-bold text-white">{activeRule.id}</span>
-                <span className="px-2.5 py-0.5 rounded-full bg-zinc-800 text-zinc-300 text-[11px]">
+                <span className="px-2.5 py-0.5 rounded-md bg-zinc-800 text-zinc-300 text-[11px]">
                   {activeRule.status.toUpperCase()}
                 </span>
               </div>
 
               <div className="space-y-1">
                 <span className="text-[11px] text-zinc-400 font-medium">Owner Identity</span>
-                <div className="p-2.5 rounded-xl bg-white/[0.02] border border-white/5 text-zinc-200 font-medium">
+                <div className="p-2.5 rounded-md bg-white/[0.02] border border-white/5 text-zinc-200 font-medium">
                   {activeRule.owner}
                 </div>
               </div>
 
               <div className="space-y-1">
                 <span className="text-[11px] text-zinc-400 font-medium">Extracted Natural Evidence</span>
-                <div className="p-3 rounded-xl bg-white/[0.02] border border-white/5 text-zinc-300 italic text-[11px] leading-relaxed">
+                <div className="p-3 rounded-md bg-white/[0.02] border border-white/5 text-zinc-300 italic text-[11px] leading-relaxed">
                   &quot;{Array.isArray(activeRule.evidence) ? activeRule.evidence.map((e: any) => e.ref || e.kind || JSON.stringify(e)).join(", ") : String(activeRule.evidence || "No natural evidence recorded")}&quot;
                 </div>
               </div>
 
               <div className="space-y-1">
                 <span className="text-[11px] text-zinc-400 font-medium">Parsed Parameters (JSON)</span>
-                <pre className="p-3 rounded-xl bg-black border border-white/10 text-zinc-300 font-mono text-[11px] overflow-x-auto">
+                <pre className="p-3 rounded-md bg-black border border-white/10 text-zinc-300 font-mono text-[11px] overflow-x-auto">
                   {JSON.stringify(activeRule.params, null, 2)}
                 </pre>
               </div>
@@ -217,14 +217,14 @@ export function RulesPage() {
                 <div className="pt-2 flex items-center gap-2">
                   <button
                     onClick={() => confirmMutation.mutate(activeRule.id)}
-                    className="flex-1 h-8 rounded-full bg-white text-zinc-950 font-medium text-xs hover:bg-zinc-200 transition-all flex items-center justify-center gap-1.5"
+                    className="flex-1 h-8 rounded-md bg-white text-zinc-950 font-medium text-xs hover:bg-zinc-200 transition-all flex items-center justify-center gap-1.5"
                   >
                     <Check size={13} />
                     <span>Confirm Rule On-Chain</span>
                   </button>
                   <button
                     onClick={() => rejectMutation.mutate(activeRule.id)}
-                    className="h-8 px-4 rounded-full bg-zinc-900 border border-white/10 text-zinc-400 hover:text-white text-xs transition-all"
+                    className="h-8 px-4 rounded-md bg-zinc-900 border border-white/10 text-zinc-400 hover:text-white text-xs transition-all"
                   >
                     Reject
                   </button>

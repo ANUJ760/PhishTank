@@ -46,7 +46,7 @@ export function SignUpPage() {
       </div>
 
       {error && (
-        <div className="mb-4 p-3 rounded-xl bg-white/[0.04] border border-white/10 text-xs text-zinc-300 text-left">
+        <div className="mb-4 p-3 rounded-md bg-white/[0.04] border border-white/10 text-xs text-zinc-300 text-left">
           {error}
         </div>
       )}
@@ -59,7 +59,7 @@ export function SignUpPage() {
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Prof. Jane Doe"
-            className="w-full h-10 px-3.5 rounded-xl bg-zinc-900 border border-white/10 text-xs text-white placeholder:text-zinc-500 focus:outline-none focus:border-white/20"
+            className="w-full h-10 px-3.5 rounded-md bg-zinc-900 border border-white/10 text-xs text-white placeholder:text-zinc-500 focus:outline-none focus:border-white/20"
             required
           />
         </div>
@@ -71,7 +71,7 @@ export function SignUpPage() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="jane@gecompose.internal"
-            className="w-full h-10 px-3.5 rounded-xl bg-zinc-900 border border-white/10 text-xs text-white placeholder:text-zinc-500 focus:outline-none focus:border-white/20"
+            className="w-full h-10 px-3.5 rounded-md bg-zinc-900 border border-white/10 text-xs text-white placeholder:text-zinc-500 focus:outline-none focus:border-white/20"
             required
           />
         </div>
@@ -83,7 +83,7 @@ export function SignUpPage() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="••••••••"
-            className="w-full h-10 px-3.5 rounded-xl bg-zinc-900 border border-white/10 text-xs text-white placeholder:text-zinc-500 focus:outline-none focus:border-white/20"
+            className="w-full h-10 px-3.5 rounded-md bg-zinc-900 border border-white/10 text-xs text-white placeholder:text-zinc-500 focus:outline-none focus:border-white/20"
             required
           />
         </div>
@@ -95,7 +95,7 @@ export function SignUpPage() {
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
             placeholder="••••••••"
-            className="w-full h-10 px-3.5 rounded-xl bg-zinc-900 border border-white/10 text-xs text-white placeholder:text-zinc-500 focus:outline-none focus:border-white/20"
+            className="w-full h-10 px-3.5 rounded-md bg-zinc-900 border border-white/10 text-xs text-white placeholder:text-zinc-500 focus:outline-none focus:border-white/20"
             required
           />
         </div>
@@ -103,7 +103,7 @@ export function SignUpPage() {
         <button
           type="submit"
           disabled={isLoading}
-          className="w-full h-10 rounded-full bg-white text-zinc-950 font-medium text-xs hover:bg-zinc-200 transition-all shadow-sm active:scale-[0.98] disabled:opacity-50 mt-2"
+          className="w-full h-10 rounded-md bg-white text-zinc-950 font-medium text-xs hover:bg-zinc-200 transition-all shadow-sm active:scale-[0.98] disabled:opacity-50 mt-2"
         >
           {isLoading ? "Creating account..." : "Register Account"}
         </button>

@@ -130,7 +130,7 @@ export function IntakePage() {
           </div>
 
           {error && (
-            <div className="p-3 rounded-xl border border-white/10 bg-white/[0.02] text-xs text-zinc-300">
+            <div className="p-3 rounded-md border border-white/10 bg-white/[0.02] text-xs text-zinc-300">
               {error}
             </div>
           )}
@@ -144,7 +144,7 @@ export function IntakePage() {
                   value={textInput}
                   onChange={(e) => setTextInput(e.target.value)}
                   placeholder="Enter unstructured requirement..."
-                  className="w-full p-3 rounded-xl bg-zinc-900 border border-white/10 text-xs text-white placeholder:text-zinc-500 focus:outline-none focus:border-white/20 resize-none"
+                  className="w-full p-3 rounded-md bg-zinc-900 border border-white/10 text-xs text-white placeholder:text-zinc-500 focus:outline-none focus:border-white/20 resize-none"
                   required
                 />
               </div>
@@ -152,7 +152,7 @@ export function IntakePage() {
               <button
                 type="submit"
                 disabled={isLoading}
-                className="h-8 px-5 rounded-full bg-white text-zinc-950 font-medium text-xs hover:bg-zinc-200 transition-all shadow-sm disabled:opacity-50"
+                className="h-8 px-5 rounded-md bg-white text-zinc-950 font-medium text-xs hover:bg-zinc-200 transition-all shadow-sm disabled:opacity-50"
               >
                 {isLoading ? "Extracting..." : "Process Text with LLM"}
               </button>
@@ -164,7 +164,7 @@ export function IntakePage() {
                 <input
                   type="file"
                   onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
-                  className="w-full p-2 rounded-xl bg-zinc-900 border border-white/10 text-xs text-zinc-300 file:mr-3 file:py-1 file:px-3 file:rounded-full file:border-0 file:bg-white file:text-zinc-950 file:text-xs file:font-medium"
+                  className="w-full p-2 rounded-md bg-zinc-900 border border-white/10 text-xs text-zinc-300 file:mr-3 file:py-1 file:px-3 file:rounded-md file:border-0 file:bg-white file:text-zinc-950 file:text-xs file:font-medium"
                   required
                 />
               </div>
@@ -172,7 +172,7 @@ export function IntakePage() {
               <button
                 type="submit"
                 disabled={isLoading || !selectedFile}
-                className="h-8 px-5 rounded-full bg-white text-zinc-950 font-medium text-xs hover:bg-zinc-200 transition-all shadow-sm disabled:opacity-50"
+                className="h-8 px-5 rounded-md bg-white text-zinc-950 font-medium text-xs hover:bg-zinc-200 transition-all shadow-sm disabled:opacity-50"
               >
                 {isLoading ? "Executing Sandbox..." : "Process File with Sandbox"}
               </button>
@@ -180,7 +180,7 @@ export function IntakePage() {
           )}
 
           {sheetMetrics && (
-            <div className="p-3.5 rounded-xl border border-white/5 bg-white/[0.02] text-xs space-y-1.5 mt-4">
+            <div className="p-3.5 rounded-md border border-white/5 bg-white/[0.02] text-xs space-y-1.5 mt-4">
               <span className="font-semibold text-white block">Docker Execution Metrics:</span>
               <div className="grid grid-cols-2 gap-2 text-zinc-400 text-[11px]">
                 <div>Execution Time: <span className="text-zinc-200">{sheetMetrics.seconds}s</span></div>
@@ -201,7 +201,7 @@ export function IntakePage() {
             </div>
             {extractedRules.length > 0 && (
               <Link to="/app/rules">
-                <button className="h-7 px-3 rounded-full bg-zinc-900 border border-white/10 text-xs text-zinc-300 hover:text-white flex items-center gap-1">
+                <button className="h-7 px-3 rounded-md bg-zinc-900 border border-white/10 text-xs text-zinc-300 hover:text-white flex items-center gap-1">
                   <span>Review All</span>
                   <ArrowRight size={11} />
                 </button>
@@ -216,10 +216,10 @@ export function IntakePage() {
               </div>
             ) : (
               extractedRules.map((rule) => (
-                <div key={rule.id} className="p-3.5 rounded-xl border border-white/10 bg-[#16161c]/80 text-xs space-y-1.5">
+                <div key={rule.id} className="p-3.5 rounded-md border border-white/10 bg-[#16161c]/80 text-xs space-y-1.5">
                   <div className="flex items-center justify-between">
                     <span className="font-mono font-bold text-white">{rule.id}</span>
-                    <span className="px-2.5 py-0.5 rounded-full bg-zinc-800 text-zinc-300 text-[10px]">
+                    <span className="px-2.5 py-0.5 rounded-md bg-zinc-800 text-zinc-300 text-[10px]">
                       {rule.status.toUpperCase()}
                     </span>
                   </div>
