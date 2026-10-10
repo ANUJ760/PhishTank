@@ -5,7 +5,7 @@ from __future__ import annotations
 from enum import Enum
 import re
 from typing import Any
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator, model_validator
 
 
 def parse_time_to_minutes(time_str: str) -> int:
@@ -588,6 +588,7 @@ class ImpactReport(BaseModel):
         description="Total number of scheduled sessions prior to disruption"
     )
 
+    @computed_field
     @property
     def has_impact(self) -> bool:
         """Returns True if any active assignments are directly invalidated by the disruption."""
@@ -655,11 +656,13 @@ class DisruptionRecoveryResult(BaseModel):
     message: str | None = Field(default=None, description="Informative status message")
     statistics: dict[str, Any] = Field(default_factory=dict, description="Solver metrics and change statistics")
 
+    @computed_field
     @property
     def is_success(self) -> bool:
         """Returns True only if the solver found a solution AND independent verification passed."""
         return self.status in (SolverStatus.OPTIMAL, SolverStatus.FEASIBLE) and self.validation_passed
 
+    @computed_field
     @property
     def total_changes(self) -> int:
         """Number of sessions moved or modified."""

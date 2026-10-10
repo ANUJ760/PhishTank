@@ -31,12 +31,27 @@ from gecompose.diagnostics import diagnose_conflicts
 from gecompose.exceptions import GeComposeError, SolverError, ValidationError
 from gecompose.models import (
     AlternativeSearchResult,
+    AssignmentChange,
     ConflictDiagnosis,
+    DisruptionEvent,
+    DisruptionRecoveryResult,
+    ImpactReport,
+    RecoveryPolicy,
     RelaxationPolicy,
+    ResourceType,
+    Room,
     ScheduledAssignment,
     ScheduleResult,
     SchedulingProblem,
+    Session,
     SolverStatus,
+    Teacher,
+    TimeSlot,
+)
+from gecompose.recovery import (
+    DisruptionRecoverer,
+    analyze_disruption_impact,
+    recover_from_disruption,
 )
 from gecompose.solver import CPSATScheduler, solve_schedule
 from gecompose.validator import verify_schedule
@@ -48,6 +63,9 @@ __all__ = [
     "schedule",
     "diagnose",
     "find_alternatives",
+    "analyze_impact",
+    "recover_schedule",
+    "DisruptionRecoverer",
     "to_timetable_grid",
     "serialize_result",
 ]
@@ -83,6 +101,52 @@ def _coerce_problem(
             ) from exc
     raise TypeError(
         f"Expected SchedulingProblem or dict, got {type(problem).__name__!r}"
+    )
+
+
+def _coerce_disruption(
+    disruption: Union[DisruptionEvent, dict[str, Any]],
+) -> DisruptionEvent:
+    """Return a validated ``DisruptionEvent``, accepting dicts as input."""
+    if isinstance(disruption, DisruptionEvent):
+        return disruption
+    if isinstance(disruption, dict):
+        try:
+            return DisruptionEvent.model_validate(disruption)
+        except pydantic.ValidationError as exc:
+            raise ValidationError(
+                f"Invalid disruption event input: {exc}"
+            ) from exc
+    raise TypeError(
+        f"Expected DisruptionEvent or dict, got {type(disruption).__name__!r}"
+    )
+
+
+def _coerce_assignments(
+    assignments: Union[Sequence[ScheduledAssignment], ScheduleResult, list[dict[str, Any]]],
+) -> list[ScheduledAssignment]:
+    """Return a list of ``ScheduledAssignment`` objects, accepting ScheduleResult or dicts."""
+    if isinstance(assignments, ScheduleResult):
+        return list(assignments.assignments)
+    if isinstance(assignments, (list, tuple)):
+        result: list[ScheduledAssignment] = []
+        for item in assignments:
+            if isinstance(item, ScheduledAssignment):
+                result.append(item)
+            elif isinstance(item, dict):
+                try:
+                    result.append(ScheduledAssignment.model_validate(item))
+                except pydantic.ValidationError as exc:
+                    raise ValidationError(
+                        f"Invalid scheduled assignment input: {exc}"
+                    ) from exc
+            else:
+                raise TypeError(
+                    f"Expected ScheduledAssignment or dict in assignment list, got {type(item).__name__!r}"
+                )
+        return result
+    raise TypeError(
+        f"Expected Sequence[ScheduledAssignment] or ScheduleResult, got {type(assignments).__name__!r}"
     )
 
 
@@ -223,8 +287,75 @@ def find_alternatives(
         ) from exc
 
 
+def analyze_impact(
+    problem: Union[SchedulingProblem, dict[str, Any]],
+    assignments: Union[Sequence[ScheduledAssignment], ScheduleResult, list[dict[str, Any]]],
+    disruption: Union[DisruptionEvent, dict[str, Any]],
+) -> ImpactReport:
+    """Analyze the direct impact of a disruption event on an active schedule.
+
+    Args:
+        problem: Validated ``SchedulingProblem`` or equivalent dict.
+        assignments: Current active ``ScheduledAssignment`` list or ``ScheduleResult``.
+        disruption: ``DisruptionEvent`` or equivalent dict.
+
+    Returns:
+        ``ImpactReport`` detailing directly affected and unaffected sessions.
+
+    Raises:
+        ValidationError: If problem, assignments, or disruption fail validation.
+        SolverError: If unexpected internal errors occur.
+    """
+    prob = _coerce_problem(problem)
+    assigns = _coerce_assignments(assignments)
+    disp = _coerce_disruption(disruption)
+    try:
+        return analyze_disruption_impact(prob, assigns, disp)
+    except GeComposeError:
+        raise
+    except Exception as exc:  # pragma: no cover
+        raise SolverError(f"Unexpected error during impact analysis: {exc}") from exc
+
+
+def recover_schedule(
+    problem: Union[SchedulingProblem, dict[str, Any]],
+    assignments: Union[Sequence[ScheduledAssignment], ScheduleResult, list[dict[str, Any]]],
+    disruption: Union[DisruptionEvent, dict[str, Any]],
+    *,
+    policy: RecoveryPolicy | None = None,
+) -> DisruptionRecoveryResult:
+    """Compute a solver-verified minimal-change recovery schedule after a disruption.
+
+    Reuses CP-SAT optimization to satisfy all hard invariants plus the disruption,
+    minimizing changes from the original schedule while protecting unaffected sessions.
+
+    Args:
+        problem: Validated ``SchedulingProblem`` or equivalent dict.
+        assignments: Current active ``ScheduledAssignment`` list or ``ScheduleResult``.
+        disruption: ``DisruptionEvent`` or equivalent dict.
+        policy: Optional ``RecoveryPolicy`` specifying change weights and limits.
+
+    Returns:
+        ``DisruptionRecoveryResult`` containing replacement schedule, change log,
+        and verification status.
+
+    Raises:
+        ValidationError: If inputs fail validation.
+        SolverError: If unexpected internal solver errors occur.
+    """
+    prob = _coerce_problem(problem)
+    assigns = _coerce_assignments(assignments)
+    disp = _coerce_disruption(disruption)
+    try:
+        return recover_from_disruption(prob, assigns, disp, policy=policy)
+    except GeComposeError:
+        raise
+    except Exception as exc:  # pragma: no cover
+        raise SolverError(f"Unexpected error during schedule recovery: {exc}") from exc
+
+
 def to_timetable_grid(
-    result: ScheduleResult,
+    result: Union[ScheduleResult, DisruptionRecoveryResult],
     problem: SchedulingProblem,
 ) -> dict[tuple[str, str], list[ScheduledAssignment]]:
     """Convert a flat assignment list into a 2-D timetable grid.
@@ -234,25 +365,26 @@ def to_timetable_grid(
     assignments produce no entry in the returned dict.
 
     Args:
-        result: A ``ScheduleResult`` returned by :func:`schedule` or any solver
-            method.  Only *successful* results (``result.is_success == True``)
-            are guaranteed to have a non-empty assignment list; the function
-            still processes partial or feasible-only results.
+        result: A ``ScheduleResult`` or ``DisruptionRecoveryResult`` containing assignments.
         problem: The original ``SchedulingProblem`` used to produce *result*,
             needed to resolve slot metadata (``day`` field).
 
     Returns:
         ``dict`` mapping ``(day, slot_id)`` → ``list[ScheduledAssignment]``.
-        The day string is taken from the corresponding ``TimeSlot.day`` field.
 
     Raises:
-        ValueError: If an assignment references a slot ID that does not exist in
-            *problem*.
+        ValueError: If an assignment references a slot ID that does not exist in *problem*.
     """
     slot_by_id = {s.id: s for s in problem.slots}
     grid: dict[tuple[str, str], list[ScheduledAssignment]] = {}
 
-    for assignment in result.assignments:
+    target_assignments = (
+        result.recovered_assignments
+        if isinstance(result, DisruptionRecoveryResult)
+        else result.assignments
+    )
+
+    for assignment in target_assignments:
         slot = slot_by_id.get(assignment.slot_id)
         if slot is None:
             raise ValueError(
@@ -266,7 +398,14 @@ def to_timetable_grid(
 
 
 def serialize_result(
-    result: Union[ScheduleResult, ConflictDiagnosis, AlternativeSearchResult],
+    result: Union[
+        ScheduleResult,
+        ConflictDiagnosis,
+        AlternativeSearchResult,
+        ImpactReport,
+        DisruptionRecoveryResult,
+        AssignmentChange,
+    ],
 ) -> dict[str, Any]:
     """Serialize a result object to a JSON-serialisable plain dict.
 
@@ -274,8 +413,7 @@ def serialize_result(
     become strings, sets become lists, and all types are JSON-native.
 
     Args:
-        result: Any of ``ScheduleResult``, ``ConflictDiagnosis``, or
-            ``AlternativeSearchResult``.
+        result: Any supported GeCompose result model.
 
     Returns:
         A plain ``dict`` that can be passed directly to ``json.dumps()``.
@@ -284,11 +422,18 @@ def serialize_result(
         TypeError: If *result* is not one of the recognised result types.
     """
     if not isinstance(
-        result, (ScheduleResult, ConflictDiagnosis, AlternativeSearchResult)
+        result,
+        (
+            ScheduleResult,
+            ConflictDiagnosis,
+            AlternativeSearchResult,
+            ImpactReport,
+            DisruptionRecoveryResult,
+            AssignmentChange,
+        ),
     ):
         raise TypeError(
-            f"Expected ScheduleResult, ConflictDiagnosis, or "
-            f"AlternativeSearchResult, got {type(result).__name__!r}"
+            f"Expected supported GeCompose result model, got {type(result).__name__!r}"
         )
     return result.model_dump(mode="json")
 
@@ -448,12 +593,64 @@ class GeComposeEngine:
             ) from exc
 
     # ------------------------------------------------------------------
+    # Disruption analysis & recovery
+    # ------------------------------------------------------------------
+
+    def analyze_disruption_impact(
+        self,
+        problem: Union[SchedulingProblem, dict[str, Any]],
+        assignments: Union[Sequence[ScheduledAssignment], ScheduleResult, list[dict[str, Any]]],
+        disruption: Union[DisruptionEvent, dict[str, Any]],
+    ) -> ImpactReport:
+        """Analyze the direct impact of a disruption event on an active schedule.
+
+        Args:
+            problem: ``SchedulingProblem`` or equivalent dict.
+            assignments: Active ``ScheduledAssignment`` list or ``ScheduleResult``.
+            disruption: ``DisruptionEvent`` or equivalent dict.
+
+        Returns:
+            ``ImpactReport`` detailing affected sessions and invalidated assignments.
+
+        Raises:
+            ValidationError: If input validation fails.
+            SolverError: If unexpected internal errors occur.
+        """
+        return analyze_impact(problem, assignments, disruption)
+
+    def recover_schedule(
+        self,
+        problem: Union[SchedulingProblem, dict[str, Any]],
+        assignments: Union[Sequence[ScheduledAssignment], ScheduleResult, list[dict[str, Any]]],
+        disruption: Union[DisruptionEvent, dict[str, Any]],
+        *,
+        policy: RecoveryPolicy | None = None,
+    ) -> DisruptionRecoveryResult:
+        """Compute a solver-verified minimal-change replacement schedule after a disruption.
+
+        Args:
+            problem: ``SchedulingProblem`` or equivalent dict.
+            assignments: Active ``ScheduledAssignment`` list or ``ScheduleResult``.
+            disruption: ``DisruptionEvent`` or equivalent dict.
+            policy: Optional ``RecoveryPolicy`` for change weights and tolerances.
+
+        Returns:
+            ``DisruptionRecoveryResult`` containing replacement schedule, itemized
+            changes, penalty score, and verification status.
+
+        Raises:
+            ValidationError: If input validation fails.
+            SolverError: If unexpected internal solver errors occur.
+        """
+        return recover_schedule(problem, assignments, disruption, policy=policy)
+
+    # ------------------------------------------------------------------
     # Utilities
     # ------------------------------------------------------------------
 
     def to_timetable_grid(
         self,
-        result: ScheduleResult,
+        result: Union[ScheduleResult, DisruptionRecoveryResult],
         problem: Union[SchedulingProblem, dict[str, Any]],
     ) -> dict[tuple[str, str], list[ScheduledAssignment]]:
         """Convert a flat assignment list to a ``(day, slot_id)`` grid.

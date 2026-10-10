@@ -36,6 +36,9 @@ from gecompose.api import (
     schedule,
     diagnose,
     find_alternatives,
+    analyze_impact,
+    recover_schedule,
+    DisruptionRecoverer,
     to_timetable_grid,
     serialize_result,
 )
@@ -75,11 +78,14 @@ __all__ = [
     "find_alternatives",
     "to_timetable_grid",
     "serialize_result",
-    # Phase 4 — disruption models
+    # Phase 4 — disruption models & recovery
     "AssignmentChange",
     "DisruptionEvent",
     "DisruptionRecoveryResult",
     "ImpactReport",
     "RecoveryPolicy",
     "ResourceType",
+    "analyze_impact",
+    "recover_schedule",
+    "DisruptionRecoverer",
 ]
