@@ -33,8 +33,8 @@ import {
   VerifyResult,
 } from "@/types/api";
 
-
-const BASE_URL = "/api/v1";
+const API_ROOT = import.meta.env.VITE_API_URL ? String(import.meta.env.VITE_API_URL).replace(/\/+$/, "") : "";
+const BASE_URL = `${API_ROOT}/api/v1`;
 
 export class ApiError extends Error {
   status: number;
