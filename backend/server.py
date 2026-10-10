@@ -128,6 +128,7 @@ async def get_rules(status: str | None = None):
         return JSONResponse({"error": str(exc)}, status_code=500)
 
 
+
 @app.post("/rules", status_code=201)
 async def post_rule(rule_data: dict):
     try:

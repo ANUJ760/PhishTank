@@ -150,6 +150,19 @@ async def require_user(
     return current_user
 
 
+async def get_user_or_demo(
+    current_user: Optional[UserResponse] = Depends(get_current_user_optional),
+) -> UserResponse:
+    if current_user is not None:
+        return current_user
+    return UserResponse(
+        id="demo-user",
+        email="admin@gecompose.internal",
+        name="Coordinator",
+        role="coordinator",
+    )
+
+
 async def require_coordinator(
     current_user: UserResponse = Depends(require_user),
 ) -> UserResponse:

@@ -2,6 +2,7 @@ import {
   AuditRecord,
   ChainEvent,
   DashboardSummary,
+  DataDumpResult,
   Explanation,
   HealthReport,
   HospitalComparison,
@@ -166,6 +167,18 @@ export const api = {
       const fd = new FormData();
       fd.append("file", file);
       return request<IngestSheetResult>("/intake/sheet", {
+        method: "POST",
+        body: fd,
+      });
+    },
+    dump: (files: File[], instructions: string, notes: string = "") => {
+      const fd = new FormData();
+      for (const f of files) {
+        fd.append("files", f);
+      }
+      fd.append("instructions", instructions);
+      fd.append("notes", notes);
+      return request<DataDumpResult>("/intake/dump", {
         method: "POST",
         body: fd,
       });
