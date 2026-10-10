@@ -1,18 +1,37 @@
 import {
+  AuditRecord,
   ChainEvent,
   DashboardSummary,
   Explanation,
   HealthReport,
+  HospitalComparison,
+  HospitalExplanation,
+  HospitalORPlan,
   IngestSheetResult,
+  MedicalStaff,
+  MedOpsOverview,
+  OperatingRoom,
+  PatientCase,
   PublishResult,
+  ReliefCamp,
+  ReliefComparison,
+  ReliefExplanation,
+  ReliefInventoryItem,
+  ReliefOverview,
+  ReliefPlan,
+  ReliefVehicle,
+  ReliefWarehouse,
   Roster,
   Rule,
   Schedule,
   ScoreboardResult,
   SolveResult,
+  UniversalProblem,
+  UniversalSolution,
   User,
   VerifyResult,
 } from "@/types/api";
+
 
 const BASE_URL = "/api/v1";
 
@@ -209,9 +228,85 @@ export const api = {
     }),
   chainEvents: () => request<{ events: ChainEvent[] }>("/chain/events"),
 
+  // ReliefOps Disaster Operations
+  reliefops: {
+    overview: () => request<ReliefOverview>("/reliefops/overview"),
+    camps: () => request<ReliefCamp[]>("/reliefops/camps"),
+    inventory: () => request<ReliefInventoryItem[]>("/reliefops/inventory"),
+    warehouses: () => request<ReliefWarehouse[]>("/reliefops/warehouses"),
+    vehicles: () => request<ReliefVehicle[]>("/reliefops/vehicles"),
+    requests: () => request<any[]>("/reliefops/requests"),
+    optimize: (scenario_name: string = "Optimal Supply Allocation") =>
+      request<ReliefPlan>("/reliefops/optimize", {
+        method: "POST",
+        body: JSON.stringify({ scenario_name }),
+      }),
+    latestPlan: () => request<ReliefPlan>("/reliefops/plan/latest"),
+    getPlan: (id: string) => request<ReliefPlan>(`/reliefops/plan/${id}`),
+    simulate: (delta: any, scenario_name?: string) =>
+      request<{ simulation_plan: ReliefPlan; comparison: ReliefComparison }>("/reliefops/simulate", {
+        method: "POST",
+        body: JSON.stringify({ delta, scenario_name }),
+      }),
+    explain: (plan_id?: string) =>
+      request<ReliefExplanation>("/reliefops/explain", {
+        method: "POST",
+        body: JSON.stringify({ plan_id }),
+      }),
+    approve: (plan_id: string, approved_by: string, notes?: string) =>
+      request<AuditRecord>("/reliefops/approve", {
+        method: "POST",
+        body: JSON.stringify({ plan_id, approved_by, notes }),
+      }),
+    audit: () => request<{ verified: boolean; message: string; records: AuditRecord[] }>("/reliefops/audit"),
+    seed: () => request<{ ok: boolean; message: string }>("/reliefops/demo/seed", { method: "POST" }),
+  },
+
+  // MedOps Hospital Emergency Surgical Theatres
+  medops: {
+    overview: () => request<MedOpsOverview>("/medops/overview"),
+    rooms: () => request<OperatingRoom[]>("/medops/rooms"),
+    staff: () => request<MedicalStaff[]>("/medops/staff"),
+    cases: () => request<PatientCase[]>("/medops/cases"),
+    optimize: (plan_id?: string) =>
+      request<HospitalORPlan>("/medops/optimize", {
+        method: "POST",
+        body: JSON.stringify({ plan_id }),
+      }),
+    latestPlan: () => request<HospitalORPlan>("/medops/plan/latest"),
+    getPlan: (id: string) => request<HospitalORPlan>(`/medops/plan/${id}`),
+    simulate: (delta: any) =>
+      request<{ simulation_plan: HospitalORPlan; comparison: HospitalComparison }>("/medops/simulate", {
+        method: "POST",
+        body: JSON.stringify({ delta }),
+      }),
+    explain: (plan_id?: string) =>
+      request<HospitalExplanation>("/medops/explain", {
+        method: "POST",
+        body: JSON.stringify({ plan_id }),
+      }),
+    approve: (plan_id: string, approved_by: string, notes?: string) =>
+      request<AuditRecord>("/medops/approve", {
+        method: "POST",
+        body: JSON.stringify({ plan_id, approved_by, notes }),
+      }),
+    audit: () => request<{ verified: boolean; message: string; records: AuditRecord[] }>("/medops/audit"),
+    seed: () => request<{ ok: boolean; message: string }>("/medops/demo/seed", { method: "POST" }),
+  },
+
+  // Universal Global Constraint Solver
+  universal: {
+    solve: (problem: UniversalProblem) =>
+      request<UniversalSolution>("/universal/solve", {
+        method: "POST",
+        body: JSON.stringify({ problem }),
+      }),
+  },
+
   // Demo management
   demo: {
     seed: () => request<{ ok: boolean; message: string }>("/demo/seed", { method: "POST" }),
     reset: () => request<{ ok: boolean; message: string }>("/demo/reset", { method: "POST" }),
   },
 };
+

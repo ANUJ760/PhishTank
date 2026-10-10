@@ -102,16 +102,16 @@ export function PublishPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Step 1: On-Chain Anchoring */}
+        {/* Step 1: Cryptographic Ledger Anchoring */}
         <div className="glass-box p-6 space-y-4">
           <div className="flex items-center justify-between border-b border-white/5 pb-3">
             <div>
               <h3 className="text-white text-sm font-semibold flex items-center gap-1.5">
                 <Lock size={15} className="text-zinc-300" />
-                Step 1: Anchor on ConsentLedger
+                Step 1: Commit to Audit Ledger
               </h3>
               <p className="text-xs text-zinc-400 mt-0.5">
-                Commit canonical SHA-256 hash to local Anvil smart contract
+                Commit canonical SHA-256 hash to immutable cryptographic ledger
               </p>
             </div>
             {schedule && (
@@ -122,7 +122,7 @@ export function PublishPage() {
           </div>
 
           <p className="text-xs text-zinc-400 leading-relaxed">
-            Publication computes the canonical schedule hash and submits a transaction to <code className="text-white font-mono">anchorSchedule(hash)</code> on Ethereum.
+            Publication computes the canonical schedule hash and registers an immutable cryptographic audit record.
           </p>
 
           <button
@@ -131,15 +131,15 @@ export function PublishPage() {
             className="w-full h-8 rounded-md bg-white text-zinc-950 font-medium text-xs hover:bg-zinc-200 transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-[0.98] disabled:opacity-50"
           >
             <ShieldCheck size={14} />
-            <span>{publishMutation.isPending ? "Anchoring on Chain..." : "Anchor Current Schedule On-Chain"}</span>
+            <span>{publishMutation.isPending ? "Committing to Ledger..." : "Commit Schedule to Audit Ledger"}</span>
           </button>
 
           {/* Receipt details */}
           {publishResult && (
             <div className="p-4 rounded-md border border-white/10 bg-white/[0.02] text-xs space-y-2 mt-3">
-              <span className="font-semibold text-white block">Anchoring Receipt:</span>
+              <span className="font-semibold text-white block">Audit Receipt:</span>
               <div className="space-y-1 font-mono text-[11px] text-zinc-400">
-                <div className="truncate">Tx: <span className="text-zinc-200">{publishResult.tx_hash}</span></div>
+                <div className="truncate">Commit ID: <span className="text-zinc-200">{publishResult.tx_hash}</span></div>
                 <div>Version: <span className="text-zinc-200">v{publishResult.version}</span></div>
                 <div className="truncate">Schedule Hash: <span className="text-zinc-200">{publishResult.hash}</span></div>
               </div>
@@ -177,7 +177,7 @@ export function PublishPage() {
               Step 2: Independent Proof Verification
             </h3>
             <p className="text-xs text-zinc-400 mt-0.5">
-              Verify any exported timetable against on-chain consensus commitments
+              Verify any exported timetable against cryptographic ledger commitments
             </p>
           </div>
 

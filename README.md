@@ -675,6 +675,49 @@ flowchart TD
 
 ---
 
+## 11. Production & AWS Docker Deployment
+
+GeCompose is fully containerized and production-ready for deployment on **AWS (ECS Fargate, EKS, EC2)** or local workstation clusters.
+
+### Container Architecture
+
+| Service | Container Image / Dockerfile | Port | Role |
+|---|---|---|---|
+| **Frontend** | `Dockerfile.frontend` (Nginx + React SPA) | `80` | High-performance SPA serving with automatic `/api/` reverse proxy |
+| **Backend** | `Dockerfile.backend` (Python 3.12 Slim + FastAPI) | `8000` | Constraint optimizer, Ollama integration, REST APIs, health checks |
+| **Database** | `postgres:16-alpine` | `5432` | Persistent transactional store for schedules, rosters, and audit records |
+| **Ollama (Optional)** | `ollama/ollama:latest` | `11434` | Local GPU-accelerated inference hosting Gemma 4B and 12B models |
+
+### Quick Start with Docker Compose
+
+```bash
+# 1. Clone repository & configure environment
+cp .env.example .env
+cp frontend/.env.example frontend/.env
+
+# 2. Build and launch all core services
+docker compose up -d --build
+
+# 3. Access web dashboard and backend APIs
+# Web UI:     http://localhost
+# Backend:    http://localhost:8000/docs
+# Health:     http://localhost:8000/health
+```
+
+### AWS ECS / EC2 Production Guidelines
+
+1. **ECS Fargate Tasks**:
+   - Deploy `Dockerfile.backend` and `Dockerfile.frontend` as task definitions behind an AWS Application Load Balancer (ALB).
+   - Set `DATABASE_URL` to point to AWS Aurora Serverless or RDS PostgreSQL.
+2. **GPU Acceleration (AWS EC2 G4dn / G5)**:
+   - For real-time on-premise Gemma inference, run the Ollama container with NVIDIA container runtime:
+     ```bash
+     docker compose --profile ai up -d
+     ```
+3. **Environment Security**:
+   - Store database credentials and API secrets in **AWS Secrets Manager** or **AWS Systems Manager Parameter Store**.
+
+---
 
 ### Project and Team Details
 

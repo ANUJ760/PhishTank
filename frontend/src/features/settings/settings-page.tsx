@@ -65,34 +65,34 @@ export function SettingsPage() {
 
   const services = [
     {
-      key: "postgres",
-      name: "PostgreSQL Database",
+      key: "database",
+      name: "Database (PostgreSQL / SQLite)",
       icon: Database,
-      desc: "Stores user sessions, verified rules, roster data, and published schedule hashes.",
+      desc: "Stores user sessions, verified constraints, master schedules, and audit records.",
     },
     {
-      key: "anvil",
-      name: "Anvil Local EVM Node",
-      icon: Server,
-      desc: "Local Ethereum execution node on chain ID 31337 for fast, deterministic contract testing.",
-    },
-    {
-      key: "contract",
-      name: "ConsentLedger Contract",
-      icon: Layers,
-      desc: "Deploys on-chain rule hashes, multi-party relaxation approvals, and timetable anchor receipts.",
-    },
-    {
-      key: "docker",
-      name: "Docker Sandbox",
-      icon: Container,
-      desc: "Safely executes generated Python spreadsheet parsers in an isolated container without network access.",
-    },
-    {
-      key: "llama-server",
-      name: "Gemma / Llama Server",
+      key: "ollama",
+      name: "Ollama / Gemma Service",
       icon: Cpu,
-      desc: "Local GGUF LLM inference for multilingual intake and natural language conflict explanations.",
+      desc: "Local inference engine hosting Gemma 4B and 12B multimodal models.",
+    },
+    {
+      key: "intake_model",
+      name: "Gemma 4B Intake Model",
+      icon: Server,
+      desc: "Fast multilingual extraction for voice, photos, and dispatch reports.",
+    },
+    {
+      key: "reason_model",
+      name: "Gemma 12B Reasoning Engine",
+      icon: Layers,
+      desc: "Deep clinical, logistical, and mathematical conflict explanation engine.",
+    },
+    {
+      key: "sandbox",
+      name: "Execution Sandbox",
+      icon: Container,
+      desc: "Safely executes generated Python spreadsheet parsers in an isolated environment.",
     },
   ];
 

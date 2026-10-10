@@ -47,14 +47,14 @@ export function ScoreboardPage() {
           <div className="flex items-center justify-between border-b border-white/5 pb-3">
             <span className="text-xs font-semibold text-white flex items-center gap-1.5">
               <Trophy size={14} className="text-zinc-300" />
-              GeCompose (CP-SAT Solver)
+              GeCompose (Constraint Engine)
             </span>
             <span className="px-2.5 py-0.5 rounded-md bg-zinc-800 text-zinc-200 border border-white/10 text-[11px] font-mono">
               0 Violations
             </span>
           </div>
           <p className="text-xs text-zinc-400 leading-relaxed">
-            CP-SAT guarantees 100% adherence to all confirmed room bounds, teacher availability windows, pinned lab requirements, and qualification sets.
+            The mathematical constraint engine guarantees 100% adherence to all confirmed room bounds, resource windows, and qualification sets.
           </p>
         </div>
 

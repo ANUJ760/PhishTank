@@ -19,6 +19,11 @@ import { ScoreboardPage } from "@/features/scoreboard/scoreboard-page";
 import { ChainPage } from "@/features/chain/chain-page";
 import { SettingsPage } from "@/features/settings/settings-page";
 
+// Specialized Optimization Engines
+import { ReliefOpsPage } from "@/features/reliefops/reliefops-page";
+import { MedOpsPage } from "@/features/medops/medops-page";
+import { UniversalSolverPage } from "@/features/universal/universal-page";
+
 export const router = createBrowserRouter([
   {
     path: "/",
@@ -47,6 +52,18 @@ export const router = createBrowserRouter([
       {
         path: "dashboard",
         element: <DashboardPage />,
+      },
+      {
+        path: "reliefops",
+        element: <ReliefOpsPage />,
+      },
+      {
+        path: "medops",
+        element: <MedOpsPage />,
+      },
+      {
+        path: "universal",
+        element: <UniversalSolverPage />,
       },
       {
         path: "intake",
@@ -78,6 +95,10 @@ export const router = createBrowserRouter([
       },
       {
         path: "chain-log",
+        element: <ChainPage />,
+      },
+      {
+        path: "audit-ledger",
         element: <ChainPage />,
       },
       {

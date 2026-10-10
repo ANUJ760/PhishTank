@@ -58,19 +58,19 @@ export function ApprovalsPage() {
   return (
     <div className="space-y-6 text-left pb-12">
       <div>
-        <h2 className="text-xl font-bold tracking-tight text-white">On-Chain Multi-Party Approvals</h2>
+        <h2 className="text-xl font-bold tracking-tight text-white">Multi-Party Consent & Approvals</h2>
         <p className="text-xs text-zinc-400 mt-0.5">
-          Two-step cryptographic consent pipeline: owner signs relaxation transaction &rarr; coordinator applies updated rule.
+          Two-step cryptographic consent pipeline: owner signs relaxation consent &rarr; coordinator applies updated rule.
         </p>
       </div>
 
       <div className="p-3.5 rounded-lg border border-white/10 bg-zinc-900/80 backdrop-blur-xl text-xs text-zinc-400 space-y-1">
         <span className="font-semibold text-white flex items-center gap-1.5">
           <FileKey size={14} className="text-zinc-300" />
-          Anvil Local Consensus Note
+          Cryptographic Authorization Note
         </span>
         <p>
-          In this local environment, Anvil accounts serve as standing identities for institutional authorities. Smart contract access control strictly validates that the transaction signer matches the registered rule owner.
+          Verified accounts serve as standing identities for institutional authorities. Access control strictly validates that the approver matches the registered rule owner.
         </p>
       </div>
 
@@ -95,10 +95,10 @@ export function ApprovalsPage() {
             <div className="space-y-0.5">
               <span className="text-xs font-semibold text-white flex items-center gap-1.5">
                 <UserCheck size={14} className="text-zinc-300" />
-                Active On-Chain Signer Identity:
+                Active Approver Identity:
               </span>
               <p className="text-[11px] text-zinc-400">
-                Switch accounts to demonstrate non-owner revert vs owner success.
+                Switch accounts to demonstrate non-owner rejection vs owner approval.
               </p>
             </div>
 
@@ -169,12 +169,12 @@ export function ApprovalsPage() {
                       <div className="p-3 rounded-md border border-white/10 bg-white/[0.02] text-xs space-y-1">
                         <div className="flex items-center justify-between">
                           <span className="font-semibold text-white">
-                            {res.ok ? "On-Chain Approval Verified" : "Transaction Reverted"}
+                            {res.ok ? "Approval Cryptographically Verified" : "Authorization Denied"}
                           </span>
                         </div>
                         {res.tx && (
                           <div className="font-mono text-[10px] text-zinc-400 truncate">
-                            Tx: {res.tx}
+                            Audit Hash: {res.tx}
                           </div>
                         )}
                         {res.error && (
@@ -192,7 +192,7 @@ export function ApprovalsPage() {
         <div className="glass-box p-12 text-center space-y-3">
           <h3 className="text-base font-semibold text-white">No Pending Relaxation Proposals</h3>
           <p className="text-xs text-zinc-400 max-w-md mx-auto">
-            To view and test on-chain consent workflows, visit Conflict Studio and generate a conflict explanation.
+            To view and test consent workflows, visit Conflict Studio and generate a conflict explanation.
           </p>
           <div className="pt-2">
             <Link to="/app/conflicts">

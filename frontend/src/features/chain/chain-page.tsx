@@ -63,10 +63,10 @@ export function ChainPage() {
         <div>
           <h2 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
             <Link2 className="w-5 h-5 text-zinc-300" />
-            ConsentLedger Audit Log
+            Cryptographic Audit Ledger
           </h2>
           <p className="text-xs text-zinc-400 mt-1">
-            Immutable on-chain event stream queried directly from the ConsentLedger smart contract on local Anvil node.
+            Immutable event stream logged with SHA-256 state commitments and role authorizations.
           </p>
         </div>
 
@@ -84,7 +84,7 @@ export function ChainPage() {
       <div className="p-4 rounded-lg border border-white/10 bg-zinc-900/80 backdrop-blur-xl text-xs text-zinc-400 leading-relaxed flex items-start gap-3">
         <ShieldCheck className="w-4 h-4 text-zinc-300 shrink-0 mt-0.5" />
         <div>
-          <span className="font-semibold text-white">Zero-Knowledge & Hash Privacy Guarantee:</span> The ConsentLedger contract only stores cryptographic commitments (<code className="font-mono text-zinc-200">rule_hash</code>, <code className="font-mono text-zinc-200">schedule_hash</code>) and authorized institutional signer addresses. PII, names, audio, and draft timetable schedules never leak on-chain.
+          <span className="font-semibold text-white">Cryptographic State & Hash Privacy Guarantee:</span> The Audit Ledger stores cryptographic commitments (<code className="font-mono text-zinc-200">rule_hash</code>, <code className="font-mono text-zinc-200">schedule_hash</code>) and authorized institutional actor IDs. PII, names, audio, and draft timetable schedules never leak in plaintext.
         </div>
       </div>
 
@@ -120,14 +120,14 @@ export function ChainPage() {
         {isLoading ? (
           <div className="p-12 text-center text-zinc-500 text-xs flex flex-col items-center justify-center gap-2">
             <RefreshCw className="w-5 h-5 animate-spin text-zinc-400" />
-            Querying Anvil block headers and contract logs...
+            Querying audit ledger log entries...
           </div>
         ) : filteredEvents.length === 0 ? (
           <div className="glass-box p-12 text-center text-zinc-500">
             <Layers className="w-7 h-7 mx-auto mb-2 text-zinc-600" />
-            <p className="text-xs font-medium text-white">No On-Chain Events Recorded</p>
+            <p className="text-xs font-medium text-white">No Audit Events Recorded</p>
             <p className="text-[11px] mt-1">
-              Events are emitted when rules are confirmed, relaxation options are signed, or final timetables are published.
+              Events are emitted when rules are confirmed, relaxation options are authorized, or final timetables are published.
             </p>
           </div>
         ) : (

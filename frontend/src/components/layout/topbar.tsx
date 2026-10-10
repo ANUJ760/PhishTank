@@ -25,11 +25,15 @@ export function Topbar({ darkMode, setDarkMode }: TopbarProps) {
     intake: "Constraint Intake",
     rules: "Constraints & Rule Review",
     schedule: "Timetable Schedule Grid",
+    reliefops: "ReliefOps Disaster Supply Allocation",
+    medops: "MedOps Emergency Surgical Suites",
+    universal: "Universal Global Constraint Solver",
     conflicts: "Conflict Studio",
-    approvals: "On-Chain Multi-Party Approvals",
-    publish: "Schedule Publication & Proof Portal",
+    approvals: "Multi-Party Consent & Approvals",
+    publish: "Schedule Publication & Verification",
     scoreboard: "Evaluation Scoreboard",
-    "chain-log": "Blockchain Audit Log",
+    "chain-log": "Cryptographic Audit Ledger",
+    "audit-ledger": "Cryptographic Audit Ledger",
     settings: "System Health & Diagnostics",
   };
   const title = titles[path] || "Workspace";

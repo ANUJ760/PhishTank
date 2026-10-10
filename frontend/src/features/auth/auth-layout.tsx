@@ -21,7 +21,7 @@ export function AuthLayout({ children }: { children: React.ReactNode }) {
           {children}
         </div>
         <div className="mt-8 text-center text-xs text-zinc-500">
-          Enterprise Timetable Synthesis &bull; Local Anvil Consensus
+          Enterprise Timetable & Resource Synthesis &bull; Cryptographic Audit Ledger
         </div>
       </div>
     </div>

@@ -88,7 +88,7 @@ export function ConflictsPage() {
                 </h3>
               </div>
               <p className="text-xs text-zinc-400">
-                CP-SAT isolated the minimal sub-set of rules that cannot simultaneously be satisfied:
+                The constraint engine isolated the minimal sub-set of rules that cannot simultaneously be satisfied:
               </p>
 
               <div className="flex flex-wrap gap-2 pt-2">
@@ -149,10 +149,10 @@ export function ConflictsPage() {
           <div className="lg:col-span-2 glass-box p-6 space-y-4">
             <div className="border-b border-white/5 pb-3">
               <h3 className="text-white text-sm font-semibold">
-                Solver-Verified Relaxation Options
+                Feasible Relaxation Options
               </h3>
               <p className="text-xs text-zinc-400 mt-0.5">
-                Every alternative proposed below has been pre-verified by CP-SAT to guarantee mathematical feasibility.
+                Every alternative proposed below has been verified to guarantee mathematical feasibility.
               </p>
             </div>
 

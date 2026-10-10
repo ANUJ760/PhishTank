@@ -16,6 +16,10 @@ import {
   LogOut,
   RefreshCw,
   Database,
+  LifeBuoy,
+  Activity,
+  Cpu,
+  ShieldCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
@@ -24,17 +28,20 @@ import { useQueryClient } from "@tanstack/react-query";
 
 const primaryNav = [
   { label: "Dashboard", to: "/app/dashboard", icon: LayoutDashboard },
-  { label: "Intake", to: "/app/intake", icon: Inbox },
-  { label: "Constraints", to: "/app/rules", icon: Sliders },
   { label: "Schedule", to: "/app/schedule", icon: Calendar },
-  { label: "Conflicts", to: "/app/conflicts", icon: AlertTriangle },
+  { label: "ReliefOps", to: "/app/reliefops", icon: LifeBuoy },
+  { label: "MedOps", to: "/app/medops", icon: Activity },
+  { label: "Universal", to: "/app/universal", icon: Cpu },
 ];
 
 const secondaryNav = [
+  { label: "Intake", to: "/app/intake", icon: Inbox },
+  { label: "Constraints", to: "/app/rules", icon: Sliders },
+  { label: "Conflicts", to: "/app/conflicts", icon: AlertTriangle },
   { label: "Approvals", to: "/app/approvals", icon: CheckCheck },
   { label: "Publish & Verify", to: "/app/publish", icon: FileCheck },
   { label: "Scoreboard", to: "/app/scoreboard", icon: BarChart3 },
-  { label: "Chain Log", to: "/app/chain-log", icon: Link2 },
+  { label: "Audit Ledger", to: "/app/chain-log", icon: ShieldCheck },
   { label: "Settings", to: "/app/settings", icon: Settings },
 ];
 
@@ -239,7 +246,7 @@ export function Navbar() {
                     <Database size={12} className="text-zinc-500" />
                     Active Environment
                   </span>
-                  <span className="text-[11px] text-zinc-300 font-medium">College Demo v1</span>
+                  <span className="text-[11px] text-zinc-300 font-medium">Unified Constraint Engine</span>
                 </div>
 
                 <button

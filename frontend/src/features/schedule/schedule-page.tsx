@@ -89,7 +89,7 @@ export function SchedulePage() {
             className="h-8 px-4 rounded-md bg-white text-zinc-950 font-medium text-xs hover:bg-zinc-200 transition-all flex items-center gap-1.5 shadow-sm active:scale-[0.98] disabled:opacity-50"
           >
             <Zap size={13} className="text-zinc-950" />
-            <span>{solveMutation.isPending ? "Solving..." : "Solve (CP-SAT)"}</span>
+            <span>{solveMutation.isPending ? "Solving..." : "Generate Schedule"}</span>
           </button>
 
           <Link to="/app/publish">

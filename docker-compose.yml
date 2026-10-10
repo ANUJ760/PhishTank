@@ -1,21 +1,109 @@
 services:
+  # =========================================================================
+  # 1. PostgreSQL Database Service
+  # =========================================================================
   postgres:
     image: postgres:16-alpine
+    container_name: gecompose-db
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-gecompose}
       POSTGRES_USER: ${POSTGRES_USER:-gecompose}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-gecompose_dev}
     ports:
-      - "127.0.0.1:5432:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - gecompose_postgres:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
       interval: 5s
       timeout: 3s
-      retries: 12
+      retries: 10
       start_period: 5s
+    networks:
+      - gecompose-net
+
+  # =========================================================================
+  # 2. GeCompose Enterprise Backend API & Solver Engine
+  # =========================================================================
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: gecompose-backend
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-gecompose}:${POSTGRES_PASSWORD:-gecompose_dev}@postgres:5432/${POSTGRES_DB:-gecompose}
+      LLM_PROVIDER: ${LLM_PROVIDER:-ollama}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://ollama:11434}
+      INTAKE_MODEL: ${INTAKE_MODEL:-gemma3:4b}
+      REASON_MODEL: ${REASON_MODEL:-gemma3:12b}
+      MOCK_LLM: ${MOCK_LLM:-0}
+      SANDBOX_MODE: ${SANDBOX_MODE:-local}
+      ALLOW_LOCAL_SANDBOX: ${ALLOW_LOCAL_SANDBOX:-true}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost,http://localhost:80,http://localhost:3000,http://127.0.0.1}
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - gecompose_data:/app/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - gecompose-net
+
+  # =========================================================================
+  # 3. GeCompose Frontend (SPA + Nginx Reverse Proxy)
+  # =========================================================================
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: gecompose-frontend
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-80}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/"]
+      interval: 20s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    networks:
+      - gecompose-net
+
+  # =========================================================================
+  # 4. Optional Ollama Service for Local / EC2 GPU Inference
+  # Run with: docker compose --profile ai up -d
+  # =========================================================================
+  ollama:
+    image: ollama/ollama:latest
+    container_name: gecompose-ollama
+    restart: unless-stopped
+    profiles:
+      - ai
+      - full
+    ports:
+      - "11434:11434"
+    volumes:
+      - gecompose_ollama:/root/.ollama
+    networks:
+      - gecompose-net
 
 volumes:
   gecompose_postgres:
+  gecompose_data:
+  gecompose_ollama:
+
+networks:
+  gecompose-net:
+    driver: bridge
