@@ -92,10 +92,16 @@ export function Navbar() {
             to="/app/dashboard"
             className="group flex items-center gap-2.5 text-white font-semibold text-sm tracking-tight select-none"
           >
-            <div className="h-7 w-7 rounded-md bg-white text-zinc-950 flex items-center justify-center font-bold text-[11px] shadow-sm shadow-white/20 group-hover:scale-105 transition-transform duration-200">
-              GC
+            <div className="h-7 w-7 flex items-center justify-center group-hover:scale-105 transition-transform duration-200">
+              <img
+                src="/logo-mark.svg"
+                alt="GeCompose Logo"
+                className="h-7 w-7 object-contain drop-shadow-[0_0_8px_rgba(52,211,153,0.35)]"
+              />
             </div>
-            <span className="hidden sm:inline font-semibold tracking-tight text-[15px]">GeCompose</span>
+            <span className="hidden sm:inline font-semibold tracking-tight text-[15px] bg-gradient-to-r from-white via-zinc-100 to-zinc-300 bg-clip-text text-transparent">
+              GeCompose
+            </span>
           </NavLink>
 
           {/* Primary nav links */}
@@ -164,10 +170,8 @@ export function Navbar() {
             <div className="space-y-6">
               {/* Drawer header */}
               <div className="flex items-center justify-between pb-4 border-b border-white/[0.08]">
-                <div className="flex items-center gap-2">
-                  <div className="h-6 w-6 rounded-md bg-white text-zinc-950 flex items-center justify-center font-bold text-[10px]">
-                    GC
-                  </div>
+                <div className="flex items-center gap-2.5">
+                  <img src="/logo-mark.svg" alt="GeCompose Logo" className="h-6 w-6 object-contain" />
                   <span className="font-semibold text-white text-sm">GeCompose Navigation</span>
                 </div>
                 <button
