@@ -425,6 +425,38 @@ The core deterministic processing engine of GeCompose is implemented in Python u
 - [`gecompose.validator`](file:///home/blxnk/agy-workspace/PhishTank/gecompose/validator.py): Independent schedule verifier (`verify_schedule`) preventing any unverified or invalid schedule from being published.
 - [`gecompose.diagnostics`](file:///home/blxnk/agy-workspace/PhishTank/gecompose/diagnostics.py): CP-SAT assumption-literal conflict diagnosis (`ConflictDiagnoser`, `diagnose_conflicts`) with deletion-based Minimal Unsatisfiable Subset (MUS) reduction.
 - [`gecompose.alternatives`](file:///home/blxnk/agy-workspace/PhishTank/gecompose/alternatives.py): Solver-verified alternative generator (`AlternativeGenerator`, `generate_alternatives`) synthesizing distinct, minimal-penalty schedule alternatives by relaxing user preferences.
+- [`gecompose.api`](file:///home/blxnk/agy-workspace/PhishTank/gecompose/api.py): Unified integration facade (`GeComposeEngine`, `schedule`, `diagnose`, `find_alternatives`, `to_timetable_grid`, `serialize_result`) providing dict/model input coercion, 2D timetable grid transformation, and clean JSON serialization.
+
+### Public API & Workflow Example
+
+```python
+from gecompose import GeComposeEngine, SchedulingProblem, RelaxationPolicy
+
+engine = GeComposeEngine(time_limit_seconds=10.0)
+
+# 1. Solve a problem (accepts Pydantic model or plain dict)
+result = engine.schedule(problem)
+
+if result.is_success:
+    # 2. Transform into a 2D timetable grid keyed by (day, slot_id)
+    grid = engine.to_timetable_grid(result, problem)
+else:
+    # 3. Diagnose infeasibility down to an unsatisfiable core (MUS)
+    diagnosis = engine.diagnose(problem)
+    print(diagnosis.explanation)
+
+    # 4. Synthesize solver-verified alternatives under a relaxation policy
+    policy = RelaxationPolicy(allow_slot_relaxation=True, max_alternatives=3)
+    alternatives = engine.find_alternatives(problem, policy=policy)
+
+# 5. Export JSON-ready serializable dictionaries for frontend / API consumers
+data = engine.serialize_result(result)
+```
+
+A complete runnable demonstration is available at [`examples/demo_workflow.py`](file:///home/blxnk/agy-workspace/PhishTank/examples/demo_workflow.py):
+```bash
+.venv/bin/python examples/demo_workflow.py
+```
 
 ### Conflict Diagnosis & Infeasibility Cores
 
@@ -449,7 +481,7 @@ When a schedule is infeasible, GeCompose searches for valid alternative schedule
 python3 -m venv .venv
 .venv/bin/pip install -e .
 
-# Run the complete test suite
+# Run the complete test suite (71 passing tests)
 .venv/bin/pytest -v
 ```
 
