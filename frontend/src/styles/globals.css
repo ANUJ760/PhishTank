@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -23,7 +25,7 @@
     --border: 240 3.7% 15.9%;
     --input: 240 3.7% 15.9%;
     --ring: 240 4.9% 83.9%;
-    --radius: 1rem;
+    --radius: 0.5rem;
   }
 
   .dark {
@@ -53,21 +55,32 @@
   }
 
   body {
-    @apply bg-black text-foreground font-sans antialiased;
+    @apply bg-black text-foreground antialiased;
     background-color: #000000;
     color: #fafafa;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
     font-feature-settings: "rlig" 1, "calt" 1;
     overflow-x: hidden;
   }
 }
 
-/* Glass styling matching shadcn design showcase */
+/* ──────────────────────────────────────────────
+   Glass morphism classes
+   ────────────────────────────────────────────── */
 .glass-box {
   background: rgba(18, 18, 22, 0.72);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 1.25rem;
+  border-radius: 0.75rem;
+  transition: border-color 0.25s ease, background 0.25s ease, transform 0.2s ease, box-shadow 0.25s ease;
+}
+
+.glass-box:hover {
+  border-color: rgba(255, 255, 255, 0.14);
+  background: rgba(22, 22, 28, 0.82);
+  transform: translateY(-1px);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.05);
 }
 
 .glass-box-subtle {
@@ -75,46 +88,85 @@
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 1rem;
+  border-radius: 0.625rem;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.glass-box-subtle:hover {
+  border-color: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
 }
 
 .glass-input {
   background: rgba(22, 22, 26, 0.85);
   border: 1px solid rgba(255, 255, 255, 0.09);
   color: #ffffff;
-  border-radius: 0.75rem;
-  transition: all 0.15s ease;
+  border-radius: 0.5rem;
+  transition: all 0.2s ease;
 }
 
 .glass-input:focus {
   border-color: rgba(255, 255, 255, 0.25);
   outline: none;
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.15);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.1);
 }
 
-/* Static clean dark ambient canvas - completely still, NO blinking, NO drifting */
+/* ──────────────────────────────────────────────
+   Professional hover utilities
+   ────────────────────────────────────────────── */
+.hover-lift {
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.hover-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3);
+}
+
+.hover-glow {
+  transition: all 0.2s ease;
+}
+
+.hover-glow:hover {
+  border-color: rgba(255, 255, 255, 0.15);
+  box-shadow: 0 0 20px rgba(255, 255, 255, 0.03);
+}
+
+/* Static clean dark ambient canvas */
 .ambient-canvas {
   position: fixed;
   inset: 0;
   z-index: 0;
   pointer-events: none;
-  background: radial-gradient(circle at 50% -20%, rgba(120, 119, 198, 0.08), transparent 60%),
-              radial-gradient(circle at 100% 40%, rgba(255, 255, 255, 0.02), transparent 40%),
+  background: radial-gradient(circle at 50% -20%, rgba(120, 119, 198, 0.06), transparent 60%),
+              radial-gradient(circle at 100% 40%, rgba(255, 255, 255, 0.015), transparent 40%),
               #000000;
 }
 
-/* Custom clean scrollbars */
+/* ──────────────────────────────────────────────
+   Custom scrollbars
+   ────────────────────────────────────────────── */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.1);
   border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* ──────────────────────────────────────────────
+   Interactive table rows
+   ────────────────────────────────────────────── */
+.table-row-hover {
+  transition: background-color 0.15s ease;
+}
+.table-row-hover:hover {
+  background-color: rgba(255, 255, 255, 0.025);
 }

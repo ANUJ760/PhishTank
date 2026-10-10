@@ -69,7 +69,7 @@ export function ConflictsPage() {
         <button
           onClick={handleInjectR3}
           disabled={isInjecting}
-          className="h-8 px-4 rounded-full bg-zinc-900 border border-white/10 text-zinc-300 hover:text-white font-medium text-xs transition-all flex items-center gap-1.5 active:scale-[0.98] disabled:opacity-50"
+          className="h-8 px-4 rounded-md bg-zinc-900 border border-white/10 text-zinc-300 hover:text-white font-medium text-xs transition-all flex items-center gap-1.5 active:scale-[0.98] disabled:opacity-50"
         >
           <Flame size={13} className="text-zinc-400" />
           <span>{isInjecting ? "Injecting..." : "Inject Demo Clash (Rule R3)"}</span>
@@ -95,7 +95,7 @@ export function ConflictsPage() {
                 {conflict.rule_ids.map((rId) => (
                   <span
                     key={rId}
-                    className="font-mono text-xs px-2.5 py-1 rounded-full bg-zinc-800 text-white border border-white/10 font-bold"
+                    className="font-mono text-xs px-2.5 py-1 rounded-md bg-zinc-800 text-white border border-white/10 font-bold"
                   >
                     {rId}
                   </span>
@@ -108,7 +108,7 @@ export function ConflictsPage() {
                   {conflict.owners.map((owner) => (
                     <span
                       key={owner}
-                      className="px-2.5 py-0.5 rounded-full bg-white/[0.03] border border-white/5 text-[11px] text-zinc-300"
+                      className="px-2.5 py-0.5 rounded-md bg-white/[0.03] border border-white/5 text-[11px] text-zinc-300"
                     >
                       {owner}
                     </span>
@@ -120,7 +120,7 @@ export function ConflictsPage() {
                 <button
                   onClick={() => explainMutation.mutate(conflict)}
                   disabled={explainMutation.isPending}
-                  className="w-full h-8 rounded-full bg-white text-zinc-950 font-medium text-xs hover:bg-zinc-200 transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-[0.98]"
+                  className="w-full h-8 rounded-md bg-white text-zinc-950 font-medium text-xs hover:bg-zinc-200 transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-[0.98]"
                 >
                   <span>{explainMutation.isPending ? "Generating Explanation..." : "Generate Natural Explanation"}</span>
                 </button>
@@ -138,7 +138,7 @@ export function ConflictsPage() {
                     Multilingual synthesis explaining root mathematical cause
                   </p>
                 </div>
-                <p className="text-xs text-zinc-300 leading-relaxed bg-white/[0.02] p-3 rounded-xl border border-white/5">
+                <p className="text-xs text-zinc-300 leading-relaxed bg-white/[0.02] p-3 rounded-md border border-white/5">
                   {explanation.summary}
                 </p>
               </div>
@@ -179,11 +179,11 @@ export function ConflictsPage() {
               ]).map((opt: RelaxOption) => (
                 <div
                   key={opt.id}
-                  className="p-4 rounded-xl border border-white/10 bg-[#16161c]/80 space-y-3 hover:border-white/20 transition-all"
+                  className="p-4 rounded-md border border-white/10 bg-[#16161c]/80 space-y-3 hover:border-white/20 transition-all"
                 >
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                     <span className="font-semibold text-white text-sm">Relax {opt.rule_id}</span>
-                    <span className="px-2.5 py-0.5 rounded-full bg-zinc-800 text-zinc-300 text-[11px] border border-white/5 font-mono">
+                    <span className="px-2.5 py-0.5 rounded-md bg-zinc-800 text-zinc-300 text-[11px] border border-white/5 font-mono">
                       Owner: {opt.approver}
                     </span>
                   </div>
@@ -199,7 +199,7 @@ export function ConflictsPage() {
                     </div>
 
                     <Link to="/app/approvals">
-                      <button className="h-7 px-3 rounded-full bg-white text-zinc-950 font-medium text-xs hover:bg-zinc-200 transition-all flex items-center gap-1">
+                      <button className="h-7 px-3 rounded-md bg-white text-zinc-950 font-medium text-xs hover:bg-zinc-200 transition-all flex items-center gap-1">
                         <span>Sign Approval</span>
                         <ArrowRight size={11} />
                       </button>

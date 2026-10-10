@@ -39,7 +39,7 @@ export function SignInPage() {
         </p>
       </div>
 
-      <div className="mb-5 p-3 rounded-xl bg-white/[0.03] border border-white/5 text-xs text-zinc-400 flex flex-col gap-1 text-left">
+      <div className="mb-5 p-3 rounded-md bg-white/[0.03] border border-white/5 text-xs text-zinc-400 flex flex-col gap-1 text-left">
         <span className="font-semibold text-white">Quick Demo Credentials:</span>
         <div className="flex justify-between items-center text-[11px] font-mono mt-1">
           <span className="text-zinc-300">admin@gecompose.internal</span>
@@ -48,7 +48,7 @@ export function SignInPage() {
       </div>
 
       {error && (
-        <div className="mb-4 p-3 rounded-xl bg-white/[0.04] border border-white/10 text-xs text-zinc-300 text-left">
+        <div className="mb-4 p-3 rounded-md bg-white/[0.04] border border-white/10 text-xs text-zinc-300 text-left">
           {error}
         </div>
       )}
@@ -61,7 +61,7 @@ export function SignInPage() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="coordinator@gecompose.internal"
-            className="w-full h-10 px-3.5 rounded-xl bg-zinc-900 border border-white/10 text-xs text-white placeholder:text-zinc-500 focus:outline-none focus:border-white/20"
+            className="w-full h-10 px-3.5 rounded-md bg-zinc-900 border border-white/10 text-xs text-white placeholder:text-zinc-500 focus:outline-none focus:border-white/20"
             required
           />
         </div>
@@ -81,7 +81,7 @@ export function SignInPage() {
               type={showPassword ? "text" : "password"}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full h-10 px-3.5 pr-10 rounded-xl bg-zinc-900 border border-white/10 text-xs text-white placeholder:text-zinc-500 focus:outline-none focus:border-white/20"
+              className="w-full h-10 px-3.5 pr-10 rounded-md bg-zinc-900 border border-white/10 text-xs text-white placeholder:text-zinc-500 focus:outline-none focus:border-white/20"
               required
             />
             <button
@@ -97,7 +97,7 @@ export function SignInPage() {
         <button
           type="submit"
           disabled={isLoading}
-          className="w-full h-10 rounded-full bg-white text-zinc-950 font-medium text-xs hover:bg-zinc-200 transition-all shadow-sm active:scale-[0.98] disabled:opacity-50 mt-2"
+          className="w-full h-10 rounded-md bg-white text-zinc-950 font-medium text-xs hover:bg-zinc-200 transition-all shadow-sm active:scale-[0.98] disabled:opacity-50 mt-2"
         >
           {isLoading ? "Signing in..." : "Sign in to workspace"}
         </button>

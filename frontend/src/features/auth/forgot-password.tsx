@@ -35,7 +35,7 @@ export function ForgotPasswordPage() {
 
       {submitted ? (
         <div className="space-y-4 text-left">
-          <div className="p-3.5 rounded-xl border border-white/10 bg-white/[0.03] text-xs text-zinc-300">
+          <div className="p-3.5 rounded-md border border-white/10 bg-white/[0.03] text-xs text-zinc-300">
             If an account exists for <strong className="text-white">{email}</strong>, a reset link has been dispatched to your institutional inbox.
           </div>
           <Link
@@ -49,7 +49,7 @@ export function ForgotPasswordPage() {
       ) : (
         <form onSubmit={handleSubmit} className="space-y-4 text-left">
           {error && (
-            <div className="p-3 rounded-xl bg-white/[0.04] border border-white/10 text-xs text-zinc-300">
+            <div className="p-3 rounded-md bg-white/[0.04] border border-white/10 text-xs text-zinc-300">
               {error}
             </div>
           )}
@@ -61,7 +61,7 @@ export function ForgotPasswordPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="coordinator@gecompose.internal"
-              className="w-full h-10 px-3.5 rounded-xl bg-zinc-900 border border-white/10 text-xs text-white placeholder:text-zinc-500 focus:outline-none focus:border-white/20"
+              className="w-full h-10 px-3.5 rounded-md bg-zinc-900 border border-white/10 text-xs text-white placeholder:text-zinc-500 focus:outline-none focus:border-white/20"
               required
             />
           </div>
@@ -69,7 +69,7 @@ export function ForgotPasswordPage() {
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full h-10 rounded-full bg-white text-zinc-950 font-medium text-xs hover:bg-zinc-200 transition-all shadow-sm active:scale-[0.98] disabled:opacity-50 mt-2"
+            className="w-full h-10 rounded-md bg-white text-zinc-950 font-medium text-xs hover:bg-zinc-200 transition-all shadow-sm active:scale-[0.98] disabled:opacity-50 mt-2"
           >
             {isLoading ? "Sending..." : "Send Reset Instructions"}
           </button>

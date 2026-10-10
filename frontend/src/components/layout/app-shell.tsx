@@ -1,15 +1,13 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect } from "react";
 import { Outlet, useLocation, Navigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Sidebar } from "./sidebar";
-import { Topbar } from "./topbar";
+import { Navbar } from "./navbar";
 import { AmbientBackground } from "../background/ambient-background";
 import { pageMotionVariants } from "@/lib/motion";
 import { useAuth } from "@/lib/auth-context";
 
 export function AppShell() {
   const { user, isLoading } = useAuth();
-  const [isCollapsed, setIsCollapsed] = useState(false);
   const location = useLocation();
 
   useEffect(() => {
@@ -31,12 +29,11 @@ export function AppShell() {
   }
 
   return (
-    <div className="relative flex h-screen w-screen overflow-hidden bg-black text-zinc-100 antialiased">
+    <div className="relative flex flex-col h-screen w-screen overflow-hidden bg-black text-zinc-100 antialiased">
       <AmbientBackground />
-      <Sidebar isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} />
-      <div className="flex flex-1 flex-col overflow-hidden relative z-10">
-        <Topbar darkMode={true} setDarkMode={() => {}} />
-        <main className="flex-1 overflow-y-auto p-6 md:p-8">
+      <Navbar />
+      <main className="flex-1 overflow-y-auto relative z-10">
+        <div className="px-6 md:px-10 py-6 md:py-8">
           <AnimatePresence mode="wait">
             <motion.div
               key={location.pathname}
@@ -49,8 +46,8 @@ export function AppShell() {
               <Outlet />
             </motion.div>
           </AnimatePresence>
-        </main>
-      </div>
+        </div>
+      </main>
     </div>
   );
 }

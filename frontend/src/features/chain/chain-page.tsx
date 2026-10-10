@@ -73,7 +73,7 @@ export function ChainPage() {
         <button
           onClick={() => refetch()}
           disabled={isLoading || isRefetching}
-          className="h-8 px-4 rounded-full bg-zinc-900 border border-white/10 text-zinc-300 hover:text-white font-medium text-xs transition-all flex items-center gap-1.5 self-start sm:self-auto"
+          className="h-8 px-4 rounded-md bg-zinc-900 border border-white/10 text-zinc-300 hover:text-white font-medium text-xs transition-all flex items-center gap-1.5 self-start sm:self-auto"
         >
           <RefreshCw className={`w-3.5 h-3.5 ${isRefetching ? "animate-spin" : ""}`} />
           <span>Refresh Log</span>
@@ -81,7 +81,7 @@ export function ChainPage() {
       </div>
 
       {/* Info notice in glass box */}
-      <div className="p-4 rounded-2xl border border-white/10 bg-zinc-900/80 backdrop-blur-xl text-xs text-zinc-400 leading-relaxed flex items-start gap-3">
+      <div className="p-4 rounded-lg border border-white/10 bg-zinc-900/80 backdrop-blur-xl text-xs text-zinc-400 leading-relaxed flex items-start gap-3">
         <ShieldCheck className="w-4 h-4 text-zinc-300 shrink-0 mt-0.5" />
         <div>
           <span className="font-semibold text-white">Zero-Knowledge & Hash Privacy Guarantee:</span> The ConsentLedger contract only stores cryptographic commitments (<code className="font-mono text-zinc-200">rule_hash</code>, <code className="font-mono text-zinc-200">schedule_hash</code>) and authorized institutional signer addresses. PII, names, audio, and draft timetable schedules never leak on-chain.
@@ -90,7 +90,7 @@ export function ChainPage() {
 
       {/* Filters & Metrics */}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-1.5 p-1 rounded-full bg-zinc-900 border border-white/10 text-xs">
+        <div className="flex items-center gap-1.5 p-1 rounded-md bg-zinc-900 border border-white/10 text-xs">
           <span className="text-xs text-zinc-400 px-2 flex items-center gap-1">
             <Filter className="w-3 h-3" /> Event:
           </span>
@@ -98,7 +98,7 @@ export function ChainPage() {
             <button
               key={type}
               onClick={() => setFilterType(type)}
-              className={`text-xs px-3 py-1 rounded-full font-medium transition-all ${
+              className={`text-xs px-3 py-1 rounded-md font-medium transition-all ${
                 filterType === type
                   ? "bg-white text-zinc-950 font-medium shadow-xs"
                   : "text-zinc-400 hover:text-white"
@@ -151,10 +151,10 @@ export function ChainPage() {
                     </button>
 
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="px-2.5 py-0.5 rounded-full bg-zinc-800 text-zinc-300 text-xs font-mono font-medium border border-white/5">
+                      <span className="px-2.5 py-0.5 rounded-md bg-zinc-800 text-zinc-300 text-xs font-mono font-medium border border-white/5">
                         {ev.event}
                       </span>
-                      <span className="font-mono text-xs px-2 py-0.5 rounded-full bg-white/[0.04] text-zinc-400 border border-white/5">
+                      <span className="font-mono text-xs px-2 py-0.5 rounded-md bg-white/[0.04] text-zinc-400 border border-white/5">
                         Block #{ev.block}
                       </span>
                       <span className="font-mono text-xs text-zinc-500">
@@ -166,7 +166,7 @@ export function ChainPage() {
                   {/* Quick preview of key args */}
                   <div className="flex items-center gap-3 text-xs">
                     {ev.args?.rule_id && (
-                      <div className="flex items-center gap-1 font-mono text-xs bg-white/[0.03] px-2 py-0.5 rounded-full border border-white/5">
+                      <div className="flex items-center gap-1 font-mono text-xs bg-white/[0.03] px-2 py-0.5 rounded-md border border-white/5">
                         <span className="text-zinc-500">Rule:</span>
                         <span className="font-medium text-white">{ev.args.rule_id}</span>
                       </div>
@@ -174,7 +174,7 @@ export function ChainPage() {
                     {ev.args?.rule_hash && (
                       <button
                         onClick={() => handleCopy(ev.args.rule_hash, `rule_hash_${i}`)}
-                        className="flex items-center gap-1 font-mono text-[11px] text-zinc-400 hover:text-white bg-white/[0.02] hover:bg-white/5 px-2 py-0.5 rounded-full border border-white/5 transition-colors"
+                        className="flex items-center gap-1 font-mono text-[11px] text-zinc-400 hover:text-white bg-white/[0.02] hover:bg-white/5 px-2 py-0.5 rounded-md border border-white/5 transition-colors"
                         title="Click to copy hash"
                       >
                         <span>{ev.args.rule_hash.slice(0, 10)}...</span>
@@ -184,7 +184,7 @@ export function ChainPage() {
                     {ev.args?.schedule_hash && (
                       <button
                         onClick={() => handleCopy(ev.args.schedule_hash, `sched_hash_${i}`)}
-                        className="flex items-center gap-1 font-mono text-[11px] text-zinc-400 hover:text-white bg-white/[0.02] hover:bg-white/5 px-2 py-0.5 rounded-full border border-white/5 transition-colors"
+                        className="flex items-center gap-1 font-mono text-[11px] text-zinc-400 hover:text-white bg-white/[0.02] hover:bg-white/5 px-2 py-0.5 rounded-md border border-white/5 transition-colors"
                         title="Click to copy schedule hash"
                       >
                         <span>{ev.args.schedule_hash.slice(0, 10)}...</span>
@@ -208,14 +208,14 @@ export function ChainPage() {
                           Decoded Event Arguments
                         </span>
                         <button
-                          className="h-6 px-2.5 rounded-full bg-zinc-900 border border-white/10 text-zinc-400 hover:text-white text-[11px] flex items-center gap-1"
+                          className="h-6 px-2.5 rounded-md bg-zinc-900 border border-white/10 text-zinc-400 hover:text-white text-[11px] flex items-center gap-1"
                           onClick={() => handleCopy(eventPayloadStr, `raw_${i}`)}
                         >
                           {copiedKey === `raw_${i}` ? <Check className="w-3 h-3 text-white" /> : <Copy className="w-3 h-3" />}
                           <span>Copy Raw JSON</span>
                         </button>
                       </div>
-                      <pre className="text-xs font-mono bg-black p-3 rounded-xl border border-white/10 overflow-x-auto text-zinc-300 leading-relaxed max-h-60">
+                      <pre className="text-xs font-mono bg-black p-3 rounded-md border border-white/10 overflow-x-auto text-zinc-300 leading-relaxed max-h-60">
                         {eventPayloadStr}
                       </pre>
                     </motion.div>

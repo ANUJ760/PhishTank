@@ -86,14 +86,14 @@ export function SchedulePage() {
           <button
             onClick={() => solveMutation.mutate(minimalChange)}
             disabled={solveMutation.isPending}
-            className="h-8 px-4 rounded-full bg-white text-zinc-950 font-medium text-xs hover:bg-zinc-200 transition-all flex items-center gap-1.5 shadow-sm active:scale-[0.98] disabled:opacity-50"
+            className="h-8 px-4 rounded-md bg-white text-zinc-950 font-medium text-xs hover:bg-zinc-200 transition-all flex items-center gap-1.5 shadow-sm active:scale-[0.98] disabled:opacity-50"
           >
             <Zap size={13} className="text-zinc-950" />
             <span>{solveMutation.isPending ? "Solving..." : "Solve (CP-SAT)"}</span>
           </button>
 
           <Link to="/app/publish">
-            <button className="h-8 px-4 rounded-full bg-zinc-900 border border-white/10 text-zinc-300 hover:text-white font-medium text-xs transition-all flex items-center gap-1">
+            <button className="h-8 px-4 rounded-md bg-zinc-900 border border-white/10 text-zinc-300 hover:text-white font-medium text-xs transition-all flex items-center gap-1">
               <span>Publish</span>
               <ArrowRight size={12} />
             </button>
@@ -103,7 +103,7 @@ export function SchedulePage() {
 
       {/* Solver Feedback Banner (Clean dark glass, NO green/red boxes) */}
       {lastSolveResult && (
-        <div className="p-3.5 rounded-2xl border border-white/10 bg-zinc-900/80 backdrop-blur-xl text-xs flex items-center justify-between text-zinc-300">
+        <div className="p-3.5 rounded-lg border border-white/10 bg-zinc-900/80 backdrop-blur-xl text-xs flex items-center justify-between text-zinc-300">
           <div className="flex items-center gap-2.5">
             <span className="h-2 w-2 rounded-full bg-zinc-400" />
             <span>
@@ -113,7 +113,7 @@ export function SchedulePage() {
           </div>
           {lastSolveResult.status === "infeasible" && (
             <Link to="/app/conflicts">
-              <button className="h-6 px-3 rounded-full bg-white text-zinc-950 font-medium text-[11px] hover:bg-zinc-200 transition-all">
+              <button className="h-6 px-3 rounded-md bg-white text-zinc-950 font-medium text-[11px] hover:bg-zinc-200 transition-all">
                 Open Conflict Studio
               </button>
             </Link>
@@ -169,7 +169,7 @@ export function SchedulePage() {
                           }`}
                         >
                           {placement ? (
-                            <div className="h-full rounded-xl border border-white/10 bg-[#16161c]/90 p-2.5 shadow-sm flex flex-col justify-between hover:border-white/20 transition-all">
+                            <div className="h-full rounded-md border border-white/10 bg-[#16161c]/90 p-2.5 shadow-sm flex flex-col justify-between hover:border-white/20 transition-all">
                               <div className="flex items-center justify-between">
                                 <span className="font-bold text-white text-xs">{placement.session_id}</span>
                                 <span className="text-[10px] text-zinc-400 font-mono">{placement.room}</span>
@@ -179,7 +179,7 @@ export function SchedulePage() {
                               </div>
                             </div>
                           ) : (
-                            <div className="h-full rounded-xl border border-dashed border-white/5 flex items-center justify-center text-zinc-600 text-[10px]">
+                            <div className="h-full rounded-md border border-dashed border-white/5 flex items-center justify-center text-zinc-600 text-[10px]">
                               Free
                             </div>
                           )}
@@ -207,7 +207,7 @@ export function SchedulePage() {
 
           {selectedSession ? (
             <div className="space-y-4">
-              <div className="p-3 rounded-xl bg-white/[0.02] border border-white/10">
+              <div className="p-3 rounded-md bg-white/[0.02] border border-white/10">
                 <span className="text-[10px] text-zinc-400 uppercase tracking-wider block">Inspecting Session</span>
                 <span className="text-sm font-bold text-white font-mono mt-0.5 block">{selectedSession}</span>
               </div>
@@ -220,10 +220,10 @@ export function SchedulePage() {
                   <p className="text-xs text-zinc-500">No explicit hard constraints pinned this specific session.</p>
                 ) : (
                   whyRules.map((rule) => (
-                    <div key={rule.id} className="p-2.5 rounded-xl border border-white/5 bg-white/[0.02] text-xs space-y-1">
+                    <div key={rule.id} className="p-2.5 rounded-md border border-white/5 bg-white/[0.02] text-xs space-y-1">
                       <div className="flex items-center justify-between">
                         <span className="font-mono font-bold text-zinc-200">{rule.id}</span>
-                        <span className="px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-300 text-[10px]">
+                        <span className="px-2 py-0.5 rounded-md bg-zinc-800 text-zinc-300 text-[10px]">
                           {rule.type}
                         </span>
                       </div>
