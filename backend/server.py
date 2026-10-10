@@ -22,6 +22,11 @@ from backend.http.app import app
 # Direct Convenience Endpoints (for Streamlit, direct curl, and testing)
 # -------------------------------------------------------------------------
 
+@app.get("/health")
+async def health_endpoint():
+    return {"status": "ok", "service": "gecompose-backend"}
+
+
 @app.get("/", response_class=HTMLResponse)
 async def index():
     h = api.health().items
