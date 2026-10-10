@@ -1,0 +1,217 @@
+import {
+  ChainEvent,
+  DashboardSummary,
+  Explanation,
+  HealthReport,
+  IngestSheetResult,
+  PublishResult,
+  Roster,
+  Rule,
+  Schedule,
+  ScoreboardResult,
+  SolveResult,
+  User,
+  VerifyResult,
+} from "@/types/api";
+
+const BASE_URL = "/api/v1";
+
+export class ApiError extends Error {
+  status: number;
+  data: any;
+
+  constructor(status: number, message: string, data?: any) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+    this.data = data;
+  }
+}
+
+async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const url = `${BASE_URL}${path}`;
+  const headers = new Headers(options.headers || {});
+
+  if (!(options.body instanceof FormData) && !headers.has("Content-Type") && options.body) {
+    headers.set("Content-Type", "application/json");
+  }
+
+  const res = await fetch(url, {
+    credentials: "include",
+    ...options,
+    headers,
+  });
+
+  if (res.status === 204) {
+    return {} as T;
+  }
+
+  let data: any = null;
+  const contentType = res.headers.get("content-type") || "";
+  if (contentType.includes("application/json")) {
+    try {
+      data = await res.json();
+    } catch {
+      data = null;
+    }
+  } else {
+    data = await res.text();
+  }
+
+  if (!res.ok) {
+    const message = (data && typeof data === "object" && data.detail) || res.statusText || `Request failed (${res.status})`;
+    throw new ApiError(res.status, message, data);
+  }
+
+  return data as T;
+}
+
+export const api = {
+  // Auth
+  auth: {
+    me: () => request<User>("/auth/me"),
+    signIn: (email: string, password: string) =>
+      request<User>("/auth/sign-in", {
+        method: "POST",
+        body: JSON.stringify({ email, password }),
+      }),
+    signUp: (name: string, email: string, password: string) =>
+      request<User>("/auth/sign-up", {
+        method: "POST",
+        body: JSON.stringify({ name, email, password }),
+      }),
+    signOut: () =>
+      request<void>("/auth/sign-out", {
+        method: "POST",
+      }),
+    forgotPassword: (email: string) =>
+      request<{ message: string }>("/auth/forgot-password", {
+        method: "POST",
+        body: JSON.stringify({ email }),
+      }),
+    resetPassword: (token: string, new_password: string) =>
+      request<void>("/auth/reset-password", {
+        method: "POST",
+        body: JSON.stringify({ token, new_password }),
+      }),
+  },
+
+  // Health & Summary
+  health: () => request<HealthReport>("/health"),
+  dashboardSummary: () => request<DashboardSummary>("/dashboard/summary"),
+
+  // Roster & Rules
+  roster: () => request<Roster>("/roster"),
+  rules: {
+    list: (status?: string) => request<Rule[]>(`/rules${status ? `?status=${status}` : ""}`),
+    edit: (id: string, params?: Record<string, any>, owner?: string) =>
+      request<Rule>(`/rules/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ params, owner }),
+      }),
+    confirm: (id: string) =>
+      request<Rule>(`/rules/${id}/confirm`, {
+        method: "POST",
+      }),
+    reject: (id: string) =>
+      request<Rule>(`/rules/${id}/reject`, {
+        method: "POST",
+      }),
+  },
+
+  // Intake
+  intake: {
+    text: (text: string) =>
+      request<Rule[]>("/intake/text", {
+        method: "POST",
+        body: JSON.stringify({ text }),
+      }),
+    audio: (file: File) => {
+      const fd = new FormData();
+      fd.append("file", file);
+      return request<Rule[]>("/intake/audio", {
+        method: "POST",
+        body: fd,
+      });
+    },
+    image: (file: File) => {
+      const fd = new FormData();
+      fd.append("file", file);
+      return request<Rule[]>("/intake/image", {
+        method: "POST",
+        body: fd,
+      });
+    },
+    sheet: (file: File) => {
+      const fd = new FormData();
+      fd.append("file", file);
+      return request<IngestSheetResult>("/intake/sheet", {
+        method: "POST",
+        body: fd,
+      });
+    },
+  },
+
+  // Scheduling
+  solve: (minimal_change: boolean = true) =>
+    request<SolveResult>("/solve", {
+      method: "POST",
+      body: JSON.stringify({ minimal_change }),
+    }),
+  schedules: {
+    latest: () => request<Schedule>("/schedules/latest"),
+    pending: () => request<Schedule>("/schedules/pending"),
+    whyCell: (sessionId: string) => request<Rule[]>(`/schedule/why/${sessionId}`),
+  },
+
+  // Conflict Resolution
+  conflicts: {
+    explain: (conflict: any) =>
+      request<Explanation>("/conflicts/explain", {
+        method: "POST",
+        body: JSON.stringify({ conflict }),
+      }),
+    approve: (optionId: string, as_user: string) =>
+      request<{ ok: boolean; tx_hash?: string; error?: string }>(`/options/${optionId}/approve`, {
+        method: "POST",
+        body: JSON.stringify({ as_user }),
+      }),
+    apply: (optionId: string) =>
+      request<Rule>(`/options/${optionId}/apply`, {
+        method: "POST",
+      }),
+  },
+
+  // Publish & Verify
+  publish: () =>
+    request<PublishResult>("/publish", {
+      method: "POST",
+    }),
+  verify: (file?: File, rawJson?: string) => {
+    if (file) {
+      const fd = new FormData();
+      fd.append("file", file);
+      return request<VerifyResult>("/verify", {
+        method: "POST",
+        body: fd,
+      });
+    }
+    return request<VerifyResult>(`/verify?raw_json=${encodeURIComponent(rawJson || "")}`, {
+      method: "POST",
+    });
+  },
+
+  // Scoreboard & Chain
+  scoreboard: (runs: number = 5) =>
+    request<ScoreboardResult>("/scoreboard", {
+      method: "POST",
+      body: JSON.stringify({ runs }),
+    }),
+  chainEvents: () => request<{ events: ChainEvent[] }>("/chain/events"),
+
+  // Demo management
+  demo: {
+    seed: () => request<{ ok: boolean; message: string }>("/demo/seed", { method: "POST" }),
+    reset: () => request<{ ok: boolean; message: string }>("/demo/reset", { method: "POST" }),
+  },
+};

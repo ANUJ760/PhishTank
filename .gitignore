@@ -8,3 +8,5 @@ models/
 contracts/out/
 contracts/cache/
 contracts/lib/
+frontend/node_modules/
+frontend/dist/

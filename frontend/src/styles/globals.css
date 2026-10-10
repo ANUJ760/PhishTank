@@ -1,0 +1,117 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 0 0% 4%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 4%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 4%;
+    --primary: 221 83% 53%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+    --muted: 210 20% 98%;
+    --muted-foreground: 0 0% 45%;
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 0 0% 90%;
+    --input: 0 0% 90%;
+    --ring: 221 83% 53%;
+    --radius: 0.625rem;
+  }
+
+  .dark {
+    --background: 240 10% 4%;
+    --foreground: 0 0% 98%;
+    --card: 240 10% 7%;
+    --card-foreground: 0 0% 98%;
+    --popover: 240 10% 7%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 217 91% 68%;
+    --primary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 240 6% 10%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 240 6% 10%;
+    --muted-foreground: 240 5% 65%;
+    --accent: 240 6% 10%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 6% 16%;
+    --input: 240 6% 16%;
+    --ring: 217 91% 68%;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
+
+/* Ambient Subtle Background */
+.ambient-canvas {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.ambient-canvas::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(currentColor 0.6px, transparent 0.6px);
+  background-size: 26px 26px;
+  opacity: 0.025;
+}
+
+.ambient-orb {
+  position: absolute;
+  right: -100px;
+  top: 14%;
+  width: 380px;
+  height: 380px;
+  border-radius: 9999px;
+  background: rgba(37, 99, 235, 0.035);
+  filter: blur(90px);
+  animation: ambient-drift 30s ease-in-out infinite alternate;
+}
+
+.ambient-orb-2 {
+  position: absolute;
+  left: -80px;
+  bottom: 10%;
+  width: 320px;
+  height: 320px;
+  border-radius: 9999px;
+  background: rgba(96, 165, 250, 0.025);
+  filter: blur(85px);
+  animation: ambient-drift-reverse 35s ease-in-out infinite alternate;
+}
+
+@keyframes ambient-drift {
+  from { transform: translate3d(0, 0, 0); }
+  to { transform: translate3d(-24px, 16px, 0); }
+}
+
+@keyframes ambient-drift-reverse {
+  from { transform: translate3d(0, 0, 0); }
+  to { transform: translate3d(20px, -18px, 0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ambient-orb, .ambient-orb-2 {
+    animation: none !important;
+  }
+}
