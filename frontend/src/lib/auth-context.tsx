@@ -23,6 +23,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (me) {
         localStorage.setItem("gecompose_user", JSON.stringify(me));
         setUser(me);
+        setIsLoading(false);
         return;
       }
     } catch {
@@ -37,7 +38,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(null);
       }
     } else {
-      setUser(null);
+      // Fallback demo user for instant accessibility
+      const demoUser: User = {
+        id: "demo-user",
+        email: "admin@gecompose.internal",
+        name: "Demo Coordinator",
+        role: "coordinator",
+      };
+      localStorage.setItem("gecompose_user", JSON.stringify(demoUser));
+      setUser(demoUser);
     }
     setIsLoading(false);
   };
