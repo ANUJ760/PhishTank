@@ -196,10 +196,21 @@ def _extract_file_preview(filename: str, content: bytes) -> tuple[str, str]:
             return "text", f"Error decoding text: {e}"
 
     if ext in (".png", ".jpg", ".jpeg", ".webp"):
-        return "image", f"Visual asset: {filename} ({ext.upper()}, {size} bytes)"
+        try:
+            from PIL import Image
+            with Image.open(io.BytesIO(content)) as im:
+                return "image", f"Visual schedule/board image: {filename} ({im.size[0]}x{im.size[1]} {im.format or ext.upper().lstrip('.')}, {size} bytes)"
+        except Exception:
+            return "image", f"Visual asset: {filename} ({ext.upper()}, {size} bytes)"
 
     if ext in (".wav", ".mp3", ".ogg", ".m4a"):
-        return "audio", f"Audio memo: {filename} ({ext.upper()}, {size} bytes)"
+        try:
+            import wave
+            with wave.open(io.BytesIO(content), "rb") as wf:
+                duration = wf.getnframes() / float(wf.getframerate())
+                return "audio", f"Voice memo: {filename} (WAV {duration:.1f}s, {wf.getframerate()}Hz {wf.getnchannels()}ch, {size} bytes)"
+        except Exception:
+            return "audio", f"Audio memo: {filename} ({ext.upper()}, {size} bytes)"
 
     return "binary", f"Binary document: {filename} ({size} bytes)"
 
@@ -831,8 +842,8 @@ def ingest_data_dump(
     # 1. Parse and extract previews from all dumped files
     for filename, content in files:
         file_type, preview = _extract_file_preview(filename, content)
-        if file_type == "binary" or file_type in {"image", "audio"}:
-            raise ValueError(f"Cannot read timetable data from {filename}. Upload a text-based PDF, Excel, CSV, or text file.")
+        if file_type == "binary":
+            raise ValueError(f"Cannot read timetable data from {filename}. Upload a text-based PDF, Excel, CSV, text file, image (PNG, JPG), or voice audio (WAV).")
         if file_type == "pdf":
             faculty = _pdf_faculty(preview)
             if not faculty:
@@ -862,8 +873,12 @@ def ingest_data_dump(
             )
         )
         db.save_upload(filename, content)
-        if file_type != "pdf":
+        if file_type not in {"pdf", "image", "audio"}:
             dump_context_parts.append(f"### FILE: {filename} (Type: {file_type}, Size: {len(content)} bytes)\n{preview}\n")
+        elif file_type == "image":
+            dump_context_parts.append(f"### VISUAL ASSET: {filename}\n{preview}\n")
+        elif file_type == "audio":
+            dump_context_parts.append(f"### VOICE AUDIO MEMO: {filename}\n{preview}\n")
         else:
             dump_context_parts.append(f"### REFERENCE TIMETABLE: {filename}\nFaculty were extracted into the known-entity list. Its class placements are reference data, not new constraint requests.\n")
 
@@ -883,6 +898,58 @@ def ingest_data_dump(
         files=files,
         allow_new_entities=not has_timetable,
     )
+
+    # 3b. Extract rules from visual (image) and audio (voice) files
+    for filename, content in files:
+        f_type, _ = _extract_file_preview(filename, content)
+        if f_type == "image":
+            try:
+                from backend.intake.voice_photo import extract_rules_from_image
+                img_drafts = extract_rules_from_image(content, filename, roster)
+                for d in img_drafts:
+                    if d.type == "teacher_unavailable" and d.params.get("teacher"):
+                        _ensure_teacher(roster, d.params["teacher"])
+                    elif d.type == "room_unavailable" and d.params.get("room"):
+                        _ensure_room(roster, d.params["room"])
+                    elif d.type in {"pin_session", "only_qualified"} and d.params.get("session_id"):
+                        _ensure_session(roster, d.params["session_id"], d.params.get("teachers"))
+                    deterministic_drafts.append(
+                        ExtractedRuleDraft(
+                            type=d.type,
+                            params=d.params,
+                            owner=config.DEFAULT_OWNER.get(d.type) or d.params.get("teacher") or "Visual Inspection",
+                            evidence_ref=f"{filename}@{d.evidence_ref or 'visual'}",
+                        )
+                    )
+                processing.append({"stage": f"Visual intake ({filename})", "status": "completed", "model": config.INTAKE_MODEL})
+            except Exception as exc:
+                log.warning("Image intake failed for %s: %s", filename, exc)
+                source_warnings.append(f"Visual rule extraction for {filename}: {exc}")
+                processing.append({"stage": f"Visual intake ({filename})", "status": "fallback", "model": config.INTAKE_MODEL})
+        elif f_type == "audio":
+            try:
+                from backend.intake.voice_photo import extract_rules_from_audio
+                aud_drafts = extract_rules_from_audio(content, filename, roster)
+                for d in aud_drafts:
+                    if d.type == "teacher_unavailable" and d.params.get("teacher"):
+                        _ensure_teacher(roster, d.params["teacher"])
+                    elif d.type == "room_unavailable" and d.params.get("room"):
+                        _ensure_room(roster, d.params["room"])
+                    elif d.type in {"pin_session", "only_qualified"} and d.params.get("session_id"):
+                        _ensure_session(roster, d.params["session_id"], d.params.get("teachers"))
+                    deterministic_drafts.append(
+                        ExtractedRuleDraft(
+                            type=d.type,
+                            params=d.params,
+                            owner=config.DEFAULT_OWNER.get(d.type) or d.params.get("teacher") or "Voice Memo",
+                            evidence_ref=f"{filename}@{d.evidence_ref or 'audio'}",
+                        )
+                    )
+                processing.append({"stage": f"Voice intake ({filename})", "status": "completed", "model": config.INTAKE_MODEL})
+            except Exception as exc:
+                log.warning("Audio intake failed for %s: %s", filename, exc)
+                source_warnings.append(f"Voice memo extraction for {filename}: {exc}")
+                processing.append({"stage": f"Voice intake ({filename})", "status": "fallback", "model": config.INTAKE_MODEL})
 
     # 4. Live timetable context for Gemma intelligence
     placements_summary = []

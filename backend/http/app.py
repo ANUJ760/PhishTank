@@ -341,9 +341,10 @@ async def reject_rule(
 
 
 @app.post("/api/v1/intake/text")
+@app.post("/intake/text")
 async def intake_text(
     body: TextIntakeRequest,
-    user: UserResponse = Depends(require_user),
+    user: UserResponse = Depends(get_user_or_demo),
 ):
     try:
         rules = await run_in_threadpool(api.ingest_text, body.text)
@@ -353,9 +354,10 @@ async def intake_text(
 
 
 @app.post("/api/v1/intake/audio")
+@app.post("/intake/audio")
 async def intake_audio(
     file: UploadFile = File(...),
-    user: UserResponse = Depends(require_user),
+    user: UserResponse = Depends(get_user_or_demo),
 ):
     content = await file.read()
     try:
@@ -366,9 +368,10 @@ async def intake_audio(
 
 
 @app.post("/api/v1/intake/image")
+@app.post("/intake/image")
 async def intake_image(
     file: UploadFile = File(...),
-    user: UserResponse = Depends(require_user),
+    user: UserResponse = Depends(get_user_or_demo),
 ):
     content = await file.read()
     try:

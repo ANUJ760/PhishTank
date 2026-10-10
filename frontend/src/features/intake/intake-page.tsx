@@ -180,8 +180,18 @@ export function IntakePage() {
     if (["xlsx", "xls", "csv"].includes(ext || "")) return <FileSpreadsheet size={14} className="text-emerald-400" />;
     if (["wav", "mp3", "ogg", "m4a"].includes(ext || "")) return <Mic size={14} className="text-amber-400" />;
     if (["png", "jpg", "jpeg", "webp"].includes(ext || "")) return <ImageIcon size={14} className="text-blue-400" />;
-    if (["json", "xml", "csv"].includes(ext || "")) return <FileCode size={14} className="text-purple-400" />;
+    if (["json", "xml"].includes(ext || "")) return <FileCode size={14} className="text-purple-400" />;
     return <FileText size={14} className="text-zinc-400" />;
+  };
+
+  const getFileTypeLabel = (filename: string) => {
+    const ext = filename.split(".").pop()?.toLowerCase();
+    if (["png", "jpg", "jpeg", "webp"].includes(ext || "")) return "Visual Asset (PNG/JPG)";
+    if (["wav", "mp3", "ogg", "m4a"].includes(ext || "")) return "Voice Memo (WAV)";
+    if (["xlsx", "xls"].includes(ext || "")) return "Excel Workbook";
+    if (["csv", "tsv"].includes(ext || "")) return "CSV Table";
+    if (ext === "pdf") return "PDF Layout";
+    return "Text Document";
   };
 
   // Convert raw rules to rich cards if rule_cards not provided
@@ -362,14 +372,29 @@ export function IntakePage() {
               <p className="text-base font-medium text-zinc-200">
                 Drag and drop files here, or <span className="text-white underline">browse from your computer</span>
               </p>
-              <p className="text-sm text-zinc-500">
-                Upload a text-based PDF, Excel, or CSV timetable.
+              <p className="text-sm text-zinc-400">
+                Supports timetable & whiteboard images (PNG, JPG), voice dictations (WAV, MP3), Excel, CSV, or PDF timetables.
               </p>
+              <div className="flex flex-wrap items-center justify-center gap-2 pt-2 text-xs text-zinc-400">
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white/5 border border-white/10 text-zinc-300">
+                  <ImageIcon size={12} className="text-blue-400" /> Image (PNG, JPG, WebP)
+                </span>
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white/5 border border-white/10 text-zinc-300">
+                  <Mic size={12} className="text-amber-400" /> Voice Memo (WAV, MP3)
+                </span>
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white/5 border border-white/10 text-zinc-300">
+                  <FileSpreadsheet size={12} className="text-emerald-400" /> Excel & CSV Workbooks
+                </span>
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white/5 border border-white/10 text-zinc-300">
+                  <FileText size={12} className="text-purple-400" /> PDF Timetables & Text Memos
+                </span>
+              </div>
             </div>
             <input
               ref={fileInputRef}
               type="file"
               multiple
+              accept=".png,.jpg,.jpeg,.webp,.wav,.mp3,.ogg,.m4a,.pdf,.xlsx,.xls,.csv,.tsv,.txt,.md,.json"
               onChange={handleFilesSelected}
               className="hidden"
             />
@@ -378,7 +403,7 @@ export function IntakePage() {
           {/* Staged File List */}
           {files.length > 0 && (
             <div className="space-y-2 pt-2">
-              <span className="text-sm font-medium text-zinc-400 block">Attached files</span>
+              <span className="text-sm font-medium text-zinc-400 block">Attached files ({files.length})</span>
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
                 {files.map((file, idx) => (
                   <div
@@ -389,7 +414,9 @@ export function IntakePage() {
                       {getFileIcon(file.name)}
                       <div className="truncate">
                         <p className="font-medium text-zinc-200 truncate text-sm">{file.name}</p>
-                        <p className="text-sm text-zinc-500">{formatFileSize(file.size)}</p>
+                        <p className="text-xs text-zinc-500">
+                          {formatFileSize(file.size)} • {getFileTypeLabel(file.name)}
+                        </p>
                       </div>
                     </div>
                     <button
@@ -765,8 +792,13 @@ export function IntakePage() {
                             <span className="text-sm font-semibold text-zinc-400 uppercase tracking-wider">
                               Rule details
                             </span>
-                            <span className="text-sm font-mono text-zinc-500">
-                              Ref: {card.evidence_ref || "Direct memo"}
+                            <span className="text-sm font-mono text-zinc-400 flex items-center gap-1.5">
+                              {card.evidence_ref?.match(/\.(png|jpg|jpeg|webp)/i) ? (
+                                <ImageIcon size={13} className="text-blue-400 shrink-0" />
+                              ) : card.evidence_ref?.match(/\.(wav|mp3|ogg|m4a)/i) ? (
+                                <Mic size={13} className="text-amber-400 shrink-0" />
+                              ) : null}
+                              <span>Ref: {card.evidence_ref || "Direct memo"}</span>
                             </span>
                           </div>
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-base">
