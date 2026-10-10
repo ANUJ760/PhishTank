@@ -532,12 +532,164 @@ Run the Phase 4 runnable demo:
 python3 -m venv .venv
 .venv/bin/pip install -e .
 
-# Run the complete test suite (93 passing tests)
+# Run the complete test suite (111 passing tests)
 .venv/bin/pytest -v
 ```
 
 ---
 
+### AI Incident Investigation Engine (Phase 5)
+
+When operational disruptions are complex or their root causes are uncertain,
+GeCompose provides a **deterministic, evidence-driven investigation engine**
+that connects distributed evidence, evaluates competing hypotheses, identifies
+gaps in observational coverage, and proposes targeted diagnostic tests — all
+without any LLM, database, or external integration.
+
+#### Architecture
+
+```
+Incident + Evidence + Hypotheses
+         │
+         ▼
+  IncidentInvestigator
+  ├── evaluate_hypothesis()        — deterministic plausibility scoring
+  ├── identify_missing_evidence()  — source-coverage gap detection
+  └── propose_diagnostic_tests()   — pairwise discriminating probes
+         │
+         ▼
+  InvestigationReport
+  ├── hypotheses           (evaluated, sorted by plausibility)
+  ├── leading_hypothesis_id
+  ├── confidence_assessment
+  ├── missing_evidence     (list[str] — identified data gaps)
+  ├── proposed_tests       (list[DiagnosticTest])
+  └── statistics
+```
+
+#### Key design decisions
+
+| Decision | Rationale |
+|---|---|
+| **Plausibility scores are heuristic** | Scores (0.0–0.95) reflect evidence count and source diversity — never ground truth. The engine never reports 1.0. |
+| **Contradiction always overrides support** | Any single contradicting evidence link immediately refutes a hypothesis; no amount of support can override it. |
+| **Two-source corroboration for STRONGLY_SUPPORTED** | Requires `plausibility ≥ 0.75` AND evidence from at least 2 distinct source types. |
+| **Hypothesis generation is interface-decoupled** | `synthesize_candidate_hypotheses()` uses heuristic archetypes today; the interface is ready for future LLM integration. |
+| **No OR-Tools dependency** | The investigation engine is entirely independent of the CP-SAT solver. |
+
+#### Public API
+
+```python
+from gecompose import (
+    Evidence, EvidenceSourceType, EvidenceRelationshipType,
+    Hypothesis, Incident, IncidentSeverity, IncidentStatus,
+    investigate_incident, serialize_result,
+)
+
+incident = Incident(
+    id="INC-001",
+    title="Payment Service — HTTP 504",
+    affected_component="payment-service",
+    severity=IncidentSeverity.HIGH,
+    status=IncidentStatus.INVESTIGATING,
+    start_time="2026-10-10T13:15:00Z",
+)
+
+evidence = [
+    Evidence(
+        id="EVD-001",
+        source_type=EvidenceSourceType.LOGS,
+        summary="HikariPool-1: Connection not available after 30000ms. Pool 10/10 active.",
+        source_ref="payment-service/app.log",
+        reliability=0.95,
+    ),
+    Evidence(
+        id="EVD-002",
+        source_type=EvidenceSourceType.ALERTS,
+        summary="CRITICAL — payment-db active_connections=98/100 (98%).",
+        source_ref="alertmanager/payment-db",
+    ),
+]
+
+hypotheses = [
+    Hypothesis(
+        id="HYP-001",
+        title="Database connection-pool exhaustion",
+        root_cause_category="database",
+        evidence_links=[
+            {"evidence_id": "EVD-001", "relationship": EvidenceRelationshipType.SUPPORTS, "weight": 1.0},
+            {"evidence_id": "EVD-002", "relationship": EvidenceRelationshipType.SUPPORTS, "weight": 1.0},
+        ],
+    ),
+]
+
+# Run full investigation — returns structured InvestigationReport
+report = investigate_incident(incident=incident, evidence=evidence, hypotheses=hypotheses)
+
+print(report.leading_hypothesis_id)   # "HYP-001"
+print(report.confidence_assessment)   # human-readable verdict
+print(report.missing_evidence)        # list of identified data gaps
+print(len(report.proposed_tests))     # number of diagnostic probes
+
+# Fully serializable to JSON
+import json
+print(json.dumps(serialize_result(report), indent=2, default=str))
+```
+
+#### Hypothesis auto-synthesis
+
+If no explicit hypotheses are provided, `investigate_incident()` automatically
+synthesizes three archetypal candidates from incident context and evidence:
+
+1. **Resource exhaustion** — capacity, CPU, memory, or connection-pool saturation
+2. **Upstream dependency failure** — upstream service, gateway, or network timeout
+3. **Config/deployment regression** — recent change introduced a defect
+
+```python
+# Let the engine synthesize hypotheses automatically
+report = investigate_incident(incident=incident, evidence=evidence)
+```
+
+#### Missing evidence detection
+
+The engine checks whether all three primary source types are covered and flags
+any unverified hypothesis assumptions and open questions:
+
+- No `METRICS` evidence → flags missing quantitative telemetry
+- No `LOGS` evidence → flags missing application trace logs
+- No `ALERTS` evidence → flags missing monitoring history
+- Unverified `Hypothesis.assumptions` → listed as explicit data gaps
+
+#### Runnable demo
+
+```bash
+.venv/bin/python examples/demo_investigation.py
+```
+
+The demo models a real payment-service outage with 7 evidence items from logs,
+alerts, and metrics across 3 competing hypotheses. It prints hypothesis
+verdicts, missing evidence gaps, proposed diagnostic tests, and full JSON
+serialization.
+
+#### Modules introduced in Phase 5
+
+| Module | Purpose |
+|---|---|
+| [`gecompose/investigation_models.py`](gecompose/investigation_models.py) | `Incident`, `Evidence`, `EvidenceLink`, `Hypothesis`, `DiagnosticTest`, `InvestigationReport` and all enums |
+| [`gecompose/investigation.py`](gecompose/investigation.py) | `evaluate_hypothesis()`, `IncidentInvestigator` engine |
+| [`examples/demo_investigation.py`](examples/demo_investigation.py) | Runnable end-to-end demonstration |
+| `tests/test_investigation_models.py` | 5 unit tests — model construction and computed fields |
+| `tests/test_investigation_analysis.py` | 7 unit tests — corroboration, refutation, and ranking |
+| `tests/test_investigation_workflow.py` | 6 end-to-end integration tests |
+
+#### Limitations
+
+- Plausibility scores are **heuristic**, not statistically calibrated.
+- Hypothesis synthesis uses **keyword-based archetypes** — accuracy improves with future LLM integration via the existing `synthesize_candidate_hypotheses()` interface.
+- Evidence relationship weights are caller-supplied; the engine does not infer weight from content.
+- No persistence layer — all state is held in memory and must be re-run per session.
+
+---
 
 ### Project and Team Details
 
