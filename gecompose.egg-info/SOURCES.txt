@@ -1,0 +1,16 @@
+README.md
+pyproject.toml
+gecompose/__init__.py
+gecompose/exceptions.py
+gecompose/models.py
+gecompose/solver.py
+gecompose/validator.py
+gecompose.egg-info/PKG-INFO
+gecompose.egg-info/SOURCES.txt
+gecompose.egg-info/dependency_links.txt
+gecompose.egg-info/requires.txt
+gecompose.egg-info/top_level.txt
+tests/test_edge_cases.py
+tests/test_models.py
+tests/test_solver.py
+tests/test_validator.py
