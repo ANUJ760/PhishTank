@@ -365,6 +365,32 @@ def _extract_deterministic_rules(
             seen_keys.add(key)
             extracted.append(d)
 
+    # 0. Layout-aware spreadsheet ingestion using sandbox parser synthesis and layout caching
+    for filename, content in files:
+        ext = Path(filename).suffix.lower()
+        if ext in (".xlsx", ".xls", ".csv") and len(content) > 0:
+            try:
+                temp_path = config.UPLOAD_DIR / f"dump_staging_{Path(filename).name}"
+                temp_path.parent.mkdir(parents=True, exist_ok=True)
+                temp_path.write_bytes(content)
+                try:
+                    from backend.intake import sheet_parser
+                    ingest_res = sheet_parser.ingest_sheet(temp_path, filename, roster=roster)
+                    for rule in ingest_res.rules:
+                        ref_str = rule.evidence[0].ref if rule.evidence else f"{filename}!sheet"
+                        add_draft(
+                            ExtractedRuleDraft(
+                                type=rule.type,
+                                params=rule.params,
+                                owner=rule.owner,
+                                evidence_ref=ref_str,
+                            )
+                        )
+                finally:
+                    temp_path.unlink(missing_ok=True)
+            except Exception as exc:
+                log.info("Layout parser pass skipped for %s (%s); falling back to direct table parser", filename, exc)
+
     # 1. Parse all tabular files (CSV, TSV, XLSX, XLS, JSON)
     for filename, content in files:
         tables = _extract_tables_from_file(filename, content)
@@ -868,7 +894,7 @@ CONSOLIDATED DATA DUMP:
                 schema=DataDumpLLMOut,
                 retries=1,
                 timeout_s=3.0,
-                options={"num_predict": 350, "temperature": 0.1},
+                options={"num_predict": 350, "temperature": 0.1, "think": False},
                 fallback_to_mock=False,
             )
         except Exception as exc:
@@ -984,6 +1010,41 @@ CONSOLIDATED DATA DUMP:
         rule_cards.append(card)
         if card.has_conflict and card.timetable_impact not in warnings_list:
             warnings_list.append(card.timetable_impact)
+
+    # 7b. Deep conflict diagnosis & resolution reasoning using Gemma 12B
+    conflicting_cards = [c for c in rule_cards if c.has_conflict]
+    if conflicting_cards:
+        try:
+            conflict_descriptions = [
+                f"Rule {c.id} ({c.type}): {c.headline} - Conflict Impact: {c.timetable_impact}"
+                for c in conflicting_cards[:4]
+            ]
+            conflict_text = "\n".join(conflict_descriptions)
+            from backend.llm.prompts import explain_conflict
+            from backend.models import ExplainOut
+
+            reason_res = call_json(
+                fn="explain_conflict",
+                tier="reason",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "You are a timetable conflict diagnosis engine. Explain rule conflicts clearly and propose bounded alternative solutions.",
+                    },
+                    {"role": "user", "content": explain_conflict(conflict_text)},
+                ],
+                schema=ExplainOut,
+                retries=1,
+                timeout_s=15.0,
+                options={"num_predict": 400, "temperature": 0.1, "think": False},
+                fallback_to_mock=False,
+            )
+            if reason_res and reason_res.summary:
+                insights_list.append(f"Gemma 12B Conflict Analysis: {reason_res.summary}")
+                for opt in reason_res.options[:2]:
+                    insights_list.append(f"Suggested Resolution Option: {opt.description}")
+        except Exception as exc:
+            log.info("12B conflict reasoning pass skipped or timed out (%s)", exc)
 
     db.log_audit_event(
         "DataDumpIngested",

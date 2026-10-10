@@ -159,8 +159,13 @@ class GemmaService:
         ollama_messages = self._convert_openai_messages_to_ollama(messages)
 
         merged_options = {"temperature": temperature}
+        think_flag = False
         if options:
             merged_options.update(options)
+            if "think" in merged_options:
+                think_flag = bool(merged_options.pop("think"))
+            elif not format_json:
+                think_flag = True
 
         payload: dict[str, Any] = {
             "model": model,
@@ -170,6 +175,9 @@ class GemmaService:
         }
         if format_json:
             payload["format"] = "json"
+            payload["think"] = think_flag
+        elif "think" in (options or {}):
+            payload["think"] = think_flag
 
         data_bytes = json.dumps(payload).encode("utf-8")
         req = urllib.request.Request(
@@ -197,6 +205,11 @@ class GemmaService:
         elapsed_ms = int((time.monotonic() - start) * 1000)
         message_obj = result.get("message", {})
         content = message_obj.get("content", "")
+        if not content and message_obj.get("thinking"):
+            thinking_str = message_obj.get("thinking", "")
+            extracted = clean_json_str(thinking_str)
+            if extracted.startswith("{") or extracted.startswith("["):
+                content = extracted
 
         usage = {
             "prompt_tokens": result.get("prompt_eval_count", 0),
