@@ -1,0 +1,1 @@
+{"code":"import pandas as pd\ndef parse(path):\n    df = pd.read_excel(path, header=0)\n    out = []\n    for i, row in df.iterrows():\n        names = [t.strip() for t in str(row.iloc[1]).replace(';', ',').split(',') if t.strip()]\n        out.append({'course': str(row.iloc[0]).strip(), 'teachers': names, 'source_cell': f'B{i + 2}'})\n    return out\n"}

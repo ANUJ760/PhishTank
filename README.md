@@ -3,27 +3,25 @@
 </p>
 
 <p align="center">
-  <b>Multimodal Constraint Intake &bull; Solver Guaranteed Schedules &bull; On-Chain Consent</b><br>
+  <b>Multimodal Constraint Intake &bull; Solver Guaranteed Schedules</b><br>
   <sub>Hacktoberfest Hack Day</sub>
 </p>
 
 <p align="center">
   <a href="https://ai.google.dev/gemma"><img src="https://img.shields.io/badge/Model-Gemma_4_(E4B_+_12B)-4285F4?style=flat-square&logo=google" alt="Gemma 4" /></a>
   <a href="https://developers.google.com/optimization"><img src="https://img.shields.io/badge/Solver-OR--Tools_CP--SAT-34A853?style=flat-square" alt="OR-Tools" /></a>
-  <a href="https://ethereum.org"><img src="https://img.shields.io/badge/Ledger-Ethereum_EVM-627EEA?style=flat-square&logo=ethereum" alt="EVM" /></a>
   <a href="https://www.docker.com"><img src="https://img.shields.io/badge/Sandbox-Docker_Containers-2496ED?style=flat-square&logo=docker" alt="Docker" /></a>
 </p>
 
 ---
 
 
-## 1. Project Name
+## 1. GeCompose
 
 **GeCompose** (derived from *Gemma* and *composition*) is a smart scheduling system that coordinates three dedicated tools for what they do best:
 
 - **Google Gemma 4** takes inputs from voice, photos, spreadsheets, and text, then explains scheduling conflicts in plain English.
 - **Google OR-Tools CP-SAT** does the heavy math to guarantee 100% clash-free schedules.
-- **Ethereum Smart Contract** ensures nobody can change someone's schedule without their signed permission.
 
 ---
 
@@ -49,10 +47,8 @@ flowchart LR
     A["Voice / Photos / Sheets"] --> B["Gemma 4\n(Extract Rules)"]
     B --> C["Human Confirm\n(Check Evidence)"]
     C --> D["CP-SAT Solver\n(Find Slots)"]
-    D -->|"Feasible"| E["Published Schedule\n(Hash on Blockchain)"]
+    D -->|"Feasible"| E["Published Schedule"]
     D -->|"Conflict"| F["Gemma 4\n(Explain Clash)"]
-    F --> G["Rule Owner Signs\n(Ethereum Contract)"]
-    G --> D
 ```
 
 ### Clean Separation of Roles
@@ -61,7 +57,6 @@ flowchart LR
 |---|---|---|
 | **Gemma 4** | Listens to audio, reads photos, writes sheet parsers, explains clashes | Never assigns slots or approves changes on its own |
 | **CP-SAT Solver** | Places every class mathematically with zero overlaps | Never guesses human language or intent |
-| **Ethereum Contract** | Stores rule ownership and records signed approvals | Never stores personal data or charges gas to view |
 
 ---
 
@@ -74,7 +69,7 @@ GeCompose runs a straightforward 6-step pipeline with human checkpoints at every
 3. **Review & Confirm:** You see every rule side-by-side with its source crop or audio playback. You click confirm before anything enters the solver.
 4. **Mathematical Solving:** Google CP-SAT calculates a clash-free timetable. Hard rules are 100% satisfied by math.
 5. **Plain-English Explanations:** If rules clash, CP-SAT pinpoints the exact conflicting subset. Gemma 4 tells you in plain English: "Prof. Rao cannot do Monday, but Section A Lab is pinned to Monday and only Prof. Rao can take it." It suggests solver-verified fixes.
-6. **On-Chain Consent:** The affected teacher or coordinator approves the fix directly from their wallet. The final schedule hash is logged on Ethereum for a permanent, tamper-proof record.
+6. **Approval:** The affected teacher or coordinator approves the fix. The final schedule is published.
 
 ---
 
@@ -84,8 +79,7 @@ GeCompose runs a straightforward 6-step pipeline with human checkpoints at every
 - **True Multimodal Support:** Voice, photos, and spreadsheets handled through Gemma 4 without chaining separate OCR or speech APIs.
 - **Zero-Token Sheet Reuse:** Write spreadsheet parsers once; re-use them forever for free.
 - **Clear Explanations:** When a schedule is impossible, explain exactly who clashed and why.
-- **Tamper-Proof Audit Trail:** Rule changes require cryptographic signatures from rule owners.
-- **Privacy by Default:** Audio, photos, and availability stay on your local machine; only secure hashes go on-chain.
+- **Privacy by Default:** Audio, photos, and availability stay on your local machine.
 - **Runs on a Laptop:** Intake runs on consumer GPUs (under 8 GB VRAM with 4-bit quantization).
 - **Measurable Proof:** Show with real numbers that an LLM alone produces clashes while GeCompose produces none.
 
@@ -108,7 +102,7 @@ GeCompose runs a straightforward 6-step pipeline with human checkpoints at every
 4. **Verified Options:** Gemma 4 proposes:
    - **Option 1:** Move Database Lab to Tuesday 10 AM (Needs approval from Department Head).
    - **Option 2:** Add Prof. Mehta as co-instructor (Needs approval from Dean).
-5. **Consent:** The Department Head approves Option 1 using their wallet. CP-SAT instantly re-solves with minimum disruption and publishes the final schedule.
+5. **Approval:** The Department Head approves Option 1. CP-SAT instantly re-solves with minimum disruption and publishes the final schedule.
 
 ---
 
@@ -192,17 +186,16 @@ flowchart TD
         UI --> SOLVE["OR-Tools CP-SAT Solver"]
     end
 
-    subgraph CONFLICT["3. Infeasibility & Consent"]
+    subgraph CONFLICT["3. Infeasibility & Resolution"]
         SOLVE -- Feasible --> CHECK["Independent Checker"]
         SOLVE -- Infeasible --> MUS["Minimal Conflict Extractor"]
         MUS --> EXP["Gemma 4 12B Explainer"]
-        EXP --> SIGN["Rule Owner Signs On-Chain"]
+        EXP --> SIGN["Rule Owner Approves Fix"]
         SIGN --> SOLVE
     end
 
     subgraph PUBLISH["4. Publication"]
-        CHECK --> ETH["Anchor Hash to Ethereum"]
-        ETH --> OUT["Interactive Grid & .ics Calendar Export"]
+        CHECK --> OUT["Interactive Grid & .ics Calendar Export"]
     end
 ```
 
@@ -215,12 +208,11 @@ flowchart TD
 | **1** | **Multimodal Intake** | Spoken audio, timetable photos, text | Structured draft rules with source pointers | Gemma 4 E4B |
 | **2** | **Format Adapter** | `.xlsx` and `.csv` files | Clean rows with cell references | Docker Sandbox + Python |
 | **3** | **Review Screen** | Draft rules + image crops / audio clips | Confirmed rules | Streamlit UI |
-| **4** | **Constraint Registry** | Confirmed rules | Salted hashes and rule IDs | Local SQLite |
+| **4** | **Constraint Registry** | Confirmed rules | Rule IDs | Local SQLite |
 | **5** | **CP-SAT Solver** | Mathematical constraints, previous schedule (optional) | Complete schedule or conflict set | Google OR-Tools |
 | **6** | **Gemma 4 Explainer** | Conflicting rule IDs | Plain-English summary + verified options | Gemma 4 12B |
-| **7** | **Consent Contract** | Signed approvals from owners | On-chain status update | Solidity (`ConsentLedger.sol`) |
-| **8** | **Schedule Publisher** | Verified timetable matrix | Timetable grid, `.ics` calendar files, proof page | Python + Web3.py |
-| **9** | **Independent Checker** | Schedule + confirmed rules | Violation count (used for publishing and for the LLM-vs-GeCompose scoreboard) | Plain Python, no solver |
+| **7** | **Schedule Publisher** | Verified timetable matrix | Timetable grid, `.ics` calendar files | Python |
+| **8** | **Independent Checker** | Schedule + confirmed rules | Violation count (used for publishing and for the LLM-vs-GeCompose scoreboard) | Plain Python, no solver |
 
 ---
 
@@ -234,31 +226,27 @@ sequenceDiagram
     participant Solver as OR-Tools CP-SAT
     participant Explainer as Gemma 4 12B
     actor Teacher as Rule Owner
-    participant Chain as Ethereum Contract
 
     Coordinator->>Gemma: Voice Note + Roster Photo + Sheet
     Gemma->>Coordinator: Extracted Rules with Audio/Image Evidence
     Coordinator->>Solver: Confirmed Rules
     
     alt Schedule is Feasible
-        Solver->>Chain: Publish Schedule Hash
     else Rules Conflict
         Solver->>Explainer: Return Exact Conflicting Rules
         Explainer->>Teacher: "Here is why your class clashed + 2 choices"
-        Teacher->>Chain: Sign approval for Option 1
-        Chain->>Solver: Rule updated on-chain -> Re-Solve
+        Teacher->>Coordinator: Approve Option 1
+        Coordinator->>Solver: Update rule -> Re-Solve
     end
 ```
 
 ### Privacy & Storage Breakdown
 
-| Data Type | Where It Stays | Is It Ever Sent to Blockchain? |
+| Data Type | Where It Stays |
 |---|---|---|
-| Voice recordings & photos | Local machine only | Never |
-| Personal availability rules | Local machine only | Never |
-| Rule hashes (salted) | Ethereum public ledger | Yes (32-byte cryptographic hash) |
-| Published schedule hash | Ethereum public ledger | Yes (32-byte cryptographic hash) |
-| Final timetable grid | Exported to `.ics` / PDF | Downloaded locally |
+| Voice recordings & photos | Local machine only |
+| Personal availability rules | Local machine only |
+| Final timetable grid | Exported to `.ics` / PDF |
 
 ---
 
@@ -272,13 +260,13 @@ flowchart LR
     B --> C["CP-SAT Solver"]
     C -->|"Conflict"| D["Gemma 4 Diagnoses Clash"]
     D --> E["Solver Pre-Checks Fixes"]
-    E --> F["Owner Signs On-Chain"]
+    E --> F["Owner Approves Fix"]
     F --> C
     C -->|"Solved"| G["Publish Schedule"]
 ```
 
 - **Strict Limits:** The loop runs at most 3 relaxation cycles. If stakeholders cannot agree after 3 tries, it stops and alerts the coordinator.
-- **Safe Tools:** The AI agent can only inspect the conflict graph and test candidate fixes against the solver. It has zero access to wallet private keys.
+- **Safe Tools:** The AI agent can only inspect the conflict graph and test candidate fixes against the solver.
 
 ---
 
@@ -291,8 +279,6 @@ flowchart LR
 | **Constraint Solver** | Google OR-Tools CP-SAT | Apache 2.0 | Industry-standard discrete optimizer; mathematically guaranteed results |
 | **Validation** | Pydantic v2 | MIT | Strict type enforcement for extracted constraints |
 | **Code Sandbox** | Docker Engine | Apache 2.0 | Runs generated spreadsheet parsers with network access turned off |
-| **Blockchain** | Solidity 0.8.24 + Foundry (Anvil) | MIT / Apache 2.0 | Local testnet with zero transaction fees and instant block mining |
-| **Web3 Client** | Web3.py | MIT | Connects Python backend to the local Ethereum node |
 | **Frontend UI** | Streamlit | Apache 2.0 | Interactive web UI with audio recording and image crop displays |
 
 ---
@@ -307,13 +293,10 @@ flowchart LR
 - **Zero Double-Bookings:** CP-SAT mathematically eliminates room and teacher overlaps.
 - **Plain-English Explanations:** Explains schedule conflicts clearly, naming the exact people and constraints involved.
 - **Pre-Verified Compromises:** Every proposed fix is tested against the solver before being shown to users.
-- **Cryptographic Consent:** Changes require an on-chain signature from the affected person's wallet.
-- **Public Schedule Verifier:** Anyone can drop a schedule file into a web page to verify its hash against the blockchain.
 - **Calendar Feeds:** One-click export to `.ics` for Google Calendar, Outlook, and Apple Calendar.
 
 ### Advanced Features (Demo Differentiators)
 
-- **Tamper-Evident Verifier:** Publish a schedule, change a single cell in the exported file, and drop it into the verifier. The hash no longer matches the on-chain record and the page turns red. This shows exactly why the ledger exists.
 - **LLM-vs-GeCompose Scoreboard:** The same inputs are given to Gemma 4 alone ("build this timetable") and to the GeCompose pipeline. An independent checker counts double-bookings and rule violations in both outputs and shows the numbers side by side.
 - **Minimal-Change Re-Solve:** After a rule changes, the solver re-solves with an objective that minimizes how many existing classes move. The UI reports "3 classes moved" instead of rebuilding the whole timetable.
 - **Conflict Graph View:** The minimal conflicting rules are drawn as a small graph (for example Prof. Rao, Database Lab, Monday morning) with the clash highlighted, shown next to Gemma's plain-English explanation.
@@ -325,7 +308,7 @@ flowchart LR
 
 ## 16. Implementation Approach
 
-Our engineering implementation divides the system into four decoupled modules, each with independent unit testing and integration criteria. A detailed backend build guide is in [`BACKEND_GUIDE.md`](BACKEND_GUIDE.md).
+Our engineering implementation divides the system into three decoupled modules, each with independent unit testing and integration criteria. A detailed backend build guide is in [`BACKEND_GUIDE.md`](BACKEND_GUIDE.md).
 
 ### Module 1: Multimodal Ingestion and Layout Parsing
 - **Audio and Image Feature Lifting:** Stream raw microphone audio and document crops into Gemma 4 E4B using native structured tool calling. Map temporal references and visual regions to concrete time slots and room identifiers.
@@ -338,13 +321,8 @@ Our engineering implementation divides the system into four decoupled modules, e
 - **Rule Provenance:** Every placed session records which rules constrain it, powering the "Why is this class here?" view.
 - **Independent Checker:** A solver-free Python function re-validates any schedule (including an LLM-generated one) against the confirmed rules and returns the list of violations.
 
-### Module 3: Smart Contract Consensus Protocol
-- **ConsentLedger Deployment:** Implement and compile `ConsentLedger.sol` using Foundry, targeting an isolated local Anvil node with zero network fees.
-- **Non-Repudiation Enforcement:** Restrict the `approveRelaxation` entrypoint so only the registered rule owner can sign off on changes. Anchor the final schedule hash immutably on-chain.
-
-### Module 4: Coordinator Interface and Verification
+### Module 3: Coordinator Interface and Verification
 - **Streamlit Frontend:** Build an interactive single-page dashboard featuring live audio capture, visual evidence crops, interactive timetable grids, conflict graph, and conflict resolution cards.
-- **Client-Side Proof Checker:** Provide a standalone verification utility that re-computes local schedule hashes and queries the public ledger to guarantee authenticity, including a visible pass/fail result for tampered files.
 - **Scoreboard Page:** Run the LLM-only baseline and the GeCompose pipeline on the same inputs and display violation counts side by side.
 
 ### Milestone Schedule and Validation Targets
@@ -353,8 +331,8 @@ Our engineering implementation divides the system into four decoupled modules, e
 |---|---|---|---|
 | **Sprint 1: Core Solver & Schema** | Constraint models, CP-SAT solver, conflict extractor, independent checker, minimal-change objective | Synthetic benchmark test suite | 100% hard rule satisfaction on 50 test instances |
 | **Sprint 2: Multimodal & Sandbox** | Gemma 4 E4B intake, Docker parser sandbox | Sample audio files and diverse Excel templates | > 95% parser synthesis accuracy within 3 attempts |
-| **Sprint 3: On-Chain Consensus** | `ConsentLedger.sol`, Foundry unit test suite | Automated Anvil deployment scripts | Owner authorization reverts all non-owner calls |
-| **Sprint 4: Frontend & Evaluation** | Streamlit UI, public proof portal, scoreboard, full integration | End-to-end integration test with user walkthrough | Sub-3-second rule extraction on laptop hardware |
+| **Sprint 3: Interface & Evaluation** | Coordinator interface and evaluation | Integration test suite | Successful end-to-end demonstration |
+| **Sprint 4: Frontend & Evaluation** | Streamlit UI, scoreboard, full integration | End-to-end integration test with user walkthrough | Sub-3-second rule extraction on laptop hardware |
 
 ---
 
@@ -363,17 +341,13 @@ Our engineering implementation divides the system into four decoupled modules, e
 1. **Interactive Web App:** A clean Streamlit application supporting microphone recording, image upload, spreadsheet drop, and live timetable grid visualization.
 2. **Side-by-Side Evidence Inspector:** Click any rule to see the highlighted photo crop, audio player snippet, or spreadsheet cell it came from.
 3. **Conflict Diagnostic Screen:** When rules clash, see a plain-English explanation, a conflict graph, the people involved, and one-click solver-tested fixes.
-4. **Local Blockchain Explorer:** View the local Anvil event log showing rule registrations, signed approvals, and published schedule hashes.
-5. **Universal Export:** Download verified timetables in interactive grid view, PDF, or `.ics` calendar format.
-6. **Tamper Verifier Page:** Drop in a schedule file and get a clear match or mismatch against the on-chain hash.
-7. **Scoreboard Page:** LLM-only vs GeCompose violation counts for the same inputs.
+4. **Universal Export:** Download verified timetables in interactive grid view, PDF, or `.ics` calendar format.
+5. **Scoreboard Page:** LLM-only vs GeCompose violation counts for the same inputs.
 
 ---
 
 ## 18. Future Scope / Scalability
 
-- **Gasless Mobile Approvals (EIP-712):** Allow teachers to sign shift changes on their phones with FaceID/TouchID without needing crypto tokens or gas fees.
-- **Zero-Knowledge Availability:** Use zero-knowledge proofs so teachers can prove they are available without revealing their personal calendars to administrators.
 - **Cross-College Resource Sharing:** Connect multiple department nodes so two colleges can share auditoriums and laboratories fairly without a central boss.
 - **PDF Timetable Extraction:** Extend one-shot parser synthesis to extract timetables trapped inside messy PDF documents.
 
@@ -387,9 +361,6 @@ Our engineering implementation divides the system into four decoupled modules, e
 | **Google OR-Tools** | [github.com/google/or-tools](https://github.com/google/or-tools) | Apache 2.0 | Discrete constraint optimization solver |
 | **llama.cpp** | [github.com/ggerganov/llama.cpp](https://github.com/ggerganov/llama.cpp) | MIT | Fast local 4-bit quantized inference |
 | **Pydantic** | [docs.pydantic.dev](https://docs.pydantic.dev) | MIT | Data schema validation |
-| **Foundry** | [book.getfoundry.sh](https://book.getfoundry.sh) | MIT / Apache 2.0 | Local Ethereum testnet (Anvil) & contract compiler |
-| **OpenZeppelin** | [openzeppelin.com/contracts](https://www.openzeppelin.com/contracts) | MIT | Secure smart contract primitives |
-| **Web3.py** | [web3py.readthedocs.io](https://web3py.readthedocs.io) | MIT | Python blockchain communication client |
 | **Docker Engine** | [docker.com](https://www.docker.com) | Apache 2.0 | Isolated container sandbox for parsing scripts |
 | **Streamlit** | [streamlit.io](https://streamlit.io) | Apache 2.0 | Interactive web user interface |
 | **pandas & openpyxl** | [pandas.pydata.org](https://pandas.pydata.org) | BSD-3 / MIT | Tabular dataset processing |
@@ -405,37 +376,6 @@ Our engineering implementation divides the system into four decoupled modules, e
 | **3** | Unsafe Generated Code | Critical | Generated Python parsers run in a container with **network access disabled** and strict timeouts. |
 | **4** | Solver Stalling on Huge Schedules | High | 10-second solver timeout with soft-constraint relaxation heuristics. |
 | **5** | Changed Spreadsheet Layouts | Medium | If more than 5% of rows fail, the system automatically triggers a re-synthesis of the parser. |
-| **6** | Users Unfamiliar with Wallets | Medium | Pre-configured local test accounts for demo; roadmap adds gasless one-tap signatures. |
-| **7** | Laptop GPU Memory Limits | High | Lightweight E4B model for intake; larger 12B model called only when a conflict occurs. |
-| **8** | Live Demo Failure | High | Every Gemma call has a recorded-fixture fallback so the full flow can run without the model. |
-
----
-
-
----
-
-## 21. Deterministic Engine & Conflict Diagnosis (Implemented)
-
-The core deterministic processing engine of GeCompose is implemented in Python using **Google OR-Tools CP-SAT** and **Pydantic v2**, providing guaranteed clash-free schedule generation, conflict core diagnosis, and solver-verified alternative synthesis.
-
-### Core Modules
-
-- [`gecompose.models`](file:///home/blxnk/agy-workspace/PhishTank/gecompose/models.py): Strongly-typed domain models (`TimeSlot`, `Teacher`, `Room`, `Session`, `SchedulingProblem`, `ScheduledAssignment`, `ScheduleResult`, `ConflictDiagnosis`, `ScheduleAlternative`, `RelaxationPolicy`).
-- [`gecompose.solver`](file:///home/blxnk/agy-workspace/PhishTank/gecompose/solver.py): CP-SAT discrete optimization solver (`CPSATScheduler`, `solve_schedule`) enforcing hard invariants with continuous timeline coordinates.
-- [`gecompose.validator`](file:///home/blxnk/agy-workspace/PhishTank/gecompose/validator.py): Independent schedule verifier (`verify_schedule`) preventing any unverified or invalid schedule from being published.
-- [`gecompose.diagnostics`](file:///home/blxnk/agy-workspace/PhishTank/gecompose/diagnostics.py): CP-SAT assumption-literal conflict diagnosis (`ConflictDiagnoser`, `diagnose_conflicts`) with deletion-based Minimal Unsatisfiable Subset (MUS) reduction.
-- [`gecompose.alternatives`](file:///home/blxnk/agy-workspace/PhishTank/gecompose/alternatives.py): Solver-verified alternative generator (`AlternativeGenerator`, `generate_alternatives`) synthesizing distinct, minimal-penalty schedule alternatives by relaxing user preferences.
-- [`gecompose.api`](file:///home/blxnk/agy-workspace/PhishTank/gecompose/api.py): Unified integration facade (`GeComposeEngine`, `schedule`, `diagnose`, `find_alternatives`, `to_timetable_grid`, `serialize_result`) providing dict/model input coercion, 2D timetable grid transformation, and clean JSON serialization.
-
-### Public API & Workflow Example
-
-```python
-from gecompose import GeComposeEngine, SchedulingProblem, RelaxationPolicy
-
-engine = GeComposeEngine(time_limit_seconds=10.0)
-
-# 1. Solve a problem (accepts Pydantic model or plain dict)
-result = engine.schedule(problem)
 
 if result.is_success:
     # 2. Transform into a 2D timetable grid keyed by (day, slot_id)

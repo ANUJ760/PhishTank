@@ -1,0 +1,1 @@
+[{"id":"R1","type":"pin_session","owner":"Dept Head","params":{"session_id":"DB_LAB","day":0,"slots":[0,1,2]},"evidence":[],"status":"confirmed"},{"id":"R2","type":"only_qualified","owner":"Dean","params":{"session_id":"DB_LAB","teachers":["Prof. Rao"]},"evidence":[],"status":"confirmed"}]
