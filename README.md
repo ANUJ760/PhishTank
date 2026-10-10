@@ -412,6 +412,50 @@ Our engineering implementation divides the system into four decoupled modules, e
 ---
 
 
+---
+
+## 21. Deterministic Engine & Conflict Diagnosis (Implemented)
+
+The core deterministic processing engine of GeCompose is implemented in Python using **Google OR-Tools CP-SAT** and **Pydantic v2**, providing guaranteed clash-free schedule generation, conflict core diagnosis, and solver-verified alternative synthesis.
+
+### Core Modules
+
+- [`gecompose.models`](file:///home/blxnk/agy-workspace/PhishTank/gecompose/models.py): Strongly-typed domain models (`TimeSlot`, `Teacher`, `Room`, `Session`, `SchedulingProblem`, `ScheduledAssignment`, `ScheduleResult`, `ConflictDiagnosis`, `ScheduleAlternative`, `RelaxationPolicy`).
+- [`gecompose.solver`](file:///home/blxnk/agy-workspace/PhishTank/gecompose/solver.py): CP-SAT discrete optimization solver (`CPSATScheduler`, `solve_schedule`) enforcing hard invariants with continuous timeline coordinates.
+- [`gecompose.validator`](file:///home/blxnk/agy-workspace/PhishTank/gecompose/validator.py): Independent schedule verifier (`verify_schedule`) preventing any unverified or invalid schedule from being published.
+- [`gecompose.diagnostics`](file:///home/blxnk/agy-workspace/PhishTank/gecompose/diagnostics.py): CP-SAT assumption-literal conflict diagnosis (`ConflictDiagnoser`, `diagnose_conflicts`) with deletion-based Minimal Unsatisfiable Subset (MUS) reduction.
+- [`gecompose.alternatives`](file:///home/blxnk/agy-workspace/PhishTank/gecompose/alternatives.py): Solver-verified alternative generator (`AlternativeGenerator`, `generate_alternatives`) synthesizing distinct, minimal-penalty schedule alternatives by relaxing user preferences.
+
+### Conflict Diagnosis & Infeasibility Cores
+
+When a schedule request is mathematically unsatisfiable, GeCompose activates diagnostic assumption literals:
+1. **Assumption Literals**: Every constraint (session requirements, teacher/room pinning, restrictions, qualifications, capacity, and availability) is guarded by a dedicated Boolean literal.
+2. **Infeasibility Core Extraction**: CP-SAT extracts a sufficient unsatisfiable subset.
+3. **Minimal Unsatisfiable Subset (MUS) Reduction**: A deletion-based filtering pass checks each core assumption. If all remaining assumptions are essential, `is_minimal` is marked `True`. If diagnosis times out before minimality is verified, `is_minimal` is accurately reported as `False`.
+4. **Factual Explanations**: Diagnoses produce deterministic, fact-grounded explanations detailing the exact conflicting requirements without hallucination.
+
+### Solver-Verified Alternative Generation
+
+When a schedule is infeasible, GeCompose searches for valid alternative schedules:
+- **Non-Negotiable Invariants**: Teacher non-overlap, room non-overlap, teacher availability, room availability, teacher qualifications, and room capacities are **always hard** and never relaxed.
+- **Relaxable Requirements**: Pinned or allowed time slots, teachers, and rooms may be relaxed according to a configurable `RelaxationPolicy`.
+- **Optimization**: CP-SAT minimizes the total relaxation penalty (e.g. preferring slot moves over teacher swaps).
+- **Independent Double-Check**: Every synthesized alternative is independently verified against `verify_schedule` before being returned.
+
+### Installation & Test Suite
+
+```bash
+# Set up virtual environment and install package in editable mode
+python3 -m venv .venv
+.venv/bin/pip install -e .
+
+# Run the complete test suite
+.venv/bin/pytest -v
+```
+
+---
+
+
 ### Project and Team Details
 
 | Item | Details |
