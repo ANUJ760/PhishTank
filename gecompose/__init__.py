@@ -25,6 +25,19 @@ from gecompose.models import (
     RecoveryPolicy,
     ResourceType,
 )
+from gecompose.investigation_models import (
+    DiagnosticTest,
+    Evidence,
+    EvidenceLink,
+    EvidenceRelationshipType,
+    EvidenceSourceType,
+    Hypothesis,
+    HypothesisStatus,
+    Incident,
+    IncidentSeverity,
+    IncidentStatus,
+    InvestigationReport,
+)
 from gecompose.solver import CPSATScheduler, solve_schedule
 from gecompose.diagnostics import ConflictDiagnoser, diagnose_conflicts
 from gecompose.alternatives import AlternativeGenerator, generate_alternatives
@@ -41,6 +54,9 @@ from gecompose.api import (
     DisruptionRecoverer,
     to_timetable_grid,
     serialize_result,
+    investigate_incident,
+    IncidentInvestigator,
+    evaluate_hypothesis,
 )
 
 __all__ = [
@@ -88,4 +104,19 @@ __all__ = [
     "analyze_impact",
     "recover_schedule",
     "DisruptionRecoverer",
+    # Incident Investigation Engine
+    "DiagnosticTest",
+    "Evidence",
+    "EvidenceLink",
+    "EvidenceRelationshipType",
+    "EvidenceSourceType",
+    "Hypothesis",
+    "HypothesisStatus",
+    "Incident",
+    "IncidentSeverity",
+    "IncidentStatus",
+    "InvestigationReport",
+    "investigate_incident",
+    "IncidentInvestigator",
+    "evaluate_hypothesis",
 ]

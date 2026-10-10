@@ -3,27 +3,25 @@
 </p>
 
 <p align="center">
-  <b>Multimodal Constraint Intake &bull; Solver Guaranteed Schedules &bull; Multi-Party Consent</b><br>
+  <b>Multimodal Constraint Intake &bull; Solver Guaranteed Schedules</b><br>
   <sub>Hacktoberfest Hack Day</sub>
 </p>
 
 <p align="center">
   <a href="https://ai.google.dev/gemma"><img src="https://img.shields.io/badge/Model-Gemma_4_(E4B_+_12B)-4285F4?style=flat-square&logo=google" alt="Gemma 4" /></a>
   <a href="https://developers.google.com/optimization"><img src="https://img.shields.io/badge/Solver-OR--Tools_CP--SAT-34A853?style=flat-square" alt="OR-Tools" /></a>
-  <a href="https://www.postgresql.org"><img src="https://img.shields.io/badge/Registry-PostgreSQL-336791?style=flat-square&logo=postgresql" alt="PostgreSQL" /></a>
   <a href="https://www.docker.com"><img src="https://img.shields.io/badge/Sandbox-Docker_Containers-2496ED?style=flat-square&logo=docker" alt="Docker" /></a>
 </p>
 
 ---
 
 
-## 1. Project Name
+## 1. GeCompose
 
 **GeCompose** (derived from *Gemma* and *composition*) is a smart scheduling system that coordinates three dedicated tools for what they do best:
 
 - **Google Gemma 4** takes inputs from voice, photos, spreadsheets, and text, then explains scheduling conflicts in plain English.
 - **Google OR-Tools CP-SAT** does the heavy math to guarantee 100% clash-free schedules.
-- **Consent Ledger & Audit Trail** ensures nobody can change someone's schedule without their explicit, verified permission.
 
 ---
 
@@ -49,10 +47,8 @@ flowchart LR
     A["Voice / Photos / Sheets"] --> B["Gemma 4\n(Extract Rules)"]
     B --> C["Human Confirm\n(Check Evidence)"]
     C --> D["CP-SAT Solver\n(Find Slots)"]
-    D -->|"Feasible"| E["Published Schedule\n(Hash in Registry)"]
+    D -->|"Feasible"| E["Published Schedule"]
     D -->|"Conflict"| F["Gemma 4\n(Explain Clash)"]
-    F --> G["Rule Owner Approves\n(Consent Ledger)"]
-    G --> D
 ```
 
 ### Clean Separation of Roles
@@ -61,7 +57,6 @@ flowchart LR
 |---|---|---|
 | **Gemma 4** | Listens to audio, reads photos, writes sheet parsers, explains clashes | Never assigns slots or approves changes on its own |
 | **CP-SAT Solver** | Places every class mathematically with zero overlaps | Never guesses human language or intent |
-| **Consent Ledger** | Stores rule ownership and records verified approvals | Never modifies rules without verified stakeholder consent |
 
 ---
 
@@ -74,7 +69,7 @@ GeCompose runs a straightforward 6-step pipeline with human checkpoints at every
 3. **Review & Confirm:** You see every rule side-by-side with its source crop or audio playback. You click confirm before anything enters the solver.
 4. **Mathematical Solving:** Google CP-SAT calculates a clash-free timetable. Hard rules are 100% satisfied by math.
 5. **Plain-English Explanations:** If rules clash, CP-SAT pinpoints the exact conflicting subset. Gemma 4 tells you in plain English: "Prof. Rao cannot do Monday, but Section A Lab is pinned to Monday and only Prof. Rao can take it." It suggests solver-verified fixes.
-6. **Multi-Party Consent:** The affected teacher or coordinator approves the fix directly in the consent ledger. The final schedule hash is recorded in the registry for a permanent, tamper-proof record.
+6. **Approval:** The affected teacher or coordinator approves the fix. The final schedule is published.
 
 ---
 
@@ -84,8 +79,7 @@ GeCompose runs a straightforward 6-step pipeline with human checkpoints at every
 - **True Multimodal Support:** Voice, photos, and spreadsheets handled through Gemma 4 without chaining separate OCR or speech APIs.
 - **Zero-Token Sheet Reuse:** Write spreadsheet parsers once; re-use them forever for free.
 - **Clear Explanations:** When a schedule is impossible, explain exactly who clashed and why.
-- **Tamper-Proof Audit Trail:** Rule changes require cryptographic signatures from rule owners.
-- **Privacy by Default:** Audio, photos, and availability stay on your local machine; only secure hashes are registered.
+- **Privacy by Default:** Audio, photos, and availability stay on your local machine.
 - **Runs on a Laptop:** Intake runs on consumer GPUs (under 8 GB VRAM with 4-bit quantization).
 - **Measurable Proof:** Show with real numbers that an LLM alone produces clashes while GeCompose produces none.
 
@@ -108,7 +102,7 @@ GeCompose runs a straightforward 6-step pipeline with human checkpoints at every
 4. **Verified Options:** Gemma 4 proposes:
    - **Option 1:** Move Database Lab to Tuesday 10 AM (Needs approval from Department Head).
    - **Option 2:** Add Prof. Mehta as co-instructor (Needs approval from Dean).
-5. **Consent:** The Department Head approves Option 1 in the consent ledger. CP-SAT instantly re-solves with minimum disruption and publishes the final schedule.
+5. **Approval:** The Department Head approves Option 1. CP-SAT instantly re-solves with minimum disruption and publishes the final schedule.
 
 ---
 
@@ -192,17 +186,16 @@ flowchart TD
         UI --> SOLVE["OR-Tools CP-SAT Solver"]
     end
 
-    subgraph CONFLICT["3. Infeasibility & Consent"]
+    subgraph CONFLICT["3. Infeasibility & Resolution"]
         SOLVE -- Feasible --> CHECK["Independent Checker"]
         SOLVE -- Infeasible --> MUS["Minimal Conflict Extractor"]
         MUS --> EXP["Gemma 4 12B Explainer"]
-        EXP --> SIGN["Rule Owner Approves"]
+        EXP --> SIGN["Rule Owner Approves Fix"]
         SIGN --> SOLVE
     end
 
     subgraph PUBLISH["4. Publication"]
-        CHECK --> REG["Record Hash in Registry"]
-        REG --> OUT["Interactive Grid & .ics Calendar Export"]
+        CHECK --> OUT["Interactive Grid & .ics Calendar Export"]
     end
 ```
 
@@ -215,12 +208,11 @@ flowchart TD
 | **1** | **Multimodal Intake** | Spoken audio, timetable photos, text | Structured draft rules with source pointers | Gemma 4 E4B |
 | **2** | **Format Adapter** | `.xlsx` and `.csv` files | Clean rows with cell references | Docker Sandbox + Python |
 | **3** | **Review Screen** | Draft rules + image crops / audio clips | Confirmed rules | Streamlit UI |
-| **4** | **Constraint Registry** | Confirmed rules | Salted hashes and rule IDs | Dockerized PostgreSQL |
+| **4** | **Constraint Registry** | Confirmed rules | Rule IDs | Local SQLite |
 | **5** | **CP-SAT Solver** | Mathematical constraints, previous schedule (optional) | Complete schedule or conflict set | Google OR-Tools |
 | **6** | **Gemma 4 Explainer** | Conflicting rule IDs | Plain-English summary + verified options | Gemma 4 12B |
-| **7** | **Consent Ledger** | Signed approvals from owners | Registry status update & audit event | Python + PostgreSQL |
-| **8** | **Schedule Publisher** | Verified timetable matrix | Timetable grid, `.ics` calendar files, proof page | Python Export Engine |
-| **9** | **Independent Checker** | Schedule + confirmed rules | Violation count (used for publishing and for the LLM-vs-GeCompose scoreboard) | Plain Python, no solver |
+| **7** | **Schedule Publisher** | Verified timetable matrix | Timetable grid, `.ics` calendar files | Python |
+| **8** | **Independent Checker** | Schedule + confirmed rules | Violation count (used for publishing and for the LLM-vs-GeCompose scoreboard) | Plain Python, no solver |
 
 ---
 
@@ -234,31 +226,27 @@ sequenceDiagram
     participant Solver as OR-Tools CP-SAT
     participant Explainer as Gemma 4 12B
     actor Teacher as Rule Owner
-    participant Ledger as Consent Ledger
 
     Coordinator->>Gemma: Voice Note + Roster Photo + Sheet
     Gemma->>Coordinator: Extracted Rules with Audio/Image Evidence
     Coordinator->>Solver: Confirmed Rules
     
     alt Schedule is Feasible
-        Solver->>Ledger: Publish Schedule Hash
     else Rules Conflict
         Solver->>Explainer: Return Exact Conflicting Rules
         Explainer->>Teacher: "Here is why your class clashed + 2 choices"
-        Teacher->>Ledger: Sign approval for Option 1
-        Ledger->>Solver: Rule updated in registry -> Re-Solve
+        Teacher->>Coordinator: Approve Option 1
+        Coordinator->>Solver: Update rule -> Re-Solve
     end
 ```
 
 ### Privacy & Storage Breakdown
 
-| Data Type | Where It Stays | Is It Ever Sent Outside Local Scope? |
+| Data Type | Where It Stays |
 |---|---|---|
-| Voice recordings & photos | Local machine only | Never |
-| Personal availability rules | Local machine only | Never |
-| Rule hashes (salted) | Registry audit log | Yes (32-byte cryptographic hash) |
-| Published schedule hash | Schedule registry | Yes (32-byte cryptographic hash) |
-| Final timetable grid | Exported to `.ics` / PDF | Downloaded locally |
+| Voice recordings & photos | Local machine only |
+| Personal availability rules | Local machine only |
+| Final timetable grid | Exported to `.ics` / PDF |
 
 ---
 
@@ -272,13 +260,13 @@ flowchart LR
     B --> C["CP-SAT Solver"]
     C -->|"Conflict"| D["Gemma 4 Diagnoses Clash"]
     D --> E["Solver Pre-Checks Fixes"]
-    E --> F["Owner Approves in Ledger"]
+    E --> F["Owner Approves Fix"]
     F --> C
     C -->|"Solved"| G["Publish Schedule"]
 ```
 
 - **Strict Limits:** The loop runs at most 3 relaxation cycles. If stakeholders cannot agree after 3 tries, it stops and alerts the coordinator.
-- **Safe Tools:** The AI agent can only inspect the conflict graph and test candidate fixes against the solver. It has zero permissions to alter rules without owner approval.
+- **Safe Tools:** The AI agent can only inspect the conflict graph and test candidate fixes against the solver.
 
 ---
 
@@ -291,8 +279,6 @@ flowchart LR
 | **Constraint Solver** | Google OR-Tools CP-SAT | Apache 2.0 | Industry-standard discrete optimizer; mathematically guaranteed results |
 | **Validation** | Pydantic v2 | MIT | Strict type enforcement for extracted constraints |
 | **Code Sandbox** | Docker Engine | Apache 2.0 | Runs generated spreadsheet parsers with network access turned off |
-| **Registry & Audit Log** | PostgreSQL 16 + psycopg3 | PostgreSQL | ACID-compliant registry for constraints, schedules, and audit events |
-| **Cryptographic Hashing** | Python hashlib (SHA-256) | PSF | Deterministic canonical JSON digests and tamper detection |
 | **Frontend UI** | Streamlit | Apache 2.0 | Interactive web UI with audio recording and image crop displays |
 
 ---
@@ -307,13 +293,10 @@ flowchart LR
 - **Zero Double-Bookings:** CP-SAT mathematically eliminates room and teacher overlaps.
 - **Plain-English Explanations:** Explains schedule conflicts clearly, naming the exact people and constraints involved.
 - **Pre-Verified Compromises:** Every proposed fix is tested against the solver before being shown to users.
-- **Cryptographic Consent:** Changes require verified approval from the affected rule owner in the consent ledger.
-- **Public Schedule Verifier:** Anyone can drop a schedule file into a web page to verify its hash against the registry.
 - **Calendar Feeds:** One-click export to `.ics` for Google Calendar, Outlook, and Apple Calendar.
 
 ### Advanced Features (Demo Differentiators)
 
-- **Tamper-Evident Verifier:** Publish a schedule, change a single cell in the exported file, and drop it into the verifier. The hash no longer matches the registry record and the page turns red. This shows exactly why the integrity ledger exists.
 - **LLM-vs-GeCompose Scoreboard:** The same inputs are given to Gemma 4 alone ("build this timetable") and to the GeCompose pipeline. An independent checker counts double-bookings and rule violations in both outputs and shows the numbers side by side.
 - **Minimal-Change Re-Solve:** After a rule changes, the solver re-solves with an objective that minimizes how many existing classes move. The UI reports "3 classes moved" instead of rebuilding the whole timetable.
 - **Conflict Graph View:** The minimal conflicting rules are drawn as a small graph (for example Prof. Rao, Database Lab, Monday morning) with the clash highlighted, shown next to Gemma's plain-English explanation.
@@ -325,7 +308,7 @@ flowchart LR
 
 ## 16. Implementation Approach
 
-Our engineering implementation divides the system into four decoupled modules, each with independent unit testing and integration criteria. A detailed backend build guide is in [`BACKEND_GUIDE.md`](BACKEND_GUIDE.md).
+Our engineering implementation divides the system into three decoupled modules, each with independent unit testing and integration criteria. A detailed backend build guide is in [`BACKEND_GUIDE.md`](BACKEND_GUIDE.md).
 
 ### Module 1: Multimodal Ingestion and Layout Parsing
 - **Audio and Image Feature Lifting:** Stream raw microphone audio and document crops into Gemma 4 E4B using native structured tool calling. Map temporal references and visual regions to concrete time slots and room identifiers.
@@ -338,13 +321,8 @@ Our engineering implementation divides the system into four decoupled modules, e
 - **Rule Provenance:** Every placed session records which rules constrain it, powering the "Why is this class here?" view.
 - **Independent Checker:** A solver-free Python function re-validates any schedule (including an LLM-generated one) against the confirmed rules and returns the list of violations.
 
-### Module 3: Multi-Party Consent & Cryptographic Integrity
-- **Consent Ledger Implementation:** Implement transactional rule confirmation and relaxation authorization in the registry.
-- **Non-Repudiation Enforcement:** Restrict relaxation approvals so only the registered rule owner can authorize changes. Record the final schedule hash immutably in the registry.
-
-### Module 4: Coordinator Interface and Verification
+### Module 3: Coordinator Interface and Verification
 - **Streamlit Frontend:** Build an interactive single-page dashboard featuring live audio capture, visual evidence crops, interactive timetable grids, conflict graph, and conflict resolution cards.
-- **Client-Side Proof Checker:** Provide a standalone verification utility that re-computes local schedule hashes and queries the registry to guarantee authenticity, including a visible pass/fail result for tampered files.
 - **Scoreboard Page:** Run the LLM-only baseline and the GeCompose pipeline on the same inputs and display violation counts side by side.
 
 ### Milestone Schedule and Validation Targets
@@ -353,8 +331,8 @@ Our engineering implementation divides the system into four decoupled modules, e
 |---|---|---|---|
 | **Sprint 1: Core Solver & Schema** | Constraint models, CP-SAT solver, conflict extractor, independent checker, minimal-change objective | Synthetic benchmark test suite | 100% hard rule satisfaction on 50 test instances |
 | **Sprint 2: Multimodal & Sandbox** | Gemma 4 E4B intake, Docker parser sandbox | Sample audio files and diverse Excel templates | > 95% parser synthesis accuracy within 3 attempts |
-| **Sprint 3: Consent & Integrity** | Consent ledger schema, audit logging, authorization test suite | Automated database fixtures and tests | Owner authorization rejects all unauthorized calls |
-| **Sprint 4: Frontend & Evaluation** | Streamlit UI, public proof portal, scoreboard, full integration | End-to-end integration test with user walkthrough | Sub-3-second rule extraction on laptop hardware |
+| **Sprint 3: Interface & Evaluation** | Coordinator interface and evaluation | Integration test suite | Successful end-to-end demonstration |
+| **Sprint 4: Frontend & Evaluation** | Streamlit UI, scoreboard, full integration | End-to-end integration test with user walkthrough | Sub-3-second rule extraction on laptop hardware |
 
 ---
 
@@ -363,17 +341,13 @@ Our engineering implementation divides the system into four decoupled modules, e
 1. **Interactive Web App:** A clean Streamlit application supporting microphone recording, image upload, spreadsheet drop, and live timetable grid visualization.
 2. **Side-by-Side Evidence Inspector:** Click any rule to see the highlighted photo crop, audio player snippet, or spreadsheet cell it came from.
 3. **Conflict Diagnostic Screen:** When rules clash, see a plain-English explanation, a conflict graph, the people involved, and one-click solver-tested fixes.
-4. **Audit Log Explorer:** View the system audit log showing rule registrations, verified approvals, and published schedule hashes.
-5. **Universal Export:** Download verified timetables in interactive grid view, PDF, or `.ics` calendar format.
-6. **Tamper Verifier Page:** Drop in a schedule file and get a clear match or mismatch against the registry hash.
-7. **Scoreboard Page:** LLM-only vs GeCompose violation counts for the same inputs.
+4. **Universal Export:** Download verified timetables in interactive grid view, PDF, or `.ics` calendar format.
+5. **Scoreboard Page:** LLM-only vs GeCompose violation counts for the same inputs.
 
 ---
 
 ## 18. Future Scope / Scalability
 
-- **Digital Signature Approvals:** Allow teachers to sign shift changes on their devices with cryptographic public-key signatures without central coordinators.
-- **Zero-Knowledge Availability:** Use zero-knowledge proofs so teachers can prove they are available without revealing their personal calendars to administrators.
 - **Cross-College Resource Sharing:** Connect multiple department nodes so two colleges can share auditoriums and laboratories fairly without a central boss.
 - **PDF Timetable Extraction:** Extend one-shot parser synthesis to extract timetables trapped inside messy PDF documents.
 
@@ -403,37 +377,6 @@ Our engineering implementation divides the system into four decoupled modules, e
 | **3** | Unsafe Generated Code | Critical | Generated Python parsers run in a container with **network access disabled** and strict timeouts. |
 | **4** | Solver Stalling on Huge Schedules | High | 10-second solver timeout with soft-constraint relaxation heuristics. |
 | **5** | Changed Spreadsheet Layouts | Medium | If more than 5% of rows fail, the system automatically triggers a re-synthesis of the parser. |
-| **6** | Human Coordination Delays | Medium | Verified compromise options generated automatically by Gemma and tested by solver. |
-| **7** | Laptop GPU Memory Limits | High | Lightweight E4B model for intake; larger 12B model called only when a conflict occurs. |
-| **8** | Live Demo Failure | High | Every Gemma call has a recorded-fixture fallback so the full flow can run without the model. |
-
----
-
-
----
-
-## 21. Deterministic Engine & Conflict Diagnosis (Implemented)
-
-The core deterministic processing engine of GeCompose is implemented in Python using **Google OR-Tools CP-SAT** and **Pydantic v2**, providing guaranteed clash-free schedule generation, conflict core diagnosis, and solver-verified alternative synthesis.
-
-### Core Modules
-
-- [`gecompose.models`](file:///home/blxnk/agy-workspace/PhishTank/gecompose/models.py): Strongly-typed domain models (`TimeSlot`, `Teacher`, `Room`, `Session`, `SchedulingProblem`, `ScheduledAssignment`, `ScheduleResult`, `ConflictDiagnosis`, `ScheduleAlternative`, `RelaxationPolicy`).
-- [`gecompose.solver`](file:///home/blxnk/agy-workspace/PhishTank/gecompose/solver.py): CP-SAT discrete optimization solver (`CPSATScheduler`, `solve_schedule`) enforcing hard invariants with continuous timeline coordinates.
-- [`gecompose.validator`](file:///home/blxnk/agy-workspace/PhishTank/gecompose/validator.py): Independent schedule verifier (`verify_schedule`) preventing any unverified or invalid schedule from being published.
-- [`gecompose.diagnostics`](file:///home/blxnk/agy-workspace/PhishTank/gecompose/diagnostics.py): CP-SAT assumption-literal conflict diagnosis (`ConflictDiagnoser`, `diagnose_conflicts`) with deletion-based Minimal Unsatisfiable Subset (MUS) reduction.
-- [`gecompose.alternatives`](file:///home/blxnk/agy-workspace/PhishTank/gecompose/alternatives.py): Solver-verified alternative generator (`AlternativeGenerator`, `generate_alternatives`) synthesizing distinct, minimal-penalty schedule alternatives by relaxing user preferences.
-- [`gecompose.api`](file:///home/blxnk/agy-workspace/PhishTank/gecompose/api.py): Unified integration facade (`GeComposeEngine`, `schedule`, `diagnose`, `find_alternatives`, `to_timetable_grid`, `serialize_result`) providing dict/model input coercion, 2D timetable grid transformation, and clean JSON serialization.
-
-### Public API & Workflow Example
-
-```python
-from gecompose import GeComposeEngine, SchedulingProblem, RelaxationPolicy
-
-engine = GeComposeEngine(time_limit_seconds=10.0)
-
-# 1. Solve a problem (accepts Pydantic model or plain dict)
-result = engine.schedule(problem)
 
 if result.is_success:
     # 2. Transform into a 2D timetable grid keyed by (day, slot_id)
@@ -530,192 +473,162 @@ Run the Phase 4 runnable demo:
 python3 -m venv .venv
 .venv/bin/pip install -e .
 
-# Run the complete test suite (93 passing tests)
+# Run the complete test suite (111 passing tests)
 .venv/bin/pytest -v
 ```
 
 ---
 
-## 8. GeCompose ReliefOps — Disaster Relief Supply Allocation Engine
+### AI Incident Investigation Engine (Phase 5)
 
-**GeCompose ReliefOps** is an AI-powered disaster logistics and emergency supply allocation engine that optimally distributes scarce life-saving supplies across multiple relief camps during natural disasters such as cyclones, floods, and earthquakes.
+When operational disruptions are complex or their root causes are uncertain,
+GeCompose provides a **deterministic, evidence-driven investigation engine**
+that connects distributed evidence, evaluates competing hypotheses, identifies
+gaps in observational coverage, and proposes targeted diagnostic tests — all
+without any LLM, database, or external integration.
 
-### Core Workflow & Architecture
+#### Architecture
 
-```mermaid
-flowchart TD
-    A["Field Reports\n(CSV, Radio Dispatches, Audio)"] --> B["Request Intake Service\n(Gemma 4B Extraction & Normalization)"]
-    B --> C["ReliefOps Registry\n(Incidents, Camps, Warehouses, Vehicles)"]
-    C --> D["Allocation Optimizer\n(Google OR-Tools CP-SAT)"]
-    D --> E["Independent Validator\n(Physical Invariant Check)"]
-    E --> F["Explanation Service\n(Gemma 12B Shortage & Trade-off Rationale)"]
-    E --> G["Audit Ledger\n(Cryptographic SHA-256 Chain)"]
-    C --> H["What-If Scenario Simulator\n(Counterfactual Influx/Loss Simulation)"]
-    H --> D
+```
+Incident + Evidence + Hypotheses
+         │
+         ▼
+  IncidentInvestigator
+  ├── evaluate_hypothesis()        — deterministic plausibility scoring
+  ├── identify_missing_evidence()  — source-coverage gap detection
+  └── propose_diagnostic_tests()   — pairwise discriminating probes
+         │
+         ▼
+  InvestigationReport
+  ├── hypotheses           (evaluated, sorted by plausibility)
+  ├── leading_hypothesis_id
+  ├── confidence_assessment
+  ├── missing_evidence     (list[str] — identified data gaps)
+  ├── proposed_tests       (list[DiagnosticTest])
+  └── statistics
 ```
 
-### Key Modules
+#### Key design decisions
 
-1. **CP-SAT Discrete Allocation Optimizer (`backend.reliefops.optimizer`)**:
-   - Strictly enforces inventory capacity upper bounds ($\sum x_{c,r} \le I_r$).
-   - Respects camp demand ceilings ($0 \le x_{c,r} \le D_{c,r}$).
-   - Enforces camp physical storage volume ($m^3$) and structural load ($kg$) constraints.
-   - Enforces vehicle terrain accessibility (`open`, `restricted_road`, `air_only`, `boat_only`).
-   - Lexicographic multi-objective prioritizing life-critical supplies (water, trauma kits) and populations with high vulnerability ratios (children, elderly).
+| Decision | Rationale |
+|---|---|
+| **Plausibility scores are heuristic** | Scores (0.0–0.95) reflect evidence count and source diversity — never ground truth. The engine never reports 1.0. |
+| **Contradiction always overrides support** | Any single contradicting evidence link immediately refutes a hypothesis; no amount of support can override it. |
+| **Two-source corroboration for STRONGLY_SUPPORTED** | Requires `plausibility ≥ 0.75` AND evidence from at least 2 distinct source types. |
+| **Hypothesis generation is interface-decoupled** | `synthesize_candidate_hypotheses()` uses heuristic archetypes today; the interface is ready for future LLM integration. |
+| **No OR-Tools dependency** | The investigation engine is entirely independent of the CP-SAT solver. |
 
-2. **Independent Allocation Validator (`backend.reliefops.validator`)**:
-   - Physical invariant checker verifying zero inventory overdrafts, zero demand overflows, non-negativity, and transportation accessibility before any plan can be approved.
+#### Public API
 
-3. **What-If Scenario Simulator (`backend.reliefops.simulator`)**:
-   - Executes isolated counterfactual simulations (e.g. +5000L water donation, offline warehouse, disabled vehicle) without mutating live state.
-   - Returns side-by-side comparative diagnostics (`fulfillment_diff`, `allocated_diff`, `camps_improved`, `camps_degraded`).
+```python
+from gecompose import (
+    Evidence, EvidenceSourceType, EvidenceRelationshipType,
+    Hypothesis, Incident, IncidentSeverity, IncidentStatus,
+    investigate_incident, serialize_result,
+)
 
-4. **Explainable Decisions (`backend.reliefops.explainer`)**:
-   - Powered by **Gemma 12B** reasoning to articulate why specific camps were rationed, which hard physical bottlenecks triggered shortages, and recommendations for operational commanders.
+incident = Incident(
+    id="INC-001",
+    title="Payment Service — HTTP 504",
+    affected_component="payment-service",
+    severity=IncidentSeverity.HIGH,
+    status=IncidentStatus.INVESTIGATING,
+    start_time="2026-10-10T13:15:00Z",
+)
 
-5. **Request Intake & Consolidation (`backend.reliefops.intake`)**:
-   - Ingests structured CSV reports and parses messy unstructured radio/dispatch field reports using **Gemma 4B**.
+evidence = [
+    Evidence(
+        id="EVD-001",
+        source_type=EvidenceSourceType.LOGS,
+        summary="HikariPool-1: Connection not available after 30000ms. Pool 10/10 active.",
+        source_ref="payment-service/app.log",
+        reliability=0.95,
+    ),
+    Evidence(
+        id="EVD-002",
+        source_type=EvidenceSourceType.ALERTS,
+        summary="CRITICAL — payment-db active_connections=98/100 (98%).",
+        source_ref="alertmanager/payment-db",
+    ),
+]
 
-6. **Cryptographic Audit Ledger (`backend.reliefops.audit`)**:
-   - Maintains an immutable, tamper-evident SHA-256 event chain recording every plan creation, validation, simulation, and commander sign-off.
+hypotheses = [
+    Hypothesis(
+        id="HYP-001",
+        title="Database connection-pool exhaustion",
+        root_cause_category="database",
+        evidence_links=[
+            {"evidence_id": "EVD-001", "relationship": EvidenceRelationshipType.SUPPORTS, "weight": 1.0},
+            {"evidence_id": "EVD-002", "relationship": EvidenceRelationshipType.SUPPORTS, "weight": 1.0},
+        ],
+    ),
+]
 
-### ReliefOps REST API Endpoints
+# Run full investigation — returns structured InvestigationReport
+report = investigate_incident(incident=incident, evidence=evidence, hypotheses=hypotheses)
 
-| Method | Endpoint | Description |
-|---|---|---|
-| `GET` | `/api/v1/reliefops/overview` | Active disaster overview, camp metrics, and latest plan status |
-| `GET` | `/api/v1/reliefops/camps` | List relief camps, populations, vulnerabilities, and access modes |
-| `GET` | `/api/v1/reliefops/inventory` | Live inventory across operational warehouses |
-| `GET` | `/api/v1/reliefops/vehicles` | Transport fleet capacities and supported access types |
-| `GET` | `/api/v1/reliefops/requests` | Pending camp resource requests |
-| `POST` | `/api/v1/reliefops/intake/csv` | Ingest camp requests via CSV upload |
-| `POST` | `/api/v1/reliefops/intake/dispatch` | Ingest unstructured radio transcripts using Gemma 4B |
-| `POST` | `/api/v1/reliefops/optimize` | Run Google OR-Tools CP-SAT supply allocation |
-| `GET` | `/api/v1/reliefops/plan/latest` | Retrieve latest verified allocation plan |
-| `POST` | `/api/v1/reliefops/simulate` | Run what-if scenario counterfactuals against baseline |
-| `POST` | `/api/v1/reliefops/explain` | Generate Gemma 12B decision rationale and commander advice |
-| `POST` | `/api/v1/reliefops/approve` | Authorize allocation plan and record in cryptographic ledger |
-| `GET` | `/api/v1/reliefops/audit` | Retrieve verified SHA-256 audit ledger |
-| `POST` | `/api/v1/reliefops/demo/seed` | Reset operational state to coastal cyclone benchmark scenario |
+print(report.leading_hypothesis_id)   # "HYP-001"
+print(report.confidence_assessment)   # human-readable verdict
+print(report.missing_evidence)        # list of identified data gaps
+print(len(report.proposed_tests))     # number of diagnostic probes
 
-
----
-
-## 9. Universal Global Constraint Solver Engine (`backend.universal`)
-
-GeCompose provides a domain-agnostic global constraint satisfaction and discrete optimization engine capable of solving multi-resource, time-windowed operations across healthcare, logistics, manufacturing, and university schedules:
-
-- **Generalized Resource Abstractions**: Models spatial assets (`ResourceKind.SPACE`), human specialists (`ResourceKind.HUMAN`), machinery (`ResourceKind.EQUIPMENT`), and consumables (`ResourceKind.INVENTORY`).
-- **Flexible Invariants**: Enforces capabilities matching, mandatory setup/turnaround windows, non-overlap groups, precedence task chains, and clinical/operational deadlines.
-- **CP-SAT Core**: Formulates optimal schedules using Google OR-Tools CP-SAT interval variables and multi-criteria lexicographic objective functions.
-
----
-
-## 10. GeCompose MedOps — Hospital Emergency Surgical Theatre Optimizer (`backend.medops`)
-
-**GeCompose MedOps** provides clinical operations intelligence and mathematical optimization for Hospital Emergency Departments and Surgical Operating Room Suites during mass-casualty events and everyday surgical emergencies.
-
-### Core Workflow
-
-```mermaid
-flowchart TD
-    A["Emergency Dispatches & EHR Waitlists\n(Paramedic Radio, CSV)"] --> B["Hospital Intake Service\n(Gemma 4B Clinical Triage Extraction)"]
-    B --> C["MedOps Surgical Registry\n(OR Suites, Surgeons, Anesthesiologists, ICU Beds)"]
-    C --> D["Surgical Theatre Optimizer\n(Google OR-Tools CP-SAT)"]
-    D --> E["Independent Clinical Validator\n(Sterility Turnaround & Team Non-Overlap)"]
-    E --> F["Clinical Explanation Service\n(Gemma 12B Triage Prioritization & Bottlenecks)"]
-    E --> G["Surgical Audit Ledger\n(Cryptographic SHA-256 Chain)"]
-    C --> H["What-If Surge Simulator\n(Mass-Casualty Incident & OR Closure)"]
-    H --> D
+# Fully serializable to JSON
+import json
+print(json.dumps(serialize_result(report), indent=2, default=str))
 ```
 
-### Key Modules
+#### Hypothesis auto-synthesis
 
-1. **Surgical Theatre CP-SAT Optimizer (`backend.medops.optimizer`)**:
-   - Enforces strict Operating Room non-overlap separated by mandatory sterilization decontamination windows (30-45 mins).
-   - Prevents clinical team double-booking (lead surgeons, anesthesiologists, and scrub nurses).
-   - Matches surgical specialties (Trauma, Cardiac, Neurosurgery, Orthopedics) and specialized OR equipment (cardiopulmonary bypass, fluoroscopy C-arm, rapid infuser).
-   - Prioritizes triage urgency: **ESI Level 1 Resuscitation** (immediate life-threat) > **ESI Level 2 Emergent** (< 60m) > **ESI Level 3 Urgent** > **ESI Level 4 Elective** (safely deferred when capacity is saturated).
+If no explicit hypotheses are provided, `investigate_incident()` automatically
+synthesizes three archetypal candidates from incident context and evidence:
 
-2. **Independent Clinical Validator (`backend.medops.validator`)**:
-   - Guarantees zero room double-booking, verifies sterilization clearance windows, checks surgeon credentials, and prevents patient arrival-time paradoxes.
+1. **Resource exhaustion** — capacity, CPU, memory, or connection-pool saturation
+2. **Upstream dependency failure** — upstream service, gateway, or network timeout
+3. **Config/deployment regression** — recent change introduced a defect
 
-3. **Mass-Casualty Surge Simulator (`backend.medops.simulator`)**:
-   - Evaluates counterfactuals (e.g. mass-casualty multi-trauma arrivals, contaminated OR closures, surgeon diversions) without mutating live active theatre boards.
-   - Computes side-by-side metrics: wait-to-incision diff, displaced elective cases, and emergency fulfillment.
+```python
+# Let the engine synthesize hypotheses automatically
+report = investigate_incident(incident=incident, evidence=evidence)
+```
 
-4. **Gemma 12B Clinical Operational Explainer (`backend.medops.explainer`)**:
-   - Explains clinical trade-offs to the Chief Medical Officer, identifying ICU bottlenecks and articulating why elective surgeries were deferred.
+#### Missing evidence detection
 
-5. **Paramedic Radio & EHR Intake (`backend.medops.intake`)**:
-   - Ingests tabular CSV waitlists and parses unstructured paramedic ambulance dispatches with **Gemma 4B**.
+The engine checks whether all three primary source types are covered and flags
+any unverified hypothesis assumptions and open questions:
 
-6. **Cryptographic Surgical Ledger (`backend.medops.audit`)**:
-   - Records surgical master schedules, emergency bumps, validations, and Chief of Surgery approvals in a tamper-evident SHA-256 chain.
+- No `METRICS` evidence → flags missing quantitative telemetry
+- No `LOGS` evidence → flags missing application trace logs
+- No `ALERTS` evidence → flags missing monitoring history
+- Unverified `Hypothesis.assumptions` → listed as explicit data gaps
 
-### MedOps REST API Endpoints
-
-| Method | Endpoint | Description |
-|---|---|---|
-| `POST` | `/api/v1/universal/solve` | Universal domain-agnostic CP-SAT constraint solver |
-| `GET` | `/api/v1/medops/overview` | Active surgical theatre operational status and metrics |
-| `GET` | `/api/v1/medops/rooms` | Operating theatre suites and equipped capabilities |
-| `GET` | `/api/v1/medops/staff` | Active surgical teams, credentials, and duty status |
-| `GET` | `/api/v1/medops/cases` | Pending emergency triage and scheduled surgical cases |
-| `POST` | `/api/v1/medops/intake/csv` | Ingest surgical waitlist via CSV upload |
-| `POST` | `/api/v1/medops/intake/dispatch` | Ingest paramedic emergency radio dispatches using Gemma 4B |
-| `POST` | `/api/v1/medops/optimize` | Run Google OR-Tools CP-SAT surgical master schedule |
-| `GET` | `/api/v1/medops/plan/latest` | Retrieve latest verified surgical theatre master plan |
-| `POST` | `/api/v1/medops/simulate` | Run mass-casualty surge or OR biohazard closure simulation |
-| `POST` | `/api/v1/medops/explain` | Generate Gemma 12B clinical operations explanation |
-| `POST` | `/api/v1/medops/approve` | Authorize surgical plan with Chief of Surgery cryptographic sign-off |
-| `GET` | `/api/v1/medops/audit` | Retrieve verified surgical SHA-256 audit ledger |
-| `POST` | `/api/v1/medops/demo/seed` | Reset operational state to Level-1 Trauma Hospital benchmark |
-
-
----
-
-## 11. Production & AWS Docker Deployment
-
-GeCompose is fully containerized and production-ready for deployment on **AWS (ECS Fargate, EKS, EC2)** or local workstation clusters.
-
-### Container Architecture
-
-| Service | Container Image / Dockerfile | Port | Role |
-|---|---|---|---|
-| **Frontend** | `Dockerfile.frontend` (Nginx + React SPA) | `80` | High-performance SPA serving with automatic `/api/` reverse proxy |
-| **Backend** | `Dockerfile.backend` (Python 3.12 Slim + FastAPI) | `8000` | Constraint optimizer, Ollama integration, REST APIs, health checks |
-| **Database** | `postgres:16-alpine` | `5432` | Persistent transactional store for schedules, rosters, and audit records |
-| **Ollama (Optional)** | `ollama/ollama:latest` | `11434` | Local GPU-accelerated inference hosting Gemma 4B and 12B models |
-
-### Quick Start with Docker Compose
+#### Runnable demo
 
 ```bash
-# 1. Clone repository & configure environment
-cp .env.example .env
-cp frontend/.env.example frontend/.env
-
-# 2. Build and launch all core services
-docker compose up -d --build
-
-# 3. Access web dashboard and backend APIs
-# Web UI:     http://localhost
-# Backend:    http://localhost:8000/docs
-# Health:     http://localhost:8000/health
+.venv/bin/python examples/demo_investigation.py
 ```
 
-### AWS ECS / EC2 Production Guidelines
+The demo models a real payment-service outage with 7 evidence items from logs,
+alerts, and metrics across 3 competing hypotheses. It prints hypothesis
+verdicts, missing evidence gaps, proposed diagnostic tests, and full JSON
+serialization.
 
-1. **ECS Fargate Tasks**:
-   - Deploy `Dockerfile.backend` and `Dockerfile.frontend` as task definitions behind an AWS Application Load Balancer (ALB).
-   - Set `DATABASE_URL` to point to AWS Aurora Serverless or RDS PostgreSQL.
-2. **GPU Acceleration (AWS EC2 G4dn / G5)**:
-   - For real-time on-premise Gemma inference, run the Ollama container with NVIDIA container runtime:
-     ```bash
-     docker compose --profile ai up -d
-     ```
-3. **Environment Security**:
-   - Store database credentials and API secrets in **AWS Secrets Manager** or **AWS Systems Manager Parameter Store**.
+#### Modules introduced in Phase 5
+
+| Module | Purpose |
+|---|---|
+| [`gecompose/investigation_models.py`](gecompose/investigation_models.py) | `Incident`, `Evidence`, `EvidenceLink`, `Hypothesis`, `DiagnosticTest`, `InvestigationReport` and all enums |
+| [`gecompose/investigation.py`](gecompose/investigation.py) | `evaluate_hypothesis()`, `IncidentInvestigator` engine |
+| [`examples/demo_investigation.py`](examples/demo_investigation.py) | Runnable end-to-end demonstration |
+| `tests/test_investigation_models.py` | 5 unit tests — model construction and computed fields |
+| `tests/test_investigation_analysis.py` | 7 unit tests — corroboration, refutation, and ranking |
+| `tests/test_investigation_workflow.py` | 6 end-to-end integration tests |
+
+#### Limitations
+
+- Plausibility scores are **heuristic**, not statistically calibrated.
+- Hypothesis synthesis uses **keyword-based archetypes** — accuracy improves with future LLM integration via the existing `synthesize_candidate_hypotheses()` interface.
+- Evidence relationship weights are caller-supplied; the engine does not infer weight from content.
+- No persistence layer — all state is held in memory and must be re-run per session.
 
 ---
 
