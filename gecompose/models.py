@@ -5,7 +5,7 @@ from __future__ import annotations
 from enum import Enum
 import re
 from typing import Any
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator, model_validator
 
 
 def parse_time_to_minutes(time_str: str) -> int:
@@ -469,4 +469,203 @@ class AlternativeSearchResult(BaseModel):
     search_time_seconds: float = Field(default=0.0, ge=0.0, description="Total search time in seconds")
     message: str | None = Field(default=None, description="Informative message about the alternative search")
     statistics: dict[str, Any] = Field(default_factory=dict, description="Search statistics")
+
+
+class ResourceType(str, Enum):
+    """Types of resources that can experience disruptions."""
+    ROOM = "room"
+    TEACHER = "teacher"
+
+
+class DisruptionEvent(BaseModel):
+    """Represents a real-world resource unavailability or closure event."""
+    model_config = ConfigDict(frozen=True)
+
+    id: str = Field(..., min_length=1, description="Unique disruption event identifier")
+    resource_type: ResourceType = Field(..., description="Type of resource disrupted ('room' or 'teacher')")
+    resource_id: str = Field(..., min_length=1, description="Identifier of the unavailable room or teacher")
+    slot_ids: set[str] = Field(
+        default_factory=set,
+        description="Explicit set of TimeSlot IDs during which the resource is unavailable"
+    )
+    day: str | None = Field(
+        default=None,
+        description="Optional day of the disruption interval (e.g., 'Monday')"
+    )
+    start_time: str | None = Field(
+        default=None,
+        description="Optional start time of the disruption interval (e.g., '09:00')"
+    )
+    end_time: str | None = Field(
+        default=None,
+        description="Optional end time of the disruption interval (e.g., '12:00')"
+    )
+    reason: str = Field(
+        default="",
+        description="Operational context or reason for the disruption"
+    )
+
+    @field_validator("id", "resource_id", mode="before")
+    @classmethod
+    def strip_ids(cls, v: Any) -> Any:
+        if isinstance(v, str):
+            v = v.strip()
+            if not v:
+                raise ValueError("Identifier cannot be empty or whitespace.")
+        return v
+
+    @model_validator(mode="after")
+    def validate_interval_and_targets(self) -> DisruptionEvent:
+        # Check time interval if provided
+        if self.start_time is not None or self.end_time is not None:
+            if not self.start_time or not self.end_time or not self.day:
+                raise ValueError(
+                    "When specifying a time interval for disruption, 'day', 'start_time', "
+                    "and 'end_time' must all be provided."
+                )
+            start_m = parse_time_to_minutes(self.start_time)
+            end_m = parse_time_to_minutes(self.end_time)
+            if end_m <= start_m:
+                raise ValueError(
+                    f"Disruption '{self.id}': end_time '{self.end_time}' ({end_m}m) "
+                    f"must be strictly after start_time '{self.start_time}' ({start_m}m)."
+                )
+
+        # Must have either slot_ids or a valid time interval
+        if not self.slot_ids and not (self.day and self.start_time and self.end_time):
+            raise ValueError(
+                f"Disruption '{self.id}' must specify either 'slot_ids' or a valid time interval ('day', 'start_time', 'end_time')."
+            )
+        return self
+
+    def resolve_unavailable_slots(self, problem: SchedulingProblem) -> set[str]:
+        """Resolve all slot IDs in the given problem that are affected by this disruption."""
+        slots = set(self.slot_ids)
+        if self.day and self.start_time and self.end_time:
+            start_m = parse_time_to_minutes(self.start_time)
+            end_m = parse_time_to_minutes(self.end_time)
+            for s in problem.slots:
+                if s.day.lower() == self.day.lower():
+                    # Overlap if max(start) < min(end)
+                    if max(start_m, s.start_minute) < min(end_m, s.end_minute):
+                        slots.add(s.id)
+        return slots
+
+
+class AssignmentChange(BaseModel):
+    """Detailed record of how an individual session assignment was modified during recovery."""
+    model_config = ConfigDict(frozen=True)
+
+    session_id: str = Field(..., description="ID of the session")
+    original_assignment: ScheduledAssignment = Field(..., description="Assignment prior to disruption")
+    new_assignment: ScheduledAssignment = Field(..., description="Assignment in the recovered schedule")
+    changed_teacher: bool = Field(default=False, description="Whether the instructor changed")
+    changed_room: bool = Field(default=False, description="Whether the room changed")
+    changed_slot: bool = Field(default=False, description="Whether the time slot changed")
+    reason: str = Field(default="", description="Human-readable explanation of why this assignment changed")
+
+
+class ImpactReport(BaseModel):
+    """Impact analysis report detailing how a disruption affects an active schedule."""
+    model_config = ConfigDict(frozen=True)
+
+    disruption: DisruptionEvent = Field(..., description="The disruption event analyzed")
+    directly_affected_session_ids: list[str] = Field(
+        default_factory=list,
+        description="IDs of sessions directly assigned to the disrupted resource during unavailable slots"
+    )
+    directly_affected_assignments: list[ScheduledAssignment] = Field(
+        default_factory=list,
+        description="Assignments invalidated by the disruption"
+    )
+    unaffected_session_ids: list[str] = Field(
+        default_factory=list,
+        description="IDs of scheduled sessions that do not conflict with the disruption"
+    )
+    total_scheduled_sessions: int = Field(
+        default=0,
+        ge=0,
+        description="Total number of scheduled sessions prior to disruption"
+    )
+
+    @computed_field
+    @property
+    def has_impact(self) -> bool:
+        """Returns True if any active assignments are directly invalidated by the disruption."""
+        return len(self.directly_affected_session_ids) > 0
+
+
+class RecoveryPolicy(BaseModel):
+    """Configuration governing minimal-change recovery optimization."""
+    model_config = ConfigDict(frozen=True)
+
+    room_change_penalty: int = Field(default=1, ge=0, description="Penalty weight for relocating a session to another room")
+    slot_change_penalty: int = Field(default=3, ge=0, description="Penalty weight for rescheduling a session to another slot")
+    teacher_change_penalty: int = Field(default=10, ge=0, description="Penalty weight for swapping the assigned instructor")
+    unaffected_displacement_penalty: int = Field(
+        default=25,
+        ge=0,
+        description="Additional penalty weight for displacing an otherwise unaffected session (cascade penalty)"
+    )
+    allow_room_reassignment: bool = Field(default=True, description="Whether sessions may move to another eligible room")
+    allow_slot_reassignment: bool = Field(default=True, description="Whether sessions may move to another eligible time slot")
+    allow_teacher_reassignment: bool = Field(default=True, description="Whether sessions may be reassigned to another qualified teacher")
+    time_limit_seconds: float = Field(default=10.0, gt=0.0, description="Solver time budget for recovery search in seconds")
+
+
+class DisruptionRecoveryResult(BaseModel):
+    """Outcome report for minimal-change schedule recovery after a disruption."""
+    model_config = ConfigDict(frozen=True)
+
+    disruption: DisruptionEvent = Field(..., description="The disruption event that triggered recovery")
+    status: SolverStatus = Field(..., description="Solver status of the recovery attempt")
+    original_assignments: list[ScheduledAssignment] = Field(
+        default_factory=list,
+        description="Schedule assignments prior to disruption"
+    )
+    recovered_assignments: list[ScheduledAssignment] = Field(
+        default_factory=list,
+        description="Verified replacement schedule assignments (if feasible/optimal)"
+    )
+    directly_affected_session_ids: list[str] = Field(
+        default_factory=list,
+        description="Sessions directly conflicting with the disruption"
+    )
+    moved_session_ids: list[str] = Field(
+        default_factory=list,
+        description="All sessions whose assignments changed in the recovery schedule"
+    )
+    unaffected_session_ids: list[str] = Field(
+        default_factory=list,
+        description="Sessions that remained in their original assignments"
+    )
+    changes: list[AssignmentChange] = Field(
+        default_factory=list,
+        description="Itemized changes between original and recovered schedule"
+    )
+    total_penalty: int = Field(default=0, ge=0, description="Total weighted change penalty score")
+    validation_passed: bool = Field(
+        default=False,
+        description="Whether the recovered schedule passed independent constraint verification"
+    )
+    violations: list[str] = Field(
+        default_factory=list,
+        description="Constraint violations if recovery validation failed"
+    )
+    wall_time_seconds: float = Field(default=0.0, ge=0.0, description="Time taken to compute recovery in seconds")
+    message: str | None = Field(default=None, description="Informative status message")
+    statistics: dict[str, Any] = Field(default_factory=dict, description="Solver metrics and change statistics")
+
+    @computed_field
+    @property
+    def is_success(self) -> bool:
+        """Returns True only if the solver found a solution AND independent verification passed."""
+        return self.status in (SolverStatus.OPTIMAL, SolverStatus.FEASIBLE) and self.validation_passed
+
+    @computed_field
+    @property
+    def total_changes(self) -> int:
+        """Number of sessions moved or modified."""
+        return len(self.changes)
+
 

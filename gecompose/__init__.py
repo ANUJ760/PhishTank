@@ -17,6 +17,13 @@ from gecompose.models import (
     Teacher,
     TimeSlot,
     parse_time_to_minutes,
+    # Phase 4 — disruption and recovery models
+    AssignmentChange,
+    DisruptionEvent,
+    DisruptionRecoveryResult,
+    ImpactReport,
+    RecoveryPolicy,
+    ResourceType,
 )
 from gecompose.solver import CPSATScheduler, solve_schedule
 from gecompose.diagnostics import ConflictDiagnoser, diagnose_conflicts
@@ -29,6 +36,9 @@ from gecompose.api import (
     schedule,
     diagnose,
     find_alternatives,
+    analyze_impact,
+    recover_schedule,
+    DisruptionRecoverer,
     to_timetable_grid,
     serialize_result,
 )
@@ -68,4 +78,14 @@ __all__ = [
     "find_alternatives",
     "to_timetable_grid",
     "serialize_result",
+    # Phase 4 — disruption models & recovery
+    "AssignmentChange",
+    "DisruptionEvent",
+    "DisruptionRecoveryResult",
+    "ImpactReport",
+    "RecoveryPolicy",
+    "ResourceType",
+    "analyze_impact",
+    "recover_schedule",
+    "DisruptionRecoverer",
 ]
