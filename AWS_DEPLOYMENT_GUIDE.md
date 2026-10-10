@@ -7,6 +7,18 @@ This guide covers deploying the GeCompose application on Amazon Web Services (AW
 
 ---
 
+## 🌐 Live Deployed Frontend on AWS
+
+The frontend has been built and deployed live to AWS:
+
+| Endpoint Type | Live URL | Details |
+|---|---|---|
+| **Direct S3 Website** | **[http://gecompose-frontend-030933799922.s3-website.ap-south-1.amazonaws.com](http://gecompose-frontend-030933799922.s3-website.ap-south-1.amazonaws.com)** | Live & active immediately (HTTP 200 OK) |
+| **Global CloudFront CDN (HTTPS)** | **[https://d2327vtp9wi2bc.cloudfront.net](https://d2327vtp9wi2bc.cloudfront.net)** | Global SSL CDN distribution (`E1TD4VUTC423CP`) |
+| **S3 Bucket** | `s3://gecompose-frontend-030933799922` | Region: `ap-south-1` (Mumbai) |
+
+---
+
 ## 🏛️ Recommended Architecture Options
 
 ### Option A: The AWS Cloud-Native Best Practice (Recommended)
