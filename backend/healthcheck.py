@@ -11,6 +11,12 @@ def _command(command:list[str],timeout:int=3)->tuple[bool,str]:
     except (OSError,subprocess.TimeoutExpired) as exc:return False,str(exc)
 def inspect()->dict[str,dict]:
     items={"mock_llm":{"ok":True,"detail":"Fixture mode enabled" if config.MOCK_LLM else "Fixture mode disabled; live inference configured"}}
+    try:
+        from backend.registry import db
+        db.check_connection()
+        items["postgres"]={"ok":True,"detail":"PostgreSQL connection is healthy"}
+    except Exception as exc:
+        items["postgres"]={"ok":False,"detail":str(exc)}
     for tier,url,model in (("intake",config.INTAKE_URL,config.INTAKE_MODEL),("reason",config.REASON_URL,config.REASON_MODEL)):
         if config.MOCK_LLM:items[f"{tier}_model"]={"ok":True,"detail":"Not required in mock mode"};continue
         try:

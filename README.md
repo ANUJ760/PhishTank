@@ -215,7 +215,7 @@ flowchart TD
 | **1** | **Multimodal Intake** | Spoken audio, timetable photos, text | Structured draft rules with source pointers | Gemma 4 E4B |
 | **2** | **Format Adapter** | `.xlsx` and `.csv` files | Clean rows with cell references | Docker Sandbox + Python |
 | **3** | **Review Screen** | Draft rules + image crops / audio clips | Confirmed rules | Streamlit UI |
-| **4** | **Constraint Registry** | Confirmed rules | Salted hashes and rule IDs | Local SQLite |
+| **4** | **Constraint Registry** | Confirmed rules | Salted hashes and rule IDs | Dockerized PostgreSQL |
 | **5** | **CP-SAT Solver** | Mathematical constraints, previous schedule (optional) | Complete schedule or conflict set | Google OR-Tools |
 | **6** | **Gemma 4 Explainer** | Conflicting rule IDs | Plain-English summary + verified options | Gemma 4 12B |
 | **7** | **Consent Contract** | Signed approvals from owners | On-chain status update | Solidity (`ConsentLedger.sol`) |

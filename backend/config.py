@@ -36,7 +36,11 @@ AUDIO_MODE = os.getenv("AUDIO_MODE", "native")
 SANDBOX_MODE = os.getenv("SANDBOX_MODE", "docker")
 SANDBOX_IMAGE = os.getenv("SANDBOX_IMAGE", "gecompose-sandbox")
 RPC_URL = os.getenv("RPC_URL", "http://127.0.0.1:8545")
-DB_PATH = Path(os.getenv("DB_PATH", "data/gecompose.db"))
+DATABASE_URL = os.getenv(
+    "DATABASE_URL",
+    "postgresql://gecompose:gecompose_dev@127.0.0.1:5432/gecompose",
+)
+UPLOAD_DIR = Path(os.getenv("UPLOAD_DIR", "data/uploads"))
 DAYS = _int("DAYS", 5)
 SLOTS_PER_DAY = _int("SLOTS_PER_DAY", 6)
 SOLVER_TIME_S = _float("SOLVER_TIME_S", 10)

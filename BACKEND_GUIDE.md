@@ -50,6 +50,7 @@ python3.11 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env
 mkdir -p data/uploads samples models
+docker compose up -d postgres
 ```
 
 `requirements.txt`
@@ -62,8 +63,11 @@ pandas>=2.2
 openpyxl>=3.1
 openai>=1.40
 python-dotenv>=1.0
+psycopg[binary,pool]>=3.2
 pytest>=8
 ```
+
+PostgreSQL data persists in the `gecompose_postgres` Docker volume. The Compose service binds only to localhost. Override the development credentials with `POSTGRES_USER`, `POSTGRES_PASSWORD`, and `POSTGRES_DB` before using this setup outside a local demo.
 
 `.env.example`
 ```
@@ -77,7 +81,8 @@ AUDIO_MODE=native          # native | transcript
 SANDBOX_MODE=docker        # docker | local  (local only with MOCK_LLM=1)
 SANDBOX_IMAGE=gecompose-sandbox
 RPC_URL=http://127.0.0.1:8545
-DB_PATH=data/gecompose.db
+DATABASE_URL=postgresql://gecompose:gecompose_dev@127.0.0.1:5432/gecompose
+UPLOAD_DIR=data/uploads
 DAYS=5
 SLOTS_PER_DAY=6
 SOLVER_TIME_S=10
@@ -199,7 +204,8 @@ AUDIO_MODE = os.getenv("AUDIO_MODE", "native")
 SANDBOX_MODE = os.getenv("SANDBOX_MODE", "docker")
 SANDBOX_IMAGE = os.getenv("SANDBOX_IMAGE", "gecompose-sandbox")
 RPC_URL = os.getenv("RPC_URL", "http://127.0.0.1:8545")
-DB_PATH = os.getenv("DB_PATH", "data/gecompose.db")
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://gecompose:gecompose_dev@127.0.0.1:5432/gecompose")
+UPLOAD_DIR = Path(os.getenv("UPLOAD_DIR", "data/uploads"))
 DAYS = int(os.getenv("DAYS", "5"))
 SLOTS_PER_DAY = int(os.getenv("SLOTS_PER_DAY", "6"))
 SOLVER_TIME_S = float(os.getenv("SOLVER_TIME_S", "10"))
@@ -352,7 +358,7 @@ Day 0 = Monday. Slots 0 to 2 are morning, 3 to 5 afternoon.
 
 ---
 
-## 5. Registry `[PY]` (`backend/registry/db.py`, SQLite)
+## 5. Registry `[PY]` (`backend/registry/db.py`, PostgreSQL)
 
 Tables:
 - `rules(id TEXT PRIMARY KEY, json TEXT, salt BLOB, rule_hash TEXT, status TEXT)`

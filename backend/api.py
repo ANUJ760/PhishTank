@@ -38,7 +38,7 @@ def ingest_image(img:bytes,filename:str)->list[Rule]:return voice_photo.ingest_i
 def ingest_text(text:str)->list[Rule]:return voice_photo.ingest_text(text)
 def ingest_sheet(xlsx:bytes,filename:str)->IngestSheetResult:
     if len(xlsx)>50*1024*1024: raise ValueError("Spreadsheet exceeds 50 MiB")
-    path=Path(config.DB_PATH.parent)/"uploads"/(Path(filename).name+".staging.xlsx"); path.parent.mkdir(parents=True,exist_ok=True)
+    path=config.UPLOAD_DIR/(Path(filename).name+".staging.xlsx"); path.parent.mkdir(parents=True,exist_ok=True)
     try:
         path.write_bytes(xlsx); result=sheet_parser.ingest_sheet(path,Path(filename).name)
         db.save_upload(Path(filename).name,xlsx); return IngestSheetResult(**result.model_dump())
@@ -149,5 +149,5 @@ def reset_demo(keep_parsers:bool=False)->None:
     global _pending,_cycles
     with _lock:_pending=None;_cycles=0
     db.reset_db(keep_parsers=keep_parsers)
-    uploads=config.DB_PATH.parent/"uploads"
+    uploads=config.UPLOAD_DIR
     if uploads.exists():shutil.rmtree(uploads)
