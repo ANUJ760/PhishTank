@@ -125,7 +125,10 @@ def publish()->PublishResult:
         if _pending is None:raise ValueError("Solve a feasible schedule before publishing")
         violations=check(_pending,db.get_roster(),db.list_rules("confirmed"))
         if violations:raise ValueError("Schedule failed independent verification: "+"; ".join(violations))
-        digest=hashing.schedule_hash(_pending);tx=Chain().anchor(digest,_pending.version);hex_digest=hashing.hexs(digest)
+        digest=hashing.schedule_hash(_pending)
+        chain=Chain()
+        tx=chain.anchor(digest,_pending.version) if not chain.is_anchored(digest) else "0x0000000000000000000000000000000000000000000000000000000000000000"
+        hex_digest=hashing.hexs(digest)
         db.save_schedule(_pending,hex_digest,tx);schedule=_pending;_pending=None
         return PublishResult(hash=hex_digest,tx_hash=tx,version=schedule.version,json_bytes=json_bytes(schedule),csv_bytes=csv_bytes(schedule),ics_bytes=ics_bytes(schedule,db.get_roster()))
 def verify_file(data:bytes)->VerifyResult:

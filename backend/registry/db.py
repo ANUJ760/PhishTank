@@ -1,6 +1,8 @@
 """PostgreSQL-backed registry with short-lived, transaction-scoped connections."""
 from __future__ import annotations
 
+import atexit
+from pathlib import Path
 import re
 import threading
 import time
@@ -12,6 +14,19 @@ from backend.models import RelaxOption, Rule, Roster, Schedule
 
 _pool = None
 _pool_lock = threading.Lock()
+
+
+def _close_pool():
+    global _pool
+    if _pool is not None:
+        try:
+            _pool.close()
+        except Exception:
+            pass
+        _pool = None
+
+
+atexit.register(_close_pool)
 
 
 def _get_pool():
@@ -195,7 +210,8 @@ def delete_parser(sig: str) -> None:
 def save_schedule(schedule: Schedule, hash_hex: str, tx_hash: str) -> None:
     with _connect() as connection:
         connection.execute(
-            "INSERT INTO schedules VALUES(%s,%s,%s,%s,%s)",
+            "INSERT INTO schedules(hash,version,json,tx_hash,created_at) VALUES(%s,%s,%s,%s,%s) "
+            "ON CONFLICT(hash) DO UPDATE SET version=EXCLUDED.version,json=EXCLUDED.json,tx_hash=EXCLUDED.tx_hash,created_at=EXCLUDED.created_at",
             (hash_hex, schedule.version, schedule.model_dump_json(), tx_hash, time.time()),
         )
 
