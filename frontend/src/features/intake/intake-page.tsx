@@ -63,9 +63,7 @@ export function IntakePage() {
   const [instructions, setInstructions] = useState(
     "Extract all faculty availability constraints, room requirements, and qualification rules. Ground against active timetable."
   );
-  const [notes, setNotes] = useState(
-    "Memo from Dean: Prof. Rao has committee meetings Monday morning (slots 0 and 1). DB_LAB session must only be assigned to qualified faculty [Prof. Rao]."
-  );
+  const [notes, setNotes] = useState("");
   const [files, setFiles] = useState<File[]>([]);
 
   // States
@@ -79,19 +77,11 @@ export function IntakePage() {
   const [filterCategory, setFilterCategory] = useState<string>("all");
   const [confirmedRules, setConfirmedRules] = useState<Record<string, boolean>>({});
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
-  const [expandedJson, setExpandedJson] = useState<Record<string, boolean>>({});
+  const [expandedDetails, setExpandedDetails] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     api.roster().then((r) => {
       setRoster(r);
-      if (r && r.teachers.length > 0) {
-        const t1 = r.teachers[0];
-        const t2 = r.teachers[1] || t1;
-        const s1 = r.sessions[0]?.id || "DB_LAB";
-        setNotes(
-          `Official Memo: ${t1} cannot teach Monday morning (09:00 - 11:00). ${t2} is on conference leave Wednesday afternoon. ${s1} must only be assigned to qualified faculty [${t1}].`
-        );
-      }
     }).catch(() => {});
   }, []);
 
@@ -151,15 +141,15 @@ export function IntakePage() {
     }
   };
 
-  const toggleJson = (ruleId: string) => {
-    setExpandedJson((prev) => ({ ...prev, [ruleId]: !prev[ruleId] }));
+  const toggleDetails = (ruleId: string) => {
+    setExpandedDetails((prev) => ({ ...prev, [ruleId]: !prev[ruleId] }));
   };
 
   const loadPreset = (type: "college" | "relief" | "hospital") => {
     if (type === "college") {
-      const t1 = roster?.teachers[0] || "Prof. Rao";
-      const t2 = roster?.teachers[1] || "Prof. Mehta";
-      const s1 = roster?.sessions[0]?.id || "DB_LAB";
+      const t1 = roster?.teachers[0] || "Faculty Coordinator";
+      const t2 = roster?.teachers[1] || "Senior Instructor";
+      const s1 = roster?.sessions[0]?.id || "CORE_LAB";
       setInstructions("Extract faculty availability, room restrictions, and instructor qualification constraints for the semester timetable.");
       setNotes(`Memo from Academic Office: ${t1} cannot teach Monday morning (09:00 - 11:00). ${t2} is on sick leave Tuesday afternoon. ${s1} session requires qualified instructor [${t1}].`);
     } else if (type === "relief") {
@@ -200,7 +190,7 @@ export function IntakePage() {
       const timeWindow = p.slots ? formatSlots(p.slots) : "All Hours";
       let category = "Operational Constraint";
       let headline = `Constraint: ${r.type}`;
-      let plainDesc = JSON.stringify(p);
+      let plainDesc = Object.entries(p).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(", ") : v}`).join(" • ") || "Operational constraint.";
       let targetEntity = "Entity";
 
       if (r.type === "teacher_unavailable") {
@@ -603,7 +593,7 @@ export function IntakePage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {filteredCards.map((card) => {
                   const isConfirmed = confirmedRules[card.id] || card.status === "confirmed";
-                  const isJsonOpen = expandedJson[card.id] || false;
+                  const isDetailsOpen = expandedDetails[card.id] || false;
 
                   return (
                     <div
@@ -690,11 +680,11 @@ export function IntakePage() {
                       <div className="flex items-center justify-between pt-1 border-t border-white/5">
                         <button
                           type="button"
-                          onClick={() => toggleJson(card.id)}
+                          onClick={() => toggleDetails(card.id)}
                           className="text-[10px] text-zinc-400 hover:text-white flex items-center gap-1 transition-colors"
                         >
-                          {isJsonOpen ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
-                          <span>{isJsonOpen ? "Hide Details" : "View Details"}</span>
+                          {isDetailsOpen ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
+                          <span>{isDetailsOpen ? "Hide Specifications" : "View Specifications"}</span>
                         </button>
 
                         <button
@@ -726,15 +716,35 @@ export function IntakePage() {
                         </button>
                       </div>
 
-                      {/* Expandable Technical JSON Drawer */}
-                      {isJsonOpen && (
-                        <div className="pt-2 border-t border-white/5 space-y-1 animate-fade-in">
-                          <span className="text-[9px] font-mono text-zinc-500 uppercase tracking-wider block">
-                            Solver Constraint Structure
-                          </span>
-                          <pre className="p-2.5 rounded bg-black/80 border border-white/10 font-mono text-[10px] text-zinc-300 overflow-x-auto leading-normal">
-                            {JSON.stringify({ type: card.type, params: card.params, owner: card.owner }, null, 2)}
-                          </pre>
+                      {/* Expandable Structured Constraint Specifications */}
+                      {isDetailsOpen && (
+                        <div className="pt-3 border-t border-white/10 space-y-2.5 animate-fade-in">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">
+                              Constraint Specifications
+                            </span>
+                            <span className="text-[10px] font-mono text-zinc-500">
+                              Ref: {card.evidence_ref || "Direct memo"}
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                            <div className="p-2 rounded-lg bg-zinc-900 border border-white/5">
+                              <span className="text-zinc-500 block text-[10px]">Target Entity</span>
+                              <span className="font-semibold text-zinc-200 truncate block">{card.target_entity}</span>
+                            </div>
+                            <div className="p-2 rounded-lg bg-zinc-900 border border-white/5">
+                              <span className="text-zinc-500 block text-[10px]">Schedule Day</span>
+                              <span className="font-semibold text-zinc-200 truncate block">{card.day_name}</span>
+                            </div>
+                            <div className="p-2 rounded-lg bg-zinc-900 border border-white/5">
+                              <span className="text-zinc-500 block text-[10px]">Time Window</span>
+                              <span className="font-semibold text-zinc-200 truncate block">{card.time_window}</span>
+                            </div>
+                            <div className="p-2 rounded-lg bg-zinc-900 border border-white/5">
+                              <span className="text-zinc-500 block text-[10px]">Governance Owner</span>
+                              <span className="font-semibold text-zinc-200 truncate block">{card.owner}</span>
+                            </div>
+                          </div>
                         </div>
                       )}
                     </div>

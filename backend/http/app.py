@@ -364,6 +364,8 @@ async def intake_sheet(
 
 @app.post("/api/v1/intake/dump")
 @app.post("/intake/dump")
+@app.post("/api/v1/intake/data-dump")
+@app.post("/intake/data-dump")
 async def intake_data_dump(
     files: list[UploadFile] = File(default=[]),
     instructions: str = Form(default=""),

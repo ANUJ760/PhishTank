@@ -19,7 +19,7 @@ from pydantic import BaseModel, Field
 
 from backend import config
 from backend.llm.client import call_json
-from backend.models import Evidence, Roster, Rule, Schedule, validate_params
+from backend.models import Evidence, Roster, Room, Rule, Schedule, Session, validate_params
 from backend.registry import db
 
 log = logging.getLogger(__name__)
@@ -169,6 +169,143 @@ def _extract_file_preview(filename: str, content: bytes) -> tuple[str, str]:
     return "binary", f"Binary document: {filename} ({size} bytes)"
 
 
+def _parse_day_value(val: Any) -> int:
+    """Parse day index (0-4) from string or number."""
+    s = str(val).strip().lower()
+    if s in DAY_LOOKUP:
+        return DAY_LOOKUP[s]
+    for k, v in DAY_LOOKUP.items():
+        if k in s:
+            return v
+    if s.isdigit() and 0 <= int(s) < config.DAYS:
+        return int(s)
+    return 0
+
+
+def _parse_slot_values(val: Any) -> list[int]:
+    """Parse list of slot indices (0-5) from string or number."""
+    s = str(val).strip().lower()
+    if s.isdigit() and 0 <= int(s) < config.SLOTS_PER_DAY:
+        return [int(s)]
+    if "morning" in s or "09:00" in s or "9:00" in s:
+        return [0, 1, 2]
+    if "afternoon" in s or "13:00" in s or "1:00" in s or "post-lunch" in s:
+        return [3, 4, 5]
+    if "full" in s or "all" in s or "entire" in s or "whole" in s:
+        return list(range(config.SLOTS_PER_DAY))
+    tokens = re.findall(r"\b([0-5])\b", s)
+    if tokens:
+        return sorted(list(set(int(t) for t in tokens)))
+    return [0, 1]
+
+
+def _ensure_teacher(roster: Roster, name: str) -> str:
+    """Ensure a teacher exists in roster, returning their canonical name."""
+    clean = name.strip()
+    if not clean:
+        return ""
+    # Exact match
+    for t in roster.teachers:
+        if clean.lower() == t.lower():
+            return t
+    # Substring / partial match
+    for t in roster.teachers:
+        if clean.lower() in t.lower() or t.lower() in clean.lower():
+            return t
+    roster.teachers.append(clean)
+    return clean
+
+
+def _ensure_room(roster: Roster, name: str) -> str:
+    """Ensure a room exists in roster, returning its canonical name."""
+    clean = name.strip()
+    if not clean:
+        return ""
+    for r in roster.rooms:
+        if clean.lower() == r.name.lower():
+            return r.name
+    for r in roster.rooms:
+        if clean.lower() in r.name.lower() or r.name.lower() in clean.lower():
+            return r.name
+    roster.rooms.append(Room(name=clean, capacity=30))
+    return clean
+
+
+def _ensure_session(roster: Roster, course_or_id: str, teachers: list[str] | None = None) -> str:
+    """Ensure a session exists in roster, updating candidate teachers if provided."""
+    clean = course_or_id.strip()
+    if not clean:
+        return ""
+    for s in roster.sessions:
+        if clean.lower() == s.id.lower() or clean.lower() == s.course.lower():
+            if teachers:
+                for t in teachers:
+                    if t not in s.teachers:
+                        s.teachers.append(t)
+            return s.id
+    # Create new session
+    sid = re.sub(r"[^A-Za-z0-9]+", "_", clean.upper()).strip("_")
+    if not sid:
+        sid = f"SES_{len(roster.sessions) + 1}"
+    t_list = [t for t in (teachers or []) if t]
+    if not t_list:
+        t_list = [roster.teachers[0]] if roster.teachers else ["Faculty"]
+    roster.sessions.append(Session(id=sid, course=clean, teachers=t_list, size=30))
+    return sid
+
+
+def _extract_tables_from_file(filename: str, content: bytes) -> list[tuple[str, list[str], list[list[str]]]]:
+    """Extract tabular data as list of (table_ref, headers, rows) from CSV, TSV, Excel, or JSON."""
+    tables: list[tuple[str, list[str], list[list[str]]]] = []
+    ext = Path(filename).suffix.lower()
+
+    if ext in (".csv", ".tsv"):
+        try:
+            delimiter = "\t" if ext == ".tsv" else ","
+            text_stream = content.decode("utf-8", errors="replace")
+            reader = csv.reader(io.StringIO(text_stream), delimiter=delimiter)
+            rows = [[str(cell).strip() for cell in r] for r in reader if r and any(str(c).strip() for c in r)]
+            if len(rows) > 1:
+                headers = [h.strip().lower() for h in rows[0]]
+                tables.append((filename, headers, rows[1:]))
+        except Exception as exc:
+            log.warning("CSV table extraction error for %s: %s", filename, exc)
+
+    elif ext in (".xlsx", ".xls"):
+        try:
+            import pandas as pd
+            excel_file = io.BytesIO(content)
+            xls = pd.ExcelFile(excel_file)
+            for sheet_name in xls.sheet_names:
+                df = pd.read_excel(xls, sheet_name=sheet_name).dropna(how="all")
+                if not df.empty and len(df.columns) > 0:
+                    headers = [str(c).strip().lower() for c in df.columns]
+                    data_rows = []
+                    for _, row in df.iterrows():
+                        data_rows.append([str(val).strip() if pd.notna(val) else "" for val in row])
+                    tables.append((f"{filename}#{sheet_name}", headers, data_rows))
+        except Exception as exc:
+            log.warning("Excel table extraction error for %s: %s", filename, exc)
+
+    elif ext == ".json":
+        try:
+            parsed = json.loads(content.decode("utf-8", errors="replace"))
+            if isinstance(parsed, list) and len(parsed) > 0 and isinstance(parsed[0], dict):
+                headers = [k.strip().lower() for k in parsed[0].keys()]
+                data_rows = [[str(item.get(k, "")).strip() for k in parsed[0].keys()] for item in parsed]
+                tables.append((filename, headers, data_rows))
+            elif isinstance(parsed, dict):
+                for k, v in parsed.items():
+                    if isinstance(v, list) and len(v) > 0 and isinstance(v[0], dict):
+                        headers = [col.strip().lower() for col in v[0].keys()]
+                        data_rows = [[str(item.get(col, "")).strip() for col in v[0].keys()] for item in v]
+                        tables.append((f"{filename}#{k}", headers, data_rows))
+        except Exception as exc:
+            log.warning("JSON table extraction error for %s: %s", filename, exc)
+
+    return tables
+
+
 def _parse_days_and_slots_from_text(text: str) -> tuple[int, list[int]]:
     """Heuristic extraction of day index (0-4) and slot indices from text snippet."""
     t_lower = text.lower()
@@ -179,15 +316,17 @@ def _parse_days_and_slots_from_text(text: str) -> tuple[int, list[int]]:
             break
 
     slots: list[int] = []
-    # Check morning / afternoon
-    if "morning" in t_lower or "09:00 to 12:00" in t_lower or "9 to 12" in t_lower or "9:00 - 12:00" in t_lower:
+    if "full day" in t_lower or "whole day" in t_lower or "all day" in t_lower or "entire day" in t_lower:
+        slots = list(range(config.SLOTS_PER_DAY))
+    elif "morning" in t_lower or "09:00 to 12:00" in t_lower or "9 to 12" in t_lower or "9:00 - 12:00" in t_lower:
         slots = [0, 1, 2]
     elif "afternoon" in t_lower or "13:00 to 16:00" in t_lower or "1 to 4" in t_lower or "post-lunch" in t_lower:
         slots = [3, 4, 5]
     elif "slots 0 and 1" in t_lower or "0 and 1" in t_lower or "slots 0, 1" in t_lower or "09:00 and 11:00" in t_lower or "09:00 to 11:00" in t_lower:
         slots = [0, 1]
+    elif "slots 3 and 4" in t_lower or "3 and 4" in t_lower:
+        slots = [3, 4]
     else:
-        # Check specific numbers or slots
         found_slots = set()
         for s in range(config.SLOTS_PER_DAY):
             if f"slot {s}" in t_lower or f"slot:{s}" in t_lower or f"slot_{s}" in t_lower:
@@ -226,48 +365,93 @@ def _extract_deterministic_rules(
             seen_keys.add(key)
             extracted.append(d)
 
-    # 1. Parse CSV/TSV files if available
+    # 1. Parse all tabular files (CSV, TSV, XLSX, XLS, JSON)
     for filename, content in files:
-        ext = Path(filename).suffix.lower()
-        if ext in (".csv", ".tsv"):
-            try:
-                delimiter = "\t" if ext == ".tsv" else ","
-                text_stream = content.decode("utf-8", errors="replace")
-                reader = csv.reader(io.StringIO(text_stream), delimiter=delimiter)
-                rows = [row for row in reader if row and any(c.strip() for c in row)]
-                if len(rows) > 1:
-                    headers = [h.strip().lower() for h in rows[0]]
-                    t_idx = next((i for i, h in enumerate(headers) if "teach" in h or "facult" in h or "prof" in h or "name" in h), -1)
-                    r_idx = next((i for i, h in enumerate(headers) if "room" in h or "lab" in h), -1)
-                    s_idx = next((i for i, h in enumerate(headers) if "session" in h or "course" in h), -1)
-                    d_idx = next((i for i, h in enumerate(headers) if "day" in h), -1)
-                    slot_idx = next((i for i, h in enumerate(headers) if "slot" in h or "time" in h), -1)
+        tables = _extract_tables_from_file(filename, content)
+        for table_ref, headers, rows in tables:
+            t_idx = next((i for i, h in enumerate(headers) if any(k in h for k in ("teach", "facult", "prof", "instructor", "doctor", "surgeon", "name"))), -1)
+            c_idx = next((i for i, h in enumerate(headers) if any(k in h for k in ("course", "session", "subject", "module", "class", "lecture"))), -1)
+            r_idx = next((i for i, h in enumerate(headers) if any(k in h for k in ("room", "lab", "hall", "theater", "theatre", "venue", "classroom", "or", "ot"))), -1)
+            d_idx = next((i for i, h in enumerate(headers) if any(k in h for k in ("day", "date", "weekday"))), -1)
+            slot_idx = next((i for i, h in enumerate(headers) if any(k in h for k in ("slot", "time", "hour", "window", "period"))), -1)
+            status_idx = next((i for i, h in enumerate(headers) if any(k in h for k in ("status", "reason", "type", "avail", "remark", "note", "action"))), -1)
 
-                    for r_num, row in enumerate(rows[1:], start=2):
-                        # Match teacher unavailability
-                        if t_idx >= 0 and t_idx < len(row):
-                            val = row[t_idx].strip()
-                            matched_t = next((t for t in roster.teachers if val.lower() in t.lower() or t.lower() in val.lower()), None)
-                            if matched_t:
-                                d_val = 0
-                                if d_idx >= 0 and d_idx < len(row):
-                                    raw_d = row[d_idx].strip().lower()
-                                    d_val = DAY_LOOKUP.get(raw_d, int(raw_d) if raw_d.isdigit() and 0 <= int(raw_d) < 5 else 0)
-                                s_vals = [0, 1]
-                                if slot_idx >= 0 and slot_idx < len(row):
-                                    raw_s = row[slot_idx].strip()
-                                    if raw_s.isdigit() and 0 <= int(raw_s) < 6:
-                                        s_vals = [int(raw_s)]
+            for r_num, row in enumerate(rows, start=2):
+                # Pattern A: Course & Teacher Workload / Schedule Placement
+                if c_idx >= 0 and c_idx < len(row) and t_idx >= 0 and t_idx < len(row):
+                    course_val = row[c_idx].strip()
+                    teacher_val = row[t_idx].strip()
+                    if course_val and teacher_val:
+                        raw_teachers = [t.strip() for t in re.split(r"[,;/]|\band\b", teacher_val) if t.strip()]
+                        registered_teachers = [_ensure_teacher(roster, t) for t in raw_teachers if t]
+                        session_id = _ensure_session(roster, course_val, registered_teachers)
+
+                        # If this row also contains day and slot -> Pinned Live Placement
+                        if d_idx >= 0 and d_idx < len(row) and slot_idx >= 0 and slot_idx < len(row):
+                            d_val = _parse_day_value(row[d_idx])
+                            s_vals = _parse_slot_values(row[slot_idx])
+                            if r_idx >= 0 and r_idx < len(row):
+                                _ensure_room(roster, row[r_idx])
+                            add_draft(
+                                ExtractedRuleDraft(
+                                    type="pin_session",
+                                    params={"session_id": session_id, "day": d_val, "slots": s_vals},
+                                    owner="Academic Dean",
+                                    evidence_ref=f"{table_ref}@row{r_num}",
+                                )
+                            )
+                            if registered_teachers:
                                 add_draft(
                                     ExtractedRuleDraft(
-                                        type="teacher_unavailable",
-                                        params={"teacher": matched_t, "day": d_val, "slots": s_vals},
-                                        owner=matched_t,
-                                        evidence_ref=f"{filename}@row{r_num}",
+                                        type="only_qualified",
+                                        params={"session_id": session_id, "teachers": registered_teachers},
+                                        owner="Academic Dean",
+                                        evidence_ref=f"{table_ref}@row{r_num}",
                                     )
                                 )
-            except Exception as exc:
-                log.info("CSV extraction error for %s: %s", filename, exc)
+                        else:
+                            # Workload qualification constraint (e.g. workload.xlsx)
+                            if registered_teachers:
+                                add_draft(
+                                    ExtractedRuleDraft(
+                                        type="only_qualified",
+                                        params={"session_id": session_id, "teachers": registered_teachers},
+                                        owner="Academic Dean",
+                                        evidence_ref=f"{table_ref}@row{r_num}",
+                                    )
+                                )
+
+                # Pattern B: Teacher Availability / Unavailability Table
+                elif t_idx >= 0 and t_idx < len(row) and c_idx < 0:
+                    val = row[t_idx].strip()
+                    if val:
+                        matched_t = _ensure_teacher(roster, val)
+                        d_val = _parse_day_value(row[d_idx]) if (d_idx >= 0 and d_idx < len(row)) else 0
+                        s_vals = _parse_slot_values(row[slot_idx]) if (slot_idx >= 0 and slot_idx < len(row)) else [0, 1]
+                        add_draft(
+                            ExtractedRuleDraft(
+                                type="teacher_unavailable",
+                                params={"teacher": matched_t, "day": d_val, "slots": s_vals},
+                                owner=matched_t,
+                                evidence_ref=f"{table_ref}@row{r_num}",
+                            )
+                        )
+
+                # Pattern C: Room Maintenance / Unavailability Table
+                elif r_idx >= 0 and r_idx < len(row) and t_idx < 0 and c_idx < 0:
+                    val = row[r_idx].strip()
+                    if val:
+                        matched_rm = _ensure_room(roster, val)
+                        d_val = _parse_day_value(row[d_idx]) if (d_idx >= 0 and d_idx < len(row)) else 0
+                        s_vals = _parse_slot_values(row[slot_idx]) if (slot_idx >= 0 and slot_idx < len(row)) else [0, 1]
+                        add_draft(
+                            ExtractedRuleDraft(
+                                type="room_unavailable",
+                                params={"room": matched_rm, "day": d_val, "slots": s_vals},
+                                owner="Facilities Manager",
+                                evidence_ref=f"{table_ref}@row{r_num}",
+                            )
+                        )
 
     # 2. Textual context analysis (instructions + notes + file text previews)
     file_texts = []
@@ -275,20 +459,19 @@ def _extract_deterministic_rules(
         ext = Path(fn).suffix.lower()
         if ext in (".txt", ".md", ".log", ".json"):
             file_texts.append(cnt.decode("utf-8", errors="replace"))
-    combined_text = "\n".join([instructions, notes] + file_texts)
-    sentences = re.split(r"[.\n;]", combined_text)
+    combined_text = "\n".join([t for t in [instructions, notes] + file_texts if t.strip()])
+    sentences = [s.strip() for s in re.split(r"(?<!\bDr)(?<!\bMr)(?<!\bMs)(?<!\bProf)\.\s+|\n+|;\s*", combined_text) if s.strip()]
 
-    # A. Teacher Unavailability
-    for t in roster.teachers:
-        t_variants = [t.lower(), t.split()[-1].lower()]  # e.g. "prof. rao", "rao"
-        for s in sentences:
-            s_low = s.lower()
-            if any(re.search(r"\b" + re.escape(v) + r"\b", s_low) for v in t_variants):
-                if any(w in s_low for w in ("unavail", "cannot", "not avail", "leave", "absent", "meeting", "duty", "duties", "sick", "off", "busy", "conference", "preference")):
+    # A. Teacher Unavailability Extraction
+    unavail_keywords = ("unavail", "cannot", "can't", "not avail", "leave", "absent", "meeting", "duty", "duties", "sick", "off", "busy", "conference", "preference", "no class", "conflict")
+    for s in sentences:
+        s_low = s.lower()
+        if any(w in s_low for w in unavail_keywords):
+            # Check known teachers
+            for t in list(roster.teachers):
+                t_variants = [t.lower(), t.split()[-1].lower()]
+                if any(re.search(r"\b" + re.escape(v) + r"\b", s_low) for v in t_variants):
                     day, slots = _parse_days_and_slots_from_text(s)
-                    # If sentence lacked day, check entire note or schedule
-                    if "monday" not in s_low and "tuesday" not in s_low and "wednesday" not in s_low and "thursday" not in s_low and "friday" not in s_low:
-                        day, _ = _parse_days_and_slots_from_text(combined_text)
                     add_draft(
                         ExtractedRuleDraft(
                             type="teacher_unavailable",
@@ -297,39 +480,80 @@ def _extract_deterministic_rules(
                             evidence_ref="intake-notes",
                         )
                     )
+            # Check title-prefixed candidates (e.g. Dr. Adams, Prof. Sharma)
+            title_matches = re.findall(r"\b(?:Prof(?:\.|essor)?|Dr\.|Doctor|Mr\.|Ms\.|Mrs\.|Faculty|Instructor)\s+[A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)?\b", s)
+            for cand in title_matches:
+                t = _ensure_teacher(roster, cand)
+                day, slots = _parse_days_and_slots_from_text(s)
+                add_draft(
+                    ExtractedRuleDraft(
+                        type="teacher_unavailable",
+                        params={"teacher": t, "day": day, "slots": slots},
+                        owner=t,
+                        evidence_ref="intake-notes",
+                    )
+                )
+            # Check untitled name followed by unavailability phrasing
+            name_m = re.search(r"\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\s+(?:cannot teach|can't teach|is unavailable|is not available|on leave|on sick leave|has a meeting|is off|cannot be scheduled)\b", s)
+            if name_m:
+                cand_name = name_m.group(1)
+                t = _ensure_teacher(roster, cand_name)
+                day, slots = _parse_days_and_slots_from_text(s)
+                add_draft(
+                    ExtractedRuleDraft(
+                        type="teacher_unavailable",
+                        params={"teacher": t, "day": day, "slots": slots},
+                        owner=t,
+                        evidence_ref="intake-notes",
+                    )
+                )
 
     # B. Room Maintenance / Unavailability
-    for rm in roster.rooms:
-        r_name = rm.name
-        for s in sentences:
-            s_low = s.lower()
-            if r_name.lower() in s_low:
-                if any(w in s_low for w in ("maint", "renovat", "closed", "offline", "unavail", "repair", "clean", "occupied")):
+    maint_keywords = ("maint", "renovat", "closed", "offline", "unavail", "repair", "clean", "occupied", "shut", "locked", "reserved")
+    for s in sentences:
+        s_low = s.lower()
+        if any(w in s_low for w in maint_keywords):
+            # Check known rooms
+            for rm in list(roster.rooms):
+                if rm.name.lower() in s_low:
                     day, slots = _parse_days_and_slots_from_text(s)
                     add_draft(
                         ExtractedRuleDraft(
                             type="room_unavailable",
-                            params={"room": r_name, "day": day, "slots": slots},
+                            params={"room": rm.name, "day": day, "slots": slots},
                             owner="Facilities Manager",
                             evidence_ref="intake-notes",
                         )
                     )
+            # Check room patterns (e.g. Room 402, Lab-B)
+            rm_matches = re.findall(r"\b(?:Room|Lab|Hall|Theater|Theatre|OR|OT|Ward)\s*[-_#]?\s*[A-Za-z0-9]+\b", s, re.IGNORECASE)
+            for cand_rm in rm_matches:
+                rm_name = _ensure_room(roster, cand_rm)
+                day, slots = _parse_days_and_slots_from_text(s)
+                add_draft(
+                    ExtractedRuleDraft(
+                        type="room_unavailable",
+                        params={"room": rm_name, "day": day, "slots": slots},
+                        owner="Facilities Manager",
+                        evidence_ref="intake-notes",
+                    )
+                )
 
     # C. Session Locking (Pin) & Qualifications
-    for ses in roster.sessions:
-        s_id = ses.id
-        c_name = ses.course
-        for s in sentences:
-            s_low = s.lower()
+    for s in sentences:
+        s_low = s.lower()
+        for ses in list(roster.sessions):
+            s_id = ses.id
+            c_name = ses.course
             if s_id.lower() in s_low or c_name.lower() in s_low:
-                # Check Qualification
-                if any(w in s_low for w in ("qualif", "only", "must be handled", "must be taught", "assigned to", "certified")):
+                # Qualification
+                if any(w in s_low for w in ("qualif", "only", "must be handled", "must be taught", "assigned to", "certified", "instructor")):
                     matched_instructors = [
-                        t for t in ses.teachers
+                        t for t in roster.teachers
                         if t.lower() in s_low or t.split()[-1].lower() in s_low
                     ]
                     if not matched_instructors:
-                        matched_instructors = [ses.teachers[0]]
+                        matched_instructors = ses.teachers[:1] or [roster.teachers[0]]
                     add_draft(
                         ExtractedRuleDraft(
                             type="only_qualified",
@@ -338,7 +562,7 @@ def _extract_deterministic_rules(
                             evidence_ref="intake-notes",
                         )
                     )
-                # Check Pinning
+                # Pinning
                 elif any(w in s_low for w in ("pin", "pinned", "lock", "locked", "fixed", "schedule at", "scheduled on", "must hold")):
                     day, slots = _parse_days_and_slots_from_text(s)
                     add_draft(
@@ -350,18 +574,8 @@ def _extract_deterministic_rules(
                         )
                     )
 
-    # 3. If zero rules found, generate grounded constraints based on live schedule placements
-    if not extracted and schedule and schedule.placements:
-        p0 = schedule.placements[0]
-        # Real placement from timetable:
-        add_draft(
-            ExtractedRuleDraft(
-                type="teacher_unavailable",
-                params={"teacher": p0.teacher, "day": p0.day, "slots": [p0.slot]},
-                owner=p0.teacher,
-                evidence_ref="active-schedule",
-            )
-        )
+    # Persist updated roster with any dynamically discovered entities
+    db.save_roster(roster)
 
     return extracted
 
@@ -644,20 +858,21 @@ CONSOLIDATED DATA DUMP:
     ]
 
     llm_out: DataDumpLLMOut | None = None
-    try:
-        # Rapid intake tier (Gemma 4B) with bounded token output and fast timeout
-        llm_out = call_json(
-            fn="extract_data_dump",
-            tier="intake",
-            messages=messages,
-            schema=DataDumpLLMOut,
-            retries=1,
-            timeout_s=3.0,
-            options={"num_predict": 350, "temperature": 0.1},
-            fallback_to_mock=False,
-        )
-    except Exception as exc:
-        log.info("Fast Gemma pass skipped/timed out (%s); leveraging real timetable deterministic extraction", exc)
+    if files or notes.strip():
+        try:
+            # Rapid intake tier (Gemma 4B) with bounded token output and fast timeout
+            llm_out = call_json(
+                fn="extract_data_dump",
+                tier="intake",
+                messages=messages,
+                schema=DataDumpLLMOut,
+                retries=1,
+                timeout_s=3.0,
+                options={"num_predict": 350, "temperature": 0.1},
+                fallback_to_mock=False,
+            )
+        except Exception as exc:
+            log.info("Fast Gemma pass skipped/timed out (%s); leveraging real timetable deterministic extraction", exc)
 
     # 5. Combine and validate rules
     final_drafts: list[ExtractedRuleDraft] = []
@@ -674,6 +889,14 @@ CONSOLIDATED DATA DUMP:
     if llm_out:
         for r_draft in llm_out.rules:
             rule_params = r_draft.params or {}
+            if r_draft.type == "teacher_unavailable" and "teacher" in rule_params:
+                _ensure_teacher(roster, rule_params["teacher"])
+            elif r_draft.type == "room_unavailable" and "room" in rule_params:
+                _ensure_room(roster, rule_params["room"])
+            elif r_draft.type == "pin_session" and "session_id" in rule_params:
+                _ensure_session(roster, rule_params["session_id"])
+            elif r_draft.type == "only_qualified" and "session_id" in rule_params:
+                _ensure_session(roster, rule_params["session_id"], rule_params.get("teachers", []))
             try:
                 validate_params(r_draft.type, rule_params, roster)
                 k = f"{r_draft.type}:{json.dumps(rule_params, sort_keys=True)}"
@@ -682,6 +905,7 @@ CONSOLIDATED DATA DUMP:
                     final_drafts.append(r_draft)
             except Exception as e:
                 log.debug("LLM rule discarded due to roster validation: %s", e)
+        db.save_roster(roster)
 
     # 6. Build executive summary, entities, and insights dynamically
     if llm_out and llm_out.summary:
@@ -691,18 +915,28 @@ CONSOLIDATED DATA DUMP:
         warnings_list = llm_out.warnings
     else:
         file_count_str = f"{len(files)} uploaded file{'s' if len(files) != 1 else ''}" if files else "operator notes"
-        summary_text = (
-            f"Successfully synthesized operational requirements from {file_count_str}. "
-            f"Grounded extractions against active timetable with {len(roster.teachers)} instructors, "
-            f"{len(roster.rooms)} facilities, and {len(roster.sessions)} sessions. "
-            f"Generated {len(final_drafts)} verified constraint rule{'s' if len(final_drafts) != 1 else ''} ready for schedule optimization."
-        )
+        if final_drafts:
+            summary_text = (
+                f"Successfully synthesized operational requirements from {file_count_str}. "
+                f"Grounded extractions against active timetable with {len(roster.teachers)} instructors, "
+                f"{len(roster.rooms)} facilities, and {len(roster.sessions)} sessions. "
+                f"Generated {len(final_drafts)} verified constraint rule{'s' if len(final_drafts) != 1 else ''} ready for schedule optimization."
+            )
+        else:
+            summary_text = (
+                f"Processed {file_count_str} against active timetable ({len(roster.teachers)} faculty, "
+                f"{len(roster.rooms)} facilities, {len(roster.sessions)} sessions). "
+                f"No explicit constraint conflicts or restrictions detected in the provided data dump."
+            )
         entities_list = [
-            {"name": t, "kind": "faculty", "details": f"Instructor in active roster ({', '.join(s.course for s in roster.sessions if t in s.teachers)})"}
+            {"name": t, "kind": "faculty", "details": f"Faculty ({', '.join(s.course for s in roster.sessions if t in s.teachers) or 'Active instructor'})"}
             for t in roster.teachers
         ] + [
             {"name": rm.name, "kind": "facility", "details": f"Capacity: {rm.capacity} seats"}
             for rm in roster.rooms
+        ] + [
+            {"name": s.course, "kind": "session", "details": f"Session ID: {s.id} • Qualified: {', '.join(s.teachers)}"}
+            for s in roster.sessions
         ]
         insights_list = [
             f"Processed data dump with {len(files)} files and direct operator directives.",
