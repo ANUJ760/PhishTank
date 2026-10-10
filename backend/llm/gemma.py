@@ -68,11 +68,11 @@ class GemmaService:
 
             # Model tags may include ':latest' or specific tag
             intake_ready = any(
-                m == self.intake_model or m.startswith(f"{self.intake_model}:") or self.intake_model.startswith(m)
+                m == self.intake_model or m == f"{self.intake_model}:latest"
                 for m in installed_models
             )
             reason_ready = any(
-                m == self.reason_model or m.startswith(f"{self.reason_model}:") or self.reason_model.startswith(m)
+                m == self.reason_model or m == f"{self.reason_model}:latest"
                 for m in installed_models
             )
 
@@ -149,7 +149,7 @@ class GemmaService:
         self,
         model: str,
         messages: list[dict],
-        format_json: bool = True,
+        format_json: bool | dict[str, Any] = True,
         temperature: float = 0.0,
         options: dict[str, Any] | None = None,
         timeout_s: float | None = None,
@@ -174,7 +174,7 @@ class GemmaService:
             "options": merged_options,
         }
         if format_json:
-            payload["format"] = "json"
+            payload["format"] = format_json if isinstance(format_json, dict) else "json"
             payload["think"] = think_flag
         elif "think" in (options or {}):
             payload["think"] = think_flag
@@ -194,6 +194,9 @@ class GemmaService:
         try:
             with urllib.request.urlopen(req, timeout=effective_timeout) as resp:
                 result = json.loads(resp.read().decode("utf-8"))
+        except urllib.error.HTTPError as exc:
+            detail = exc.read().decode("utf-8", errors="replace")[:1000]
+            raise GemmaServiceError(f"Ollama rejected {model} (HTTP {exc.code}): {detail}") from exc
         except urllib.error.URLError as exc:
             raise GemmaServiceError(
                 f"Failed to communicate with Ollama service at {url}: {exc}. "
@@ -237,7 +240,7 @@ class GemmaService:
             raw_text, usage = self.chat_complete(
                 model=model,
                 messages=conversation,
-                format_json=True,
+                format_json=schema.model_json_schema(),
                 temperature=0.0,
                 options=options,
                 timeout_s=timeout_s,

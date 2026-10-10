@@ -100,3 +100,17 @@ def test_data_dump_with_conflicts_triggers_12b_reasoning():
 
     # Check that warnings list contains the conflict impact
     assert len(result.warnings) > 0
+
+
+def test_generated_parser_cannot_register_names_absent_from_upload(monkeypatch):
+    from backend.intake import sheet_parser
+    from backend.models import Roster
+    roster = Roster(teachers=[], rooms=[], sessions=[])
+    monkeypatch.setattr(sheet_parser.db, 'save_roster', lambda *args: None)
+    good, failed = sheet_parser._validated([
+        {'course': 'Applied Optics', 'teachers': ['Prof. Rao'], 'source_cell': 'B2'},
+    ], roster, {'applied optics', 'dr. lina rivera'})
+    assert not good
+    assert failed == 1
+    assert roster.teachers == []
+    assert roster.sessions == []

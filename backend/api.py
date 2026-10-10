@@ -1,6 +1,6 @@
 """Stable facade consumed by the Streamlit frontend."""
 from __future__ import annotations
-import json, logging, shutil, threading, time
+import json, logging, shutil, threading, time, tempfile
 from pathlib import Path
 from typing import Literal
 from pydantic import BaseModel
@@ -38,7 +38,9 @@ def ingest_image(img:bytes,filename:str)->list[Rule]:return voice_photo.ingest_i
 def ingest_text(text:str)->list[Rule]:return voice_photo.ingest_text(text)
 def ingest_sheet(xlsx:bytes,filename:str)->IngestSheetResult:
     if len(xlsx)>50*1024*1024: raise ValueError("Spreadsheet exceeds 50 MiB")
-    path=config.UPLOAD_DIR/(Path(filename).name+".staging.xlsx"); path.parent.mkdir(parents=True,exist_ok=True)
+    config.UPLOAD_DIR.mkdir(parents=True,exist_ok=True)
+    with tempfile.NamedTemporaryFile(prefix="sheet-", suffix=Path(filename).suffix or ".xlsx", dir=config.UPLOAD_DIR, delete=False) as staging:
+        path=Path(staging.name)
     try:
         path.write_bytes(xlsx); result=sheet_parser.ingest_sheet(path,Path(filename).name)
         db.save_upload(Path(filename).name,xlsx); return IngestSheetResult(**result.model_dump())

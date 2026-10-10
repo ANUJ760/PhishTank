@@ -104,3 +104,30 @@ def test_call_json_mock_mode(monkeypatch):
     result = call_json("extract_rules_text", "intake", [], DraftRulesOut)
     assert isinstance(result, DraftRulesOut)
     assert len(result.rules) > 0
+
+
+def test_live_requests_include_schema_and_requested_timeout(monkeypatch):
+    captured = {}
+    class Response:
+        def __enter__(self): return self
+        def __exit__(self, *args): pass
+        def read(self):
+            return json.dumps({'message': {'content': '{"status":"ok","code":200}'}}).encode()
+    def urlopen(request, timeout):
+        captured.update(payload=json.loads(request.data), timeout=timeout)
+        return Response()
+    monkeypatch.setattr('urllib.request.urlopen', urlopen)
+    result, _ = GemmaService().generate_json('intake', [{'role': 'user', 'content': 'Check'}], SampleSchema, timeout_s=120)
+    assert result.code == 200
+    assert captured['payload']['format'] == SampleSchema.model_json_schema()
+    assert captured['timeout'] == 120
+
+
+def test_health_does_not_match_a_partial_model_name(monkeypatch):
+    class Response:
+        def __enter__(self): return self
+        def __exit__(self, *args): pass
+        def read(self): return json.dumps({'models': [{'name': 'gemma:4'}]}).encode()
+    monkeypatch.setattr('urllib.request.urlopen', lambda *a, **k: Response())
+    health = GemmaService(intake_model='gemma:4b').check_health()
+    assert not health['intake_ready']

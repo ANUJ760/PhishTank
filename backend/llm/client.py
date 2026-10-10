@@ -53,6 +53,8 @@ def call_json(
 ) -> T:
     """Call language model (Gemma 4B intake or 12B reason) returning validated schema object."""
     if config.MOCK_LLM:
+        if not fallback_to_mock:
+            raise LLMError(f"{fn} requires source-grounded extraction; mock responses are disabled")
         return _run_mock(fn, schema)
 
     # If configured for Ollama provider
@@ -132,12 +134,12 @@ def call_json(
                     {"role": "user", "content": f"Correct the JSON to match the required schema. Validation error: {exc}"},
                 ])
         except Exception as exc:
-            if config.LLM_FALLBACK_TO_MOCK:
+            if fallback_to_mock and config.LLM_FALLBACK_TO_MOCK:
                 log.warning("OpenAI inference for %s failed (%s); falling back to mock fixture", fn, exc)
                 return _run_mock(fn, schema)
             raise LLMError(f"{fn} inference failed: {exc}") from exc
 
-    if config.LLM_FALLBACK_TO_MOCK:
+    if fallback_to_mock and config.LLM_FALLBACK_TO_MOCK:
         log.warning("Inference output did not match schema after retries; falling back to mock fixture")
         return _run_mock(fn, schema)
     raise LLMError(f"{fn} output did not match schema after {retries + 1} attempts: {last_error}")

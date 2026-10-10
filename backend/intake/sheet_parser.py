@@ -142,7 +142,20 @@ def _find_session(roster: Roster, course_name: str) -> Session | None:
             return s
     return None
 
-def _validated(rows: list[dict], roster: Roster) -> tuple[list[tuple[str, list[str], str]], int]:
+def _source_values(path: Path) -> set[str]:
+    """Cell values used to reject cached/generated parsers that invent entities."""
+    if path.suffix.lower() == ".csv":
+        with path.open(encoding="utf-8-sig", errors="replace", newline="") as handle:
+            return {" ".join(cell.split()).casefold() for row in csv.reader(handle) for cell in row if cell.strip()}
+    import openpyxl
+    book = openpyxl.load_workbook(path, read_only=True, data_only=True)
+    try:
+        return {" ".join(str(cell).split()).casefold() for sheet in book for row in sheet.iter_rows(values_only=True) for cell in row if cell is not None}
+    finally:
+        book.close()
+
+
+def _validated(rows: list[dict], roster: Roster, source_values: set[str] | None = None) -> tuple[list[tuple[str, list[str], str]], int]:
     roster_changed = False
     good = []
     failures = 0
@@ -160,6 +173,14 @@ def _validated(rows: list[dict], roster: Roster) -> tuple[list[tuple[str, list[s
             cleaned_teachers = [t.strip() for t in raw_teachers if isinstance(t, str) and t.strip()]
             if not cleaned_teachers:
                 raise ValueError("empty teachers list")
+
+            if source_values is not None:
+                if " ".join(course_clean.split()).casefold() not in source_values:
+                    raise ValueError("course is absent from the uploaded sheet")
+                for teacher in cleaned_teachers:
+                    normalized = " ".join(teacher.split()).casefold()
+                    if not any(normalized in [part.strip() for part in re.split(r"[,;]|\band\b", cell)] for cell in source_values):
+                        raise ValueError("teacher is absent from the uploaded sheet")
 
             # Ensure all teachers are registered in roster
             for t in cleaned_teachers:
@@ -197,6 +218,7 @@ def ingest_sheet(path: Path, filename: str, roster: Roster | None = None) -> Ing
     if path.stat().st_size > 50 * 1024 * 1024:
         raise ParseError("Spreadsheet exceeds 50 MiB")
     roster = roster or db.get_roster()
+    source_values = _source_values(path)
     sig = layout_signature(path)
     code = db.get_parser(sig)
     cache_hit = code is not None
@@ -206,7 +228,7 @@ def ingest_sheet(path: Path, filename: str, roster: Roster | None = None) -> Ing
     if code:
         try:
             rows = sandbox.run_parser(code, path)
-            good, failed = _validated(rows, roster)
+            good, failed = _validated(rows, roster, source_values)
             if not good or (failed / len(rows) > 0.05):
                 raise ParseError("cached parser output did not validate")
         except Exception as exc:
@@ -230,13 +252,13 @@ def ingest_sheet(path: Path, filename: str, roster: Roster | None = None) -> Ing
                     ],
                     schema=ParserOut,
                     retries=1,
-                    timeout_s=30.0,
-                    options={"num_predict": 700, "temperature": 0.1, "think": False},
+                    timeout_s=config.LLM_TIMEOUT_S,
+                    options={"num_predict": 2200, "temperature": 0.1, "think": False},
                     fallback_to_mock=False,
                 )
                 candidate_code = generated.code
                 rows = sandbox.run_parser(candidate_code, path)
-                good, failed = _validated(rows, roster)
+                good, failed = _validated(rows, roster, source_values)
                 if rows and good and (failed / len(rows) <= 0.05):
                     code = candidate_code
                     db.save_parser(sig, code)
@@ -249,7 +271,7 @@ def ingest_sheet(path: Path, filename: str, roster: Roster | None = None) -> Ing
             try:
                 candidate_code = _default_parser_code()
                 rows = sandbox.run_parser(candidate_code, path)
-                good, failed = _validated(rows, roster)
+                good, failed = _validated(rows, roster, source_values)
                 if rows and good and (failed / len(rows) <= 0.05):
                     code = candidate_code
                     db.save_parser(sig, code)

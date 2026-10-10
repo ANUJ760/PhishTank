@@ -22,7 +22,7 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, PlainTextResponse, Response
 
-from backend import api, config
+from backend import api, config, hashing
 from backend.models import Conflict, Roster, Rule, Schedule
 from backend.http.auth import (
     SESSION_COOKIE_NAME,

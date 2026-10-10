@@ -39,7 +39,7 @@ const SLOT_WINDOWS: Record<number, string> = {
   0: "09:00 - 10:00",
   1: "10:00 - 11:00",
   2: "11:00 - 12:00",
-  3: "13:00 - 14:00",
+  3: "12:00 - 13:00",
   4: "14:00 - 15:00",
   5: "15:00 - 16:00",
 };
@@ -48,7 +48,7 @@ function formatSlots(slots: number[] = []): string {
   if (!slots || slots.length === 0) return "Unspecified";
   const sorted = [...slots].sort((a, b) => a - b);
   if (sorted.length === 3 && sorted[0] === 0 && sorted[2] === 2) return "Morning (09:00 - 12:00)";
-  if (sorted.length === 3 && sorted[0] === 3 && sorted[2] === 5) return "Afternoon (13:00 - 16:00)";
+  if (sorted.length === 3 && sorted[0] === 3 && sorted[2] === 5) return "Afternoon (12:00 - 16:00)";
   if (sorted.length === 6) return "Full Day (09:00 - 16:00)";
   if (sorted.length === 1) return SLOT_WINDOWS[sorted[0]] || `Slot ${sorted[0]}`;
   const start = (SLOT_WINDOWS[sorted[0]] || `Slot ${sorted[0]}`).split(" - ")[0];
@@ -61,7 +61,7 @@ export function IntakePage() {
 
   // Inputs
   const [instructions, setInstructions] = useState(
-    "Extract all faculty availability constraints, room requirements, and qualification rules. Ground against active timetable."
+    "Find faculty availability, room restrictions, and teaching requirements."
   );
   const [notes, setNotes] = useState("");
   const [files, setFiles] = useState<File[]>([]);
@@ -115,11 +115,16 @@ export function IntakePage() {
       return;
     }
     setIsLoading(true);
+    setDumpResult(null);
+    setSearchQuery("");
+    setFilterCategory("all");
+    setConfirmedRules({});
+    setExpandedDetails({});
     setError(null);
     try {
       const res = await api.intake.dump(files, instructions, notes);
       setDumpResult(res);
-      toast.success(`Data dump processed! ${res.rules.length} timetable constraints extracted.`);
+      toast.success(`Input processed. ${res.rules.length} draft rule${res.rules.length === 1 ? "" : "s"} extracted.`);
     } catch (err: any) {
       setError(err?.message || "Data dump intake failed");
       toast.error("Failed to process data dump");
@@ -147,11 +152,8 @@ export function IntakePage() {
 
   const loadPreset = (type: "college" | "relief" | "hospital") => {
     if (type === "college") {
-      const t1 = roster?.teachers[0] || "Faculty Coordinator";
-      const t2 = roster?.teachers[1] || "Senior Instructor";
-      const s1 = roster?.sessions[0]?.id || "CORE_LAB";
       setInstructions("Extract faculty availability, room restrictions, and instructor qualification constraints for the semester timetable.");
-      setNotes(`Memo from Academic Office: ${t1} cannot teach Monday morning (09:00 - 11:00). ${t2} is on sick leave Tuesday afternoon. ${s1} session requires qualified instructor [${t1}].`);
+      setNotes("");
     } else if (type === "relief") {
       setInstructions("Consolidate disaster relief supply requests across all flood camps. Prioritize drinking water and medical kits, and respect vehicle payload caps.");
       setNotes("Field Dispatch: Camp Delta (pop 850) has severe drinking water shortage, request 600 units. Camp Alpha cut off by road, requires helicopter transport only.");
@@ -260,80 +262,91 @@ export function IntakePage() {
   const conflictsCount = useMemo(() => ruleCards.filter((c) => c.has_conflict).length, [ruleCards]);
 
   return (
-    <div className="space-y-6 text-left pb-16 max-w-7xl mx-auto">
+    <div className="space-y-6 text-left pb-16 max-w-6xl mx-auto">
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
+          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-white flex items-center gap-2">
             <Sparkles className="w-5 h-5 text-zinc-100" />
-            Universal Multi-Modal Data Dump Studio
+            Timetable & constraints
           </h2>
-          <p className="text-xs text-zinc-400 mt-0.5">
-            Dump spreadsheets, schedules, memos, and direct notes together. Powered by fast timetable grounding and Gemma intelligence.
+          <p className="text-base text-zinc-400 mt-0.5">
+            Upload your timetable and add any scheduling restrictions.
           </p>
         </div>
 
         {/* Quick Presets */}
-        <div className="flex items-center gap-2">
-          <span className="text-[11px] text-zinc-500 font-medium hidden md:inline">Live Presets:</span>
+        <details className="text-sm text-zinc-300">
+          <summary className="cursor-pointer py-2">Try an example</summary>
+          <div className="flex flex-wrap gap-2 mt-2">
           <button
             onClick={() => loadPreset("college")}
             type="button"
-            className="h-7 px-2.5 rounded-md bg-zinc-900 border border-white/10 text-zinc-300 hover:text-white text-[11px] transition-colors"
+            className="min-h-10 px-2.5 rounded-md bg-zinc-900 border border-white/10 text-zinc-300 hover:text-white text-sm transition-colors"
           >
             Academic Timetable
           </button>
           <button
             onClick={() => loadPreset("relief")}
             type="button"
-            className="h-7 px-2.5 rounded-md bg-zinc-900 border border-white/10 text-zinc-300 hover:text-white text-[11px] transition-colors"
+            className="min-h-10 px-2.5 rounded-md bg-zinc-900 border border-white/10 text-zinc-300 hover:text-white text-sm transition-colors"
           >
             Disaster Relief
           </button>
           <button
             onClick={() => loadPreset("hospital")}
             type="button"
-            className="h-7 px-2.5 rounded-md bg-zinc-900 border border-white/10 text-zinc-300 hover:text-white text-[11px] transition-colors"
+            className="min-h-10 px-2.5 rounded-md bg-zinc-900 border border-white/10 text-zinc-300 hover:text-white text-sm transition-colors"
           >
             Hospital OR
           </button>
-        </div>
+          </div>
+        </details>
       </div>
 
       <form onSubmit={handleSubmitDump} className="space-y-6">
         {/* Step 1: Prompt & Instructions Box */}
-        <div className="glass-box p-5 space-y-3">
+        <div className="glass-box p-5 sm:p-6 space-y-3">
           <div className="flex items-center justify-between border-b border-white/5 pb-2.5">
-            <label className="text-xs font-semibold text-white flex items-center gap-2">
+            <label htmlFor="intake-instructions" className="text-base font-semibold text-white flex items-center gap-2">
               <Cpu size={14} className="text-zinc-300" />
-              1. What is required out of this data dump? (Operator Directive)
+              1. What should we check?
             </label>
-            <span className="text-[10px] text-zinc-400 font-mono">Real Timetable Grounding</span>
           </div>
           <textarea
+            id="intake-instructions"
             rows={2}
             value={instructions}
             onChange={(e) => setInstructions(e.target.value)}
-            placeholder="Type your instructions: What specific rules, constraints, or allocations do you want extracted from the dumped files?"
-            className="w-full p-3 rounded-lg bg-zinc-900/90 border border-white/10 text-xs text-white placeholder:text-zinc-500 focus:outline-none focus:border-white/25 transition-all resize-none leading-relaxed"
+            placeholder="Describe what you want to check in your timetable."
+            className="w-full p-3 rounded-lg bg-zinc-900/90 border border-white/10 text-base text-white placeholder:text-zinc-500 focus:outline-none focus:border-white/25 transition-all resize-y leading-relaxed"
             required
           />
         </div>
 
         {/* Step 2: Unified Multi-File Data Dump Dropzone */}
-        <div className="glass-box p-5 space-y-4">
+        <div className="glass-box p-5 sm:p-6 space-y-4">
           <div className="flex items-center justify-between border-b border-white/5 pb-2.5">
-            <label className="text-xs font-semibold text-white flex items-center gap-2">
+            <label className="text-base font-semibold text-white flex items-center gap-2">
               <UploadCloud size={14} className="text-zinc-300" />
-              2. Data Dump Files (Spreadsheets, Photos, Voice Recordings, Documents)
+              2. Upload your timetable
             </label>
-            <span className="text-[10px] text-zinc-400">
+            <span className="text-sm text-zinc-400">
               {files.length} {files.length === 1 ? "file" : "files"} staged
             </span>
           </div>
 
           {/* Drag & Drop Zone */}
           <div
+            role="button"
+            tabIndex={0}
+            aria-label="Choose timetable files"
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                fileInputRef.current?.click();
+              }
+            }}
             onDragOver={handleDragOver}
             onDrop={handleDrop}
             onClick={() => fileInputRef.current?.click()}
@@ -341,11 +354,11 @@ export function IntakePage() {
           >
             <UploadCloud className="w-8 h-8 text-zinc-400 mx-auto" />
             <div className="space-y-1">
-              <p className="text-xs font-medium text-zinc-200">
+              <p className="text-base font-medium text-zinc-200">
                 Drag and drop files here, or <span className="text-white underline">browse from your computer</span>
               </p>
-              <p className="text-[11px] text-zinc-500">
-                Supports all formats simultaneously: XLSX, CSV, PNG, JPG, WAV, MP3, PDF, TXT, JSON
+              <p className="text-sm text-zinc-500">
+                Upload a text-based PDF, Excel, or CSV timetable.
               </p>
             </div>
             <input
@@ -360,18 +373,18 @@ export function IntakePage() {
           {/* Staged File List */}
           {files.length > 0 && (
             <div className="space-y-2 pt-2">
-              <span className="text-[11px] font-medium text-zinc-400 block">Staged Files in Data Dump:</span>
+              <span className="text-sm font-medium text-zinc-400 block">Attached files</span>
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
                 {files.map((file, idx) => (
                   <div
                     key={`${file.name}-${idx}`}
-                    className="flex items-center justify-between p-2.5 rounded-lg bg-zinc-900 border border-white/10 text-xs"
+                    className="flex items-center justify-between p-2.5 rounded-lg bg-zinc-900 border border-white/10 text-base"
                   >
                     <div className="flex items-center gap-2 overflow-hidden">
                       {getFileIcon(file.name)}
                       <div className="truncate">
-                        <p className="font-medium text-zinc-200 truncate text-[11px]">{file.name}</p>
-                        <p className="text-[10px] text-zinc-500">{formatFileSize(file.size)}</p>
+                        <p className="font-medium text-zinc-200 truncate text-sm">{file.name}</p>
+                        <p className="text-sm text-zinc-500">{formatFileSize(file.size)}</p>
                       </div>
                     </div>
                     <button
@@ -380,9 +393,10 @@ export function IntakePage() {
                         e.stopPropagation();
                         handleRemoveFile(idx);
                       }}
-                      className="p-1 text-zinc-500 hover:text-white rounded hover:bg-white/5 transition-colors"
+                      aria-label={`Remove ${file.name}`}
+                      className="p-2 text-zinc-400 hover:text-white rounded hover:bg-white/5 transition-colors"
                     >
-                      <X size={13} />
+                      <X size={18} />
                     </button>
                   </div>
                 ))}
@@ -392,51 +406,48 @@ export function IntakePage() {
         </div>
 
         {/* Step 3: Raw Notes & Text Dump */}
-        <div className="glass-box p-5 space-y-3">
+        <div className="glass-box p-5 sm:p-6 space-y-3">
           <div className="flex items-center justify-between border-b border-white/5 pb-2.5">
-            <label className="text-xs font-semibold text-white flex items-center gap-2">
+            <label htmlFor="intake-notes" className="text-base font-semibold text-white flex items-center gap-2">
               <FileText size={14} className="text-zinc-300" />
-              3. Raw Notes / Direct Text Dump (Unstructured Input)
+              3. Add your constraints
             </label>
-            <span className="text-[10px] text-zinc-500">Paste email threads, meeting transcripts, or memos</span>
           </div>
           <textarea
+            id="intake-notes"
             rows={3}
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
-            placeholder="Paste any unstructured notes, emails, leave requests, or lab maintenance memos here..."
-            className="w-full p-3 rounded-lg bg-zinc-900/90 border border-white/10 text-xs text-white placeholder:text-zinc-500 focus:outline-none focus:border-white/25 transition-all resize-none leading-relaxed font-mono text-[11px]"
+            placeholder="For example: Prof. Sharma is unavailable on Monday morning."
+            className="w-full p-3 rounded-lg bg-zinc-900/90 border border-white/10 text-base text-white placeholder:text-zinc-500 focus:outline-none focus:border-white/25 transition-all resize-y leading-relaxed"
           />
         </div>
 
         {error && (
-          <div className="p-3.5 rounded-lg border border-red-500/20 bg-red-950/20 text-xs text-red-300 flex items-center gap-2">
+          <div className="p-3.5 rounded-lg border border-red-500/20 bg-red-950/20 text-base text-red-300 flex items-center gap-2">
             <AlertTriangle size={14} className="shrink-0" />
             <span>{error}</span>
           </div>
         )}
 
         {/* Submit Action */}
-        <div className="flex items-center justify-between gap-4 pt-1">
-          <div className="text-[11px] text-zinc-500 flex items-center gap-2">
-            <Layers size={13} />
-            <span>Instant Extraction with Timetable Grounding</span>
-          </div>
+        <div className="flex items-center justify-end gap-4 pt-1">
+
 
           <button
             type="submit"
             disabled={isLoading}
-            className="h-9 px-6 rounded-lg bg-white text-zinc-950 font-semibold text-xs hover:bg-zinc-200 transition-all flex items-center gap-2 shadow-sm active:scale-[0.98] disabled:opacity-50"
+            className="min-h-12 px-6 rounded-lg bg-white text-zinc-950 font-semibold text-base hover:bg-zinc-200 transition-all flex items-center gap-2 shadow-sm active:scale-[0.98] disabled:opacity-50"
           >
             {isLoading ? (
               <>
                 <RefreshCw size={14} className="animate-spin" />
-                <span>Synthesizing Dump & Cross-Referencing Timetable...</span>
+                <span>Checking timetable…</span>
               </>
             ) : (
               <>
                 <Sparkles size={14} />
-                <span>Process Data Dump</span>
+                <span>Find constraints</span>
               </>
             )}
           </button>
@@ -451,22 +462,57 @@ export function IntakePage() {
             <div>
               <h3 className="text-lg font-bold text-white flex items-center gap-2">
                 <CheckCircle2 size={18} className="text-emerald-400" />
-                Timetable Synthesis & Extracted Constraints
+                Your constraints
               </h3>
-              <p className="text-xs text-zinc-400 mt-0.5">
-                Directives executed: &quot;{dumpResult.instructions_executed}&quot;
-              </p>
+              <p className="text-base text-zinc-400 mt-1">Review each rule before applying it.</p>
             </div>
 
             <div className="flex items-center gap-2">
               <Link to="/app/rules">
-                <button className="h-8 px-3.5 rounded-md bg-white text-zinc-950 font-medium text-xs hover:bg-zinc-200 transition-all flex items-center gap-1.5 shadow-sm">
-                  <span>Manage All Constraints in Studio</span>
+                <button className="min-h-10 px-3.5 rounded-md bg-white text-zinc-950 font-medium text-base hover:bg-zinc-200 transition-all flex items-center gap-1.5 shadow-sm">
+                  <span>View all rules</span>
                   <ArrowRight size={12} />
                 </button>
               </Link>
             </div>
           </div>
+
+          {dumpResult.warnings.length > 0 && (
+            <details className="rounded-xl border border-amber-500/30 bg-amber-950/20 p-5 text-base text-amber-100">
+              <summary className="cursor-pointer font-medium">
+                Review {dumpResult.warnings.length} parsing or scheduling notes before applying rules
+              </summary>
+              <ul className="mt-3 list-disc pl-5 space-y-2 leading-relaxed">
+                {dumpResult.warnings.map((warning, index) => <li key={index}>{warning}</li>)}
+              </ul>
+            </details>
+          )}
+
+          {(dumpResult.timetable_classes?.length ?? 0) > 0 && (
+            <details className="glass-box p-5 sm:p-6">
+              <summary className="cursor-pointer text-base font-semibold text-zinc-200">
+                Uploaded timetable · {dumpResult.timetable_classes!.length} extracted classes
+              </summary>
+              <div className="mt-4 overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead className="text-zinc-400"><tr>
+                    {['Day', 'Time', 'Course', 'Faculty', 'Room'].map(label => <th key={label} className="p-3 font-medium">{label}</th>)}
+                  </tr></thead>
+                  <tbody>
+                    {dumpResult.timetable_classes!.map((item, index) => (
+                      <tr key={index} className="border-t border-white/10 text-zinc-200">
+                        <td className="p-3">{item.day}</td>
+                        <td className="p-3 whitespace-nowrap">{item.start}–{item.end}</td>
+                        <td className="p-3">{item.course_code}</td>
+                        <td className="p-3">{item.teachers.join(', ') || 'Not identified'}</td>
+                        <td className="p-3">{item.room || 'Not specified'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </details>
+          )}
 
           {/* Quick Metrics Bar */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -475,7 +521,7 @@ export function IntakePage() {
                 <Layers size={15} />
               </div>
               <div>
-                <p className="text-[10px] text-zinc-400 font-medium">Extracted Rules</p>
+                <p className="text-sm text-zinc-400 font-medium">Rules found</p>
                 <p className="text-base font-bold text-white">{ruleCards.length}</p>
               </div>
             </div>
@@ -487,7 +533,7 @@ export function IntakePage() {
                 {conflictsCount > 0 ? <AlertTriangle size={15} /> : <CheckCircle2 size={15} />}
               </div>
               <div>
-                <p className="text-[10px] text-zinc-400 font-medium">Schedule Impacts</p>
+                <p className="text-sm text-zinc-400 font-medium">Conflicts</p>
                 <p className="text-base font-bold text-white">{conflictsCount}</p>
               </div>
             </div>
@@ -497,7 +543,7 @@ export function IntakePage() {
                 <Cpu size={15} />
               </div>
               <div>
-                <p className="text-[10px] text-zinc-400 font-medium">Cataloged Entities</p>
+                <p className="text-sm text-zinc-400 font-medium">People & places</p>
                 <p className="text-base font-bold text-white">{dumpResult.entities.length}</p>
               </div>
             </div>
@@ -507,31 +553,33 @@ export function IntakePage() {
                 <FileText size={15} />
               </div>
               <div>
-                <p className="text-[10px] text-zinc-400 font-medium">Files Ingested</p>
+                <p className="text-sm text-zinc-400 font-medium">Files checked</p>
                 <p className="text-base font-bold text-white">{dumpResult.processed_files.length}</p>
               </div>
             </div>
           </div>
 
           {/* Executive Synthesis */}
-          <div className="glass-box p-5 space-y-2 border-l-2 border-l-white">
-            <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider block">
-              Operational Executive Summary
-            </span>
-            <p className="text-xs text-zinc-200 leading-relaxed">
+          <details open={dumpResult.rules.length === 0} className="glass-box p-5 sm:p-6 space-y-3">
+            <summary className="cursor-pointer text-base font-semibold text-zinc-200">Analysis summary</summary>
+            <p className="text-base text-zinc-200 leading-relaxed">
               {dumpResult.summary}
             </p>
-          </div>
+            {dumpResult.processing?.map((step, index) => (
+              <p key={index} className="text-sm text-zinc-400">
+                {step.stage}: {step.status} ({step.model})
+              </p>
+            ))}
+          </details>
 
           {/* Section: Human-Readable Constraint Cards */}
           <div className="space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-3">
               <div className="flex items-center gap-2">
-                <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                <h4 className="text-lg font-semibold text-white flex items-center gap-2">
                   <CheckCircle2 size={15} className="text-emerald-400" />
                   Extracted Constraints ({filteredCards.length} of {ruleCards.length})
                 </h4>
-                <span className="text-[10px] text-zinc-400 font-mono">Live Timetable Bound</span>
               </div>
 
               {/* Filters & Search */}
@@ -541,40 +589,41 @@ export function IntakePage() {
                   <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-400" />
                   <input
                     type="text"
-                    placeholder="Search by instructor or room..."
+                    aria-label="Search constraints"
+                    placeholder="Search professors or rooms"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="h-7 pl-7 pr-2.5 rounded-md bg-zinc-900 border border-white/10 text-[11px] text-white placeholder:text-zinc-500 focus:outline-none focus:border-white/20"
+                    className="min-h-10 pl-7 pr-2.5 rounded-md bg-zinc-900 border border-white/10 text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:border-white/20"
                   />
                 </div>
 
                 {/* Category Pills */}
-                <div className="flex items-center gap-1 bg-zinc-900 p-0.5 rounded-md border border-white/10 text-[10px]">
+                <div className="flex flex-wrap items-center gap-1 bg-zinc-900 p-0.5 rounded-md border border-white/10 text-sm">
                   <button
                     onClick={() => setFilterCategory("all")}
                     type="button"
-                    className={`px-2 py-0.5 rounded ${filterCategory === "all" ? "bg-white text-zinc-950 font-semibold" : "text-zinc-400 hover:text-white"}`}
+                    className={`px-3 py-2 rounded ${filterCategory === "all" ? "bg-white text-zinc-950 font-semibold" : "text-zinc-400 hover:text-white"}`}
                   >
                     All
                   </button>
                   <button
                     onClick={() => setFilterCategory("faculty")}
                     type="button"
-                    className={`px-2 py-0.5 rounded ${filterCategory === "faculty" ? "bg-white text-zinc-950 font-semibold" : "text-zinc-400 hover:text-white"}`}
+                    className={`px-3 py-2 rounded ${filterCategory === "faculty" ? "bg-white text-zinc-950 font-semibold" : "text-zinc-400 hover:text-white"}`}
                   >
                     Faculty
                   </button>
                   <button
                     onClick={() => setFilterCategory("room")}
                     type="button"
-                    className={`px-2 py-0.5 rounded ${filterCategory === "room" ? "bg-white text-zinc-950 font-semibold" : "text-zinc-400 hover:text-white"}`}
+                    className={`px-3 py-2 rounded ${filterCategory === "room" ? "bg-white text-zinc-950 font-semibold" : "text-zinc-400 hover:text-white"}`}
                   >
                     Rooms
                   </button>
                   <button
                     onClick={() => setFilterCategory("conflicts")}
                     type="button"
-                    className={`px-2 py-0.5 rounded ${filterCategory === "conflicts" ? "bg-amber-400 text-zinc-950 font-semibold" : "text-zinc-400 hover:text-white"}`}
+                    className={`px-3 py-2 rounded ${filterCategory === "conflicts" ? "bg-amber-400 text-zinc-950 font-semibold" : "text-zinc-400 hover:text-white"}`}
                   >
                     Conflicts ({conflictsCount})
                   </button>
@@ -586,11 +635,11 @@ export function IntakePage() {
             {filteredCards.length === 0 ? (
               <div className="glass-box p-8 text-center space-y-2">
                 <AlertCircle size={20} className="text-zinc-500 mx-auto" />
-                <p className="text-xs font-medium text-zinc-300">No constraints match your search criteria.</p>
-                <p className="text-[11px] text-zinc-500">Try clearing your search query or choosing another category filter.</p>
+                <p className="text-base font-medium text-zinc-300">{ruleCards.length === 0 ? "No constraints found yet." : "No matching constraints."}</p>
+                <p className="text-sm text-zinc-400">{ruleCards.length === 0 ? <>No draft rules were extracted. Review the analysis summary for the reason, then <a href="#intake-notes" className="underline text-zinc-200 hover:text-white">edit your constraint and try again</a>.</> : "Clear your search or choose another filter."}</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
                 {filteredCards.map((card) => {
                   const isConfirmed = confirmedRules[card.id] || card.status === "confirmed";
                   const isDetailsOpen = expandedDetails[card.id] || false;
@@ -598,13 +647,13 @@ export function IntakePage() {
                   return (
                     <div
                       key={card.id}
-                      className="glass-box p-4 rounded-xl border border-white/10 hover:border-white/20 transition-all space-y-3.5 relative overflow-hidden"
+                      className="glass-box p-5 sm:p-6 rounded-xl border border-white/10 hover:border-white/20 transition-all space-y-3.5 relative overflow-hidden"
                     >
                       {/* Card Header */}
                       <div className="flex items-center justify-between gap-2 border-b border-white/5 pb-2.5">
                         <div className="flex items-center gap-2">
                           {/* Type icon & category */}
-                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold flex items-center gap-1.5 ${
+                          <span className={`px-2 py-0.5 rounded-full text-sm font-semibold flex items-center gap-1.5 ${
                             card.type === "teacher_unavailable"
                               ? "bg-rose-500/10 text-rose-300 border border-rose-500/20"
                               : card.type === "room_unavailable"
@@ -620,14 +669,10 @@ export function IntakePage() {
                             <span>{card.category}</span>
                           </span>
 
-                          <span className="font-mono text-[10px] text-zinc-500">ID: {card.id}</span>
                         </div>
 
                         <div className="flex items-center gap-2">
-                          <span className="text-[10px] text-zinc-400 font-mono">
-                            By {card.owner}
-                          </span>
-                          <span className={`px-1.5 py-0.5 rounded text-[9px] font-semibold font-mono uppercase ${
+                          <span className={`px-1.5 py-0.5 rounded text-sm font-semibold font-mono uppercase ${
                             isConfirmed ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30" : "bg-zinc-800 text-zinc-400"
                           }`}>
                             {isConfirmed ? "Active" : "Draft"}
@@ -637,16 +682,16 @@ export function IntakePage() {
 
                       {/* Headline & Plain-English Description */}
                       <div className="space-y-1">
-                        <h5 className="text-xs font-bold text-white tracking-tight">
-                          {card.headline}
+                        <h5 className="text-lg font-semibold text-white leading-snug">
+                          {card.target_entity}
                         </h5>
-                        <p className="text-xs text-zinc-300 leading-relaxed">
+                        <p className="text-base text-zinc-300 leading-relaxed">
                           {card.plain_description}
                         </p>
                       </div>
 
                       {/* Visual Parameter Badges */}
-                      <div className="flex flex-wrap items-center gap-1.5 text-[10px]">
+                      <div className="flex flex-wrap items-center gap-1.5 text-sm">
                         <span className="px-2 py-1 rounded bg-zinc-900 border border-white/10 text-zinc-200 flex items-center gap-1 font-medium">
                           <Calendar size={11} className="text-zinc-400" />
                           <span>{card.day_name}</span>
@@ -655,43 +700,34 @@ export function IntakePage() {
                           <Clock size={11} className="text-zinc-400" />
                           <span>{card.time_window}</span>
                         </span>
-                        {card.evidence_ref && (
-                          <span className="px-2 py-1 rounded bg-zinc-900/60 border border-white/5 text-zinc-400 font-mono text-[9px] truncate max-w-[140px]">
-                            {card.evidence_ref}
-                          </span>
-                        )}
+
                       </div>
 
                       {/* Timetable Impact Alert */}
-                      <div className={`p-2.5 rounded-lg border text-[11px] leading-relaxed flex items-start gap-2 ${
-                        card.has_conflict
-                          ? "bg-amber-950/25 border-amber-500/30 text-amber-200"
-                          : "bg-emerald-950/15 border-emerald-500/20 text-emerald-200/90"
-                      }`}>
-                        {card.has_conflict ? (
-                          <AlertTriangle size={14} className="shrink-0 mt-0.5 text-amber-400" />
-                        ) : (
-                          <CheckCircle2 size={14} className="shrink-0 mt-0.5 text-emerald-400" />
-                        )}
-                        <span>{card.timetable_impact}</span>
-                      </div>
+                      {card.has_conflict && (
+                        <div className="p-3 rounded-lg border border-amber-500/30 bg-amber-950/25 text-base text-amber-200 leading-relaxed flex items-start gap-2">
+                          <AlertTriangle size={18} className="shrink-0 mt-0.5 text-amber-400" />
+                          <span>{card.timetable_impact}</span>
+                        </div>
+                      )}
 
                       {/* Card Action Footer */}
                       <div className="flex items-center justify-between pt-1 border-t border-white/5">
                         <button
                           type="button"
+                          aria-expanded={isDetailsOpen}
                           onClick={() => toggleDetails(card.id)}
-                          className="text-[10px] text-zinc-400 hover:text-white flex items-center gap-1 transition-colors"
+                          className="min-h-10 text-sm text-zinc-300 hover:text-white flex items-center gap-1 transition-colors"
                         >
                           {isDetailsOpen ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
-                          <span>{isDetailsOpen ? "Hide Specifications" : "View Specifications"}</span>
+                          <span>{isDetailsOpen ? "Hide details" : "Details"}</span>
                         </button>
 
                         <button
                           type="button"
                           disabled={isConfirmed || confirmingId === card.id}
                           onClick={() => handleConfirmRule(card.id)}
-                          className={`h-7 px-3 rounded-md text-[11px] font-semibold transition-all flex items-center gap-1.5 ${
+                          className={`min-h-10 px-3 rounded-md text-sm font-semibold transition-all flex items-center gap-1.5 ${
                             isConfirmed
                               ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 cursor-default"
                               : "bg-white text-zinc-950 hover:bg-zinc-200 active:scale-[0.98] shadow-sm"
@@ -705,44 +741,45 @@ export function IntakePage() {
                           ) : isConfirmed ? (
                             <>
                               <Check size={11} />
-                              <span>Active in Solver</span>
+                              <span>Applied</span>
                             </>
                           ) : (
                             <>
                               <Plus size={11} />
-                              <span>Apply to Schedule</span>
+                              <span>Apply rule</span>
                             </>
                           )}
                         </button>
                       </div>
 
-                      {/* Expandable Structured Constraint Specifications */}
+                      {/* Expandable Structured Rule details */}
                       {isDetailsOpen && (
-                        <div className="pt-3 border-t border-white/10 space-y-2.5 animate-fade-in">
+                        <div className="pt-3 border-t border-white/10 space-y-3 animate-fade-in">
+                          <p className="text-base text-zinc-300 leading-relaxed">{card.timetable_impact}</p>
                           <div className="flex items-center justify-between">
-                            <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">
-                              Constraint Specifications
+                            <span className="text-sm font-semibold text-zinc-400 uppercase tracking-wider">
+                              Rule details
                             </span>
-                            <span className="text-[10px] font-mono text-zinc-500">
+                            <span className="text-sm font-mono text-zinc-500">
                               Ref: {card.evidence_ref || "Direct memo"}
                             </span>
                           </div>
-                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-base">
                             <div className="p-2 rounded-lg bg-zinc-900 border border-white/5">
-                              <span className="text-zinc-500 block text-[10px]">Target Entity</span>
-                              <span className="font-semibold text-zinc-200 truncate block">{card.target_entity}</span>
+                              <span className="text-zinc-500 block text-sm">Applies to</span>
+                              <span className="font-semibold text-zinc-200 break-words block">{card.target_entity}</span>
                             </div>
                             <div className="p-2 rounded-lg bg-zinc-900 border border-white/5">
-                              <span className="text-zinc-500 block text-[10px]">Schedule Day</span>
-                              <span className="font-semibold text-zinc-200 truncate block">{card.day_name}</span>
+                              <span className="text-zinc-500 block text-sm">Schedule Day</span>
+                              <span className="font-semibold text-zinc-200 break-words block">{card.day_name}</span>
                             </div>
                             <div className="p-2 rounded-lg bg-zinc-900 border border-white/5">
-                              <span className="text-zinc-500 block text-[10px]">Time Window</span>
-                              <span className="font-semibold text-zinc-200 truncate block">{card.time_window}</span>
+                              <span className="text-zinc-500 block text-sm">Time Window</span>
+                              <span className="font-semibold text-zinc-200 break-words block">{card.time_window}</span>
                             </div>
                             <div className="p-2 rounded-lg bg-zinc-900 border border-white/5">
-                              <span className="text-zinc-500 block text-[10px]">Governance Owner</span>
-                              <span className="font-semibold text-zinc-200 truncate block">{card.owner}</span>
+                              <span className="text-zinc-500 block text-sm">Owner</span>
+                              <span className="font-semibold text-zinc-200 break-words block">{card.owner}</span>
                             </div>
                           </div>
                         </div>
@@ -754,34 +791,38 @@ export function IntakePage() {
             )}
           </div>
 
+          <details className="glass-box p-5 sm:p-6">
+            <summary className="cursor-pointer text-base font-semibold text-zinc-200">
+              People, files & analysis notes ({dumpResult.warnings.length} warnings)
+            </summary>
+            <div className="mt-5 space-y-5">
           {/* Section: Identified Entities & Operational Insights */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-2">
             {/* Cataloged Domain Entities */}
-            <div className="glass-box p-5 space-y-3">
+            <div className="glass-box p-5 sm:p-6 space-y-3">
               <div className="border-b border-white/5 pb-2.5 flex items-center justify-between">
-                <h4 className="text-xs font-semibold text-white flex items-center gap-2">
+                <h4 className="text-base font-semibold text-white flex items-center gap-2">
                   <Layers size={13} className="text-zinc-300" />
-                  Identified Timetable Entities ({dumpResult.entities.length})
+                  People, rooms & classes ({dumpResult.entities.length})
                 </h4>
-                <span className="text-[10px] text-zinc-400 font-mono">Live Roster</span>
               </div>
 
               {dumpResult.entities.length === 0 ? (
-                <p className="text-xs text-zinc-500 py-4 text-center">No distinct entities cataloged.</p>
+                <p className="text-base text-zinc-500 py-4 text-center">No distinct entities cataloged.</p>
               ) : (
                 <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
                   {dumpResult.entities.map((ent, idx) => (
                     <div
                       key={`${ent.name}-${idx}`}
-                      className="p-2.5 rounded-lg bg-zinc-900 border border-white/10 text-xs flex items-center justify-between gap-3"
+                      className="p-2.5 rounded-lg bg-zinc-900 border border-white/10 text-base flex items-center justify-between gap-3"
                     >
                       <div className="truncate">
-                        <span className="font-semibold text-white text-xs">{ent.name}</span>
+                        <span className="font-semibold text-white text-base">{ent.name}</span>
                         {ent.details && (
-                          <p className="text-[10px] text-zinc-400 truncate mt-0.5">{ent.details}</p>
+                          <p className="text-sm text-zinc-400 truncate mt-0.5">{ent.details}</p>
                         )}
                       </div>
-                      <span className="px-2 py-0.5 rounded bg-zinc-800 text-zinc-300 text-[10px] font-mono shrink-0">
+                      <span className="px-2 py-0.5 rounded bg-zinc-800 text-zinc-300 text-sm font-mono shrink-0">
                         {ent.kind}
                       </span>
                     </div>
@@ -791,18 +832,18 @@ export function IntakePage() {
             </div>
 
             {/* Operational Insights & Findings */}
-            <div className="glass-box p-5 space-y-3">
+            <div className="glass-box p-5 sm:p-6 space-y-3">
               <div className="border-b border-white/5 pb-2.5">
-                <h4 className="text-xs font-semibold text-white flex items-center gap-2">
+                <h4 className="text-base font-semibold text-white flex items-center gap-2">
                   <Lightbulb size={13} className="text-amber-400" />
-                  Operational Insights & Timetable Impacts
+                  Notes & warnings
                 </h4>
               </div>
 
               {dumpResult.insights.length === 0 && dumpResult.warnings.length === 0 ? (
-                <p className="text-xs text-zinc-500 py-4 text-center">No operational patterns flagged.</p>
+                <p className="text-base text-zinc-500 py-4 text-center">No operational patterns flagged.</p>
               ) : (
-                <ul className="space-y-2 text-xs text-zinc-300 max-h-72 overflow-y-auto pr-1">
+                <ul className="space-y-2 text-base text-zinc-300 max-h-72 overflow-y-auto pr-1">
                   {dumpResult.insights.map((ins, i) => (
                     <li key={`ins-${i}`} className="p-2 rounded bg-zinc-900/60 border border-white/5 flex items-start gap-2">
                       <CheckCircle2 size={13} className="shrink-0 mt-0.5 text-emerald-400" />
@@ -822,28 +863,27 @@ export function IntakePage() {
 
           {/* Section: Processed Files Breakdown */}
           {dumpResult.processed_files.length > 0 && (
-            <div className="glass-box p-5 space-y-3">
+            <div className="glass-box p-5 sm:p-6 space-y-3">
               <div className="border-b border-white/5 pb-2.5 flex items-center justify-between">
-                <span className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider block">
-                  Processed Dump Files ({dumpResult.processed_files.length})
+                <span className="text-sm font-semibold text-zinc-400 uppercase tracking-wider block">
+                  Uploaded files ({dumpResult.processed_files.length})
                 </span>
-                <span className="text-[10px] text-zinc-500 font-mono">Consolidated Ingestion</span>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                 {dumpResult.processed_files.map((pf, idx) => (
-                  <div key={idx} className="p-3 rounded-lg bg-zinc-900/80 border border-white/10 text-xs space-y-1.5">
+                  <div key={idx} className="p-3 rounded-lg bg-zinc-900/80 border border-white/10 text-base space-y-1.5">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-1.5 truncate">
                         {getFileIcon(pf.filename)}
                         <span className="font-semibold text-zinc-200 truncate">{pf.filename}</span>
                       </div>
-                      <span className="text-[9px] uppercase font-mono px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400">
+                      <span className="text-sm uppercase font-mono px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400">
                         {pf.file_type}
                       </span>
                     </div>
-                    <p className="text-[10px] text-zinc-500">{formatFileSize(pf.size_bytes)}</p>
+                    <p className="text-sm text-zinc-500">{formatFileSize(pf.size_bytes)}</p>
                     {pf.preview && (
-                      <p className="text-[10px] text-zinc-400 font-mono bg-black/40 p-2 rounded truncate leading-relaxed">
+                      <p className="text-sm text-zinc-400 font-mono bg-black/40 p-2 rounded truncate leading-relaxed">
                         {pf.preview}
                       </p>
                     )}
@@ -852,6 +892,8 @@ export function IntakePage() {
               </div>
             </div>
           )}
+            </div>
+          </details>
         </div>
       )}
     </div>

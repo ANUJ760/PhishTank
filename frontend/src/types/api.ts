@@ -122,6 +122,8 @@ export interface ExtractedRuleCard {
 }
 
 export interface DataDumpResult {
+  timetable_classes?: Array<{day: string; start: string; end: string; course_code: string; teachers: string[]; room: string}>;
+  processing?: Array<{stage: string; status: string; model: string}>;
   summary: string;
   instructions_executed: string;
   rules: Rule[];

@@ -12,6 +12,7 @@ import io
 import json
 import logging
 import re
+import subprocess
 from pathlib import Path
 from typing import Any
 
@@ -21,6 +22,7 @@ from backend import config
 from backend.llm.client import call_json
 from backend.models import Evidence, Roster, Room, Rule, Schedule, Session, validate_params
 from backend.registry import db
+from backend.intake.pdf_timetable import PDFClass, extract_pdf_timetable, overlaps_rule
 
 log = logging.getLogger(__name__)
 
@@ -30,6 +32,8 @@ DAY_NAMES: dict[int, str] = {
     2: "Wednesday",
     3: "Thursday",
     4: "Friday",
+    5: "Saturday",
+    6: "Sunday",
 }
 
 DAY_LOOKUP: dict[str, int] = {
@@ -38,15 +42,12 @@ DAY_LOOKUP: dict[str, int] = {
     "wed": 2, "wednesday": 2, "day 2": 2, "day2": 2,
     "thu": 3, "thur": 3, "thurs": 3, "thursday": 3, "day 3": 3, "day3": 3,
     "fri": 4, "friday": 4, "day 4": 4, "day4": 4,
+    "sat": 5, "saturday": 5, "sun": 6, "sunday": 6,
 }
 
 SLOT_HOURS: dict[int, str] = {
-    0: "09:00 - 10:00",
-    1: "10:00 - 11:00",
-    2: "11:00 - 12:00",
-    3: "13:00 - 14:00",
-    4: "14:00 - 15:00",
-    5: "15:00 - 16:00",
+    index: f"{start} - {int(start.split(':')[0]) + 1:02d}:{start.split(':')[1]}"
+    for index, start in enumerate(config.SLOT_TIMES)
 }
 
 
@@ -57,7 +58,7 @@ def _format_time_window(slots: list[int]) -> str:
     if sorted_slots == [0, 1, 2]:
         return "Morning (09:00 - 12:00)"
     if sorted_slots == [3, 4, 5]:
-        return "Afternoon (13:00 - 16:00)"
+        return f"Afternoon ({config.SLOT_TIMES[3]} - 16:00)"
     if sorted_slots == list(range(6)):
         return "Full Day (09:00 - 16:00)"
     if len(sorted_slots) == 1:
@@ -125,12 +126,46 @@ class DataDumpResult(BaseModel):
     insights: list[str]
     warnings: list[str]
     processed_files: list[DataDumpFileSummary]
+    timetable_classes: list[PDFClass] = Field(default_factory=list)
+    processing: list[dict[str, str]] = Field(default_factory=list)
+
+
+def _extract_pdf_text(content: bytes) -> str:
+    """Read embedded PDF text, retaining columns for timetable faculty lists."""
+    try:
+        result = subprocess.run(
+            ["pdftotext", "-layout", "-", "-"], input=content,
+            capture_output=True, timeout=20, check=True,
+        )
+    except FileNotFoundError as exc:
+        raise ValueError("PDF reading requires pdftotext (poppler-utils). Upload Excel or CSV instead.") from exc
+    except (subprocess.SubprocessError, OSError) as exc:
+        raise ValueError("Could not read this PDF. Upload a text-based PDF, Excel, or CSV timetable.") from exc
+    text = result.stdout.decode("utf-8", errors="replace").strip()
+    if not text:
+        raise ValueError("This PDF has no readable text. Upload a text-based PDF, Excel, or CSV timetable.")
+    return text
+
+
+def _pdf_faculty(text: str) -> list[str]:
+    # Coordinator legends identify teaching faculty; signatures above them may
+    # instead name administrators who do not teach the uploaded classes.
+    legend = re.search(r"Course\s+Code.*?Coordinator", text, re.IGNORECASE)
+    faculty_text = text[legend.start():] if legend else text
+    pattern = r"\b(?:Prof(?:essor)?\.?|Dr\.?)\s+(?:[A-Z]\.?[ \t]*)*[A-Z][a-z][A-Za-z'’-]*(?:[ \t]+[A-Z][a-z][A-Za-z'’-]*){0,3}"
+    return list(dict.fromkeys(
+        re.sub(r"[ \t]+", " ", match.group()).strip()
+        for match in re.finditer(pattern, faculty_text)
+    ))
 
 
 def _extract_file_preview(filename: str, content: bytes) -> tuple[str, str]:
     """Returns (file_type, preview_text) for a dumped file."""
     ext = Path(filename).suffix.lower()
     size = len(content)
+
+    if ext == ".pdf":
+        return "pdf", _extract_pdf_text(content)
 
     if ext in (".csv", ".tsv"):
         try:
@@ -309,7 +344,7 @@ def _extract_tables_from_file(filename: str, content: bytes) -> list[tuple[str, 
 def _parse_days_and_slots_from_text(text: str) -> tuple[int, list[int]]:
     """Heuristic extraction of day index (0-4) and slot indices from text snippet."""
     t_lower = text.lower()
-    day = 0
+    day = -1
     for day_word, day_idx in DAY_LOOKUP.items():
         if re.search(r"\b" + re.escape(day_word) + r"\b", t_lower):
             day = day_idx
@@ -331,19 +366,18 @@ def _parse_days_and_slots_from_text(text: str) -> tuple[int, list[int]]:
         for s in range(config.SLOTS_PER_DAY):
             if f"slot {s}" in t_lower or f"slot:{s}" in t_lower or f"slot_{s}" in t_lower:
                 found_slots.add(s)
-        if "09:00" in t_lower or "9:00" in t_lower or "9am" in t_lower:
-            found_slots.add(0)
-        if "10:00" in t_lower or "10am" in t_lower:
-            found_slots.add(1)
-        if "11:00" in t_lower or "11am" in t_lower:
-            found_slots.add(2)
-        if "13:00" in t_lower or "1:00" in t_lower or "1pm" in t_lower:
-            found_slots.add(3)
-        if "14:00" in t_lower or "2:00" in t_lower or "2pm" in t_lower:
-            found_slots.add(4)
-        if "15:00" in t_lower or "3:00" in t_lower or "3pm" in t_lower:
-            found_slots.add(5)
-        slots = sorted(list(found_slots)) if found_slots else [0, 1]
+        for match in re.finditer(r"(?<![0-9])([0-9]{1,2})(?::([0-9]{2})\s*(am|pm)?|\s*(am|pm))\b", t_lower):
+            hour = int(match.group(1))
+            minute = int(match.group(2) or 0)
+            meridiem = match.group(3) or match.group(4)
+            if meridiem == "pm" and hour < 12:
+                hour += 12
+            elif meridiem == "am" and hour == 12:
+                hour = 0
+            value = f"{hour:02d}:{minute:02d}"
+            if value in config.SLOT_TIMES:
+                found_slots.add(config.SLOT_TIMES.index(value))
+        slots = sorted(found_slots)
 
     return day, slots
 
@@ -354,6 +388,7 @@ def _extract_deterministic_rules(
     instructions: str,
     notes: str,
     files: list[tuple[str, bytes]],
+    allow_new_entities: bool = True,
 ) -> list[ExtractedRuleDraft]:
     """Rapid, timetable-grounded deterministic extraction avoiding LLM latency and hallucination."""
     extracted: list[ExtractedRuleDraft] = []
@@ -365,39 +400,13 @@ def _extract_deterministic_rules(
             seen_keys.add(key)
             extracted.append(d)
 
-    # 0. Layout-aware spreadsheet ingestion using sandbox parser synthesis and layout caching
-    for filename, content in files:
-        ext = Path(filename).suffix.lower()
-        if ext in (".xlsx", ".xls", ".csv") and len(content) > 0:
-            try:
-                temp_path = config.UPLOAD_DIR / f"dump_staging_{Path(filename).name}"
-                temp_path.parent.mkdir(parents=True, exist_ok=True)
-                temp_path.write_bytes(content)
-                try:
-                    from backend.intake import sheet_parser
-                    ingest_res = sheet_parser.ingest_sheet(temp_path, filename, roster=roster)
-                    for rule in ingest_res.rules:
-                        ref_str = rule.evidence[0].ref if rule.evidence else f"{filename}!sheet"
-                        add_draft(
-                            ExtractedRuleDraft(
-                                type=rule.type,
-                                params=rule.params,
-                                owner=rule.owner,
-                                evidence_ref=ref_str,
-                            )
-                        )
-                finally:
-                    temp_path.unlink(missing_ok=True)
-            except Exception as exc:
-                log.info("Layout parser pass skipped for %s (%s); falling back to direct table parser", filename, exc)
-
     # 1. Parse all tabular files (CSV, TSV, XLSX, XLS, JSON)
     for filename, content in files:
         tables = _extract_tables_from_file(filename, content)
         for table_ref, headers, rows in tables:
-            t_idx = next((i for i, h in enumerate(headers) if any(k in h for k in ("teach", "facult", "prof", "instructor", "doctor", "surgeon", "name"))), -1)
+            t_idx = next((i for i, h in enumerate(headers) if any(k in h for k in ("teach", "facult", "prof", "instructor", "doctor", "surgeon"))), -1)
             c_idx = next((i for i, h in enumerate(headers) if any(k in h for k in ("course", "session", "subject", "module", "class", "lecture"))), -1)
-            r_idx = next((i for i, h in enumerate(headers) if any(k in h for k in ("room", "lab", "hall", "theater", "theatre", "venue", "classroom", "or", "ot"))), -1)
+            r_idx = next((i for i, h in enumerate(headers) if any(k in h for k in ("room", "lab", "hall", "theater", "theatre", "venue"))), -1)
             d_idx = next((i for i, h in enumerate(headers) if any(k in h for k in ("day", "date", "weekday"))), -1)
             slot_idx = next((i for i, h in enumerate(headers) if any(k in h for k in ("slot", "time", "hour", "window", "period"))), -1)
             status_idx = next((i for i, h in enumerate(headers) if any(k in h for k in ("status", "reason", "type", "avail", "remark", "note", "action"))), -1)
@@ -486,18 +495,20 @@ def _extract_deterministic_rules(
         if ext in (".txt", ".md", ".log", ".json"):
             file_texts.append(cnt.decode("utf-8", errors="replace"))
     combined_text = "\n".join([t for t in [instructions, notes] + file_texts if t.strip()])
-    sentences = [s.strip() for s in re.split(r"(?<!\bDr)(?<!\bMr)(?<!\bMs)(?<!\bProf)\.\s+|\n+|;\s*", combined_text) if s.strip()]
+    sentences = [s.strip() for s in re.split(r"(?<!\bDr)(?<!\bMr)(?<!\bMs)(?<!\bProf)(?<!\b[A-Z])\.\s+|\n+|;\s*", combined_text) if s.strip()]
 
     # A. Teacher Unavailability Extraction
-    unavail_keywords = ("unavail", "cannot", "can't", "not avail", "leave", "absent", "meeting", "duty", "duties", "sick", "off", "busy", "conference", "preference", "no class", "conflict")
+    unavail_keywords = ("unavail", "cannot", "can't", "unable", "should not", "shouldn't", "must not", "mustn't", "avoid", "not avail", "leave", "absent", "meeting", "duty", "duties", "sick", "off", "busy", "conference", "preference", "no class", "no teaching", "not teach", "not take", "cannot take", "can't take", "conflict")
     for s in sentences:
         s_low = s.lower()
         if any(w in s_low for w in unavail_keywords):
-            # Check known teachers
+            # Match only faculty in the uploaded timetable/registered roster.
             for t in list(roster.teachers):
                 t_variants = [t.lower(), t.split()[-1].lower()]
                 if any(re.search(r"\b" + re.escape(v) + r"\b", s_low) for v in t_variants):
                     day, slots = _parse_days_and_slots_from_text(s)
+                    if day < 0 or not slots:
+                        continue
                     add_draft(
                         ExtractedRuleDraft(
                             type="teacher_unavailable",
@@ -508,9 +519,11 @@ def _extract_deterministic_rules(
                     )
             # Check title-prefixed candidates (e.g. Dr. Adams, Prof. Sharma)
             title_matches = re.findall(r"\b(?:Prof(?:\.|essor)?|Dr\.|Doctor|Mr\.|Ms\.|Mrs\.|Faculty|Instructor)\s+[A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)?\b", s)
-            for cand in title_matches:
+            for cand in title_matches if allow_new_entities else []:
                 t = _ensure_teacher(roster, cand)
                 day, slots = _parse_days_and_slots_from_text(s)
+                if day < 0 or not slots:
+                    continue
                 add_draft(
                     ExtractedRuleDraft(
                         type="teacher_unavailable",
@@ -521,10 +534,12 @@ def _extract_deterministic_rules(
                 )
             # Check untitled name followed by unavailability phrasing
             name_m = re.search(r"\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\s+(?:cannot teach|can't teach|is unavailable|is not available|on leave|on sick leave|has a meeting|is off|cannot be scheduled)\b", s)
-            if name_m:
+            if name_m and allow_new_entities:
                 cand_name = name_m.group(1)
                 t = _ensure_teacher(roster, cand_name)
                 day, slots = _parse_days_and_slots_from_text(s)
+                if day < 0 or not slots:
+                    continue
                 add_draft(
                     ExtractedRuleDraft(
                         type="teacher_unavailable",
@@ -579,7 +594,7 @@ def _extract_deterministic_rules(
                         if t.lower() in s_low or t.split()[-1].lower() in s_low
                     ]
                     if not matched_instructors:
-                        matched_instructors = ses.teachers[:1] or [roster.teachers[0]]
+                        continue
                     add_draft(
                         ExtractedRuleDraft(
                             type="only_qualified",
@@ -599,9 +614,6 @@ def _extract_deterministic_rules(
                             evidence_ref="intake-notes",
                         )
                     )
-
-    # Persist updated roster with any dynamically discovered entities
-    db.save_roster(roster)
 
     return extracted
 
@@ -793,14 +805,53 @@ def ingest_data_dump(
     roster: Roster | None = None,
 ) -> DataDumpResult:
     """Process a heterogeneous data dump with user instructions using Gemma intelligence and live timetable grounding."""
-    roster = roster or db.get_roster()
-    schedule = db.latest_schedule()
+    existing_roster = (roster or db.get_roster()).model_copy(deep=True)
+    # A supplied timetable defines the extraction context. Seed/demo faculty must
+    # not leak into its output, but existing registry data is preserved below.
+    has_timetable = any(Path(name).suffix.lower() == ".pdf" for name, _ in files) or any(
+        any(any(k in h for k in ("teach", "facult", "prof", "instructor")) for h in headers)
+        and any(any(k in h for k in ("course", "session", "subject", "module", "class", "lecture")) for h in headers)
+        for filename, content in files
+        for _, headers, _ in _extract_tables_from_file(filename, content)
+    )
+    roster = Roster(teachers=[], rooms=[], sessions=[]) if has_timetable else existing_roster.model_copy(deep=True)
+    schedule = None if has_timetable else db.latest_schedule()
     processed_files: list[DataDumpFileSummary] = []
+    source_warnings: list[str] = []
+    timetable_classes: list[PDFClass] = []
+    processing: list[dict[str, str]] = []
     dump_context_parts: list[str] = []
+
+    processing.append({
+        "stage": "Constraint text",
+        "status": "received" if notes.strip() else "not provided",
+        "model": "Text input",
+    })
 
     # 1. Parse and extract previews from all dumped files
     for filename, content in files:
         file_type, preview = _extract_file_preview(filename, content)
+        if file_type == "binary" or file_type in {"image", "audio"}:
+            raise ValueError(f"Cannot read timetable data from {filename}. Upload a text-based PDF, Excel, CSV, or text file.")
+        if file_type == "pdf":
+            faculty = _pdf_faculty(preview)
+            if not faculty:
+                raise ValueError(f"No faculty names could be identified in {filename}. Upload an Excel or CSV timetable with a Professor column.")
+            for teacher in faculty:
+                _ensure_teacher(roster, teacher)
+            try:
+                parsed_timetable = extract_pdf_timetable(preview, faculty)
+                timetable_classes.extend(parsed_timetable.classes)
+                source_warnings.extend(parsed_timetable.warnings)
+                processing.append({"stage": "PDF timetable", "status": "completed" if parsed_timetable.classes else "incomplete", "model": "PDF layout parser"})
+                if not parsed_timetable.classes:
+                    source_warnings.append("No class placements could be verified in the PDF; timetable conflicts remain unchecked.")
+                if any(c.day in {"Saturday", "Sunday"} or c.start not in config.SLOT_TIMES for c in parsed_timetable.classes):
+                    source_warnings.append("The PDF includes days or times outside the optimizer's configured grid. Uploaded placements are checked for conflicts, but the full PDF schedule cannot yet be optimized on that grid.")
+            except Exception as exc:
+                log.warning("PDF timetable extraction failed: %s", exc)
+                processing.append({"stage": "PDF timetable", "status": "unavailable", "model": "PDF layout parser"})
+                source_warnings.append("Faculty names were read, but PDF class extraction failed. Timetable conflicts remain unchecked; upload a clearer table layout.")
         processed_files.append(
             DataDumpFileSummary(
                 filename=filename,
@@ -811,7 +862,10 @@ def ingest_data_dump(
             )
         )
         db.save_upload(filename, content)
-        dump_context_parts.append(f"### FILE: {filename} (Type: {file_type}, Size: {len(content)} bytes)\n{preview}\n")
+        if file_type != "pdf":
+            dump_context_parts.append(f"### FILE: {filename} (Type: {file_type}, Size: {len(content)} bytes)\n{preview}\n")
+        else:
+            dump_context_parts.append(f"### REFERENCE TIMETABLE: {filename}\nFaculty were extracted into the known-entity list. Its class placements are reference data, not new constraint requests.\n")
 
     # 2. Add raw typed notes
     if notes.strip():
@@ -820,13 +874,14 @@ def ingest_data_dump(
     consolidated_data = "\n".join(dump_context_parts) if dump_context_parts else "No files attached. Only instructions provided."
     instructions_clean = instructions.strip() or "Extract all applicable operational constraints, entity relationships, and requirements."
 
-    # 3. High-speed timetable-grounded deterministic extraction (0-5ms, zero hallucination)
+    # 3. Extract explicit constraints from source tables and notes.
     deterministic_drafts = _extract_deterministic_rules(
         roster=roster,
         schedule=schedule,
         instructions=instructions_clean,
         notes=notes,
         files=files,
+        allow_new_entities=not has_timetable,
     )
 
     # 4. Live timetable context for Gemma intelligence
@@ -855,7 +910,12 @@ Allowed Standard Rule Types & Parameters:
 - room_unavailable: {{"room": <name>, "day": <0-4>, "slots": [<0-5>, ...]}}
 - pin_session: {{"session_id": <id>, "day": <0-4>, "slots": [<0-5>, ...]}}
 - only_qualified: {{"session_id": <id>, "teachers": [<name>, ...]}}
-(Day 0=Mon ... 4=Fri. Slots 0-2=morning, 3-5=afternoon)
+Day indices are ZERO-BASED: Monday=0, Tuesday=1, Wednesday=2, Thursday=3, Friday=4.
+Morning means slots [0,1,2]. Afternoon means slots [3,4,5].
+Timetable placements and course legends are reference data, not instructions to create constraints.
+Extract rules ONLY for explicit restrictions in operator notes, instructions, or constraint documents.
+Never create a rule for a faculty member merely because they appear in the timetable.
+Use only the listed names and session IDs. Do not infer new sessions or qualification rules.
 
 Return concise JSON adhering exactly to this schema:
 {{
@@ -886,18 +946,21 @@ CONSOLIDATED DATA DUMP:
     llm_out: DataDumpLLMOut | None = None
     if files or notes.strip():
         try:
-            # Rapid intake tier (Gemma 4B) with bounded token output and fast timeout
+            # Use a timeout that permits live local inference, including model loading.
             llm_out = call_json(
                 fn="extract_data_dump",
                 tier="intake",
                 messages=messages,
                 schema=DataDumpLLMOut,
                 retries=1,
-                timeout_s=3.0,
-                options={"num_predict": 350, "temperature": 0.1, "think": False},
+                timeout_s=config.LLM_TIMEOUT_S,
+                options={"num_predict": 1800, "temperature": 0, "think": False},
                 fallback_to_mock=False,
             )
+            processing.append({"stage": "Constraint extraction", "status": "completed", "model": config.INTAKE_MODEL})
         except Exception as exc:
+            processing.append({"stage": "Constraint extraction", "status": "fallback", "model": config.INTAKE_MODEL})
+            source_warnings.append("The intake model was unavailable. Only directly recognized text constraints are shown.")
             log.info("Fast Gemma pass skipped/timed out (%s); leveraging real timetable deterministic extraction", exc)
 
     # 5. Combine and validate rules
@@ -913,62 +976,86 @@ CONSOLIDATED DATA DUMP:
 
     # Priority 2: LLM-extracted rules if valid against roster
     if llm_out:
+        rejected_model_rule = False
         for r_draft in llm_out.rules:
             rule_params = r_draft.params or {}
-            if r_draft.type == "teacher_unavailable" and "teacher" in rule_params:
-                _ensure_teacher(roster, rule_params["teacher"])
-            elif r_draft.type == "room_unavailable" and "room" in rule_params:
-                _ensure_room(roster, rule_params["room"])
-            elif r_draft.type == "pin_session" and "session_id" in rule_params:
-                _ensure_session(roster, rule_params["session_id"])
-            elif r_draft.type == "only_qualified" and "session_id" in rule_params:
-                _ensure_session(roster, rule_params["session_id"], rule_params.get("teachers", []))
             try:
                 validate_params(r_draft.type, rule_params, roster)
+                target_key = {"teacher_unavailable": "teacher", "room_unavailable": "room", "pin_session": "session_id", "only_qualified": "session_id"}.get(r_draft.type)
+                grounded = [d for d in deterministic_drafts if d.type == r_draft.type and target_key and d.params.get(target_key) == rule_params.get(target_key)]
+                if grounded and not any(d.params == rule_params for d in grounded):
+                    rejected_model_rule = True
+                    continue
                 k = f"{r_draft.type}:{json.dumps(rule_params, sort_keys=True)}"
                 if k not in seen_keys:
                     seen_keys.add(k)
                     final_drafts.append(r_draft)
             except Exception as e:
+                rejected_model_rule = True
                 log.debug("LLM rule discarded due to roster validation: %s", e)
-        db.save_roster(roster)
+        if rejected_model_rule:
+            for step in processing:
+                if step["stage"] == "Constraint extraction":
+                    step["status"] = "partially validated"
+            source_warnings.append("Some model suggestions did not match the source constraints and were discarded.")
+            # Prose accompanying invented rules is not grounded either.
+            llm_out = None
 
-    # 6. Build executive summary, entities, and insights dynamically
-    if llm_out and llm_out.summary:
-        summary_text = llm_out.summary
-        entities_list = [e.model_dump() for e in llm_out.entities]
-        insights_list = llm_out.insights
-        warnings_list = llm_out.warnings
+    # 6. State clearly whether restrictions were actually found.
+    if final_drafts:
+        summary_text = (
+            llm_out.summary if llm_out and llm_out.summary
+            else f"Found {len(final_drafts)} scheduling restriction(s) in the supplied files or notes."
+        )
+        insights_list = llm_out.insights if llm_out else [
+            f"Checked {len(timetable_classes) if has_timetable else len(schedule.placements) if schedule else 0} class placements for overlaps."
+        ]
+        warnings_list = llm_out.warnings if llm_out else []
+    elif notes.strip():
+        summary_text = (
+            "Your constraint text was received, but no supported rule could be extracted. "
+            "Check that it names a professor from the uploaded timetable, a weekday, and a time or period."
+        )
+        insights_list = llm_out.insights if llm_out else []
+        warnings_list = llm_out.warnings if llm_out else []
+    elif has_timetable:
+        summary_text = (
+            f"Read {len(roster.teachers)} faculty names and {len(timetable_classes)} class placements from the timetable. "
+            "No constraint text was included in this submission. Add it in the notes and submit again."
+        )
+        insights_list = []
+        warnings_list = llm_out.warnings if llm_out else []
     else:
-        file_count_str = f"{len(files)} uploaded file{'s' if len(files) != 1 else ''}" if files else "operator notes"
-        if final_drafts:
-            summary_text = (
-                f"Successfully synthesized operational requirements from {file_count_str}. "
-                f"Grounded extractions against active timetable with {len(roster.teachers)} instructors, "
-                f"{len(roster.rooms)} facilities, and {len(roster.sessions)} sessions. "
-                f"Generated {len(final_drafts)} verified constraint rule{'s' if len(final_drafts) != 1 else ''} ready for schedule optimization."
-            )
+        summary_text = "No scheduling restrictions were found in the supplied files or notes. Add a specific rule and submit again."
+        insights_list = llm_out.insights if llm_out else []
+        warnings_list = llm_out.warnings if llm_out else []
+
+    entities_list = [
+        {"name": t, "kind": "faculty", "details": "Timetable instructor"}
+        for t in roster.teachers
+    ] + [
+        {"name": r.name, "kind": "facility", "details": f"Capacity: {r.capacity} seats"}
+        for r in roster.rooms
+    ] + [
+        {"name": s.course, "kind": "session", "details": f"Session ID: {s.id} • Qualified: {', '.join(s.teachers)}"}
+        for s in roster.sessions
+    ]
+    # Merge confirmed source entities without deleting prior registry records.
+    for teacher in roster.teachers:
+        if teacher not in existing_roster.teachers:
+            existing_roster.teachers.append(teacher)
+    for room in roster.rooms:
+        if not any(r.name == room.name for r in existing_roster.rooms):
+            existing_roster.rooms.append(room)
+    for session in roster.sessions:
+        previous = next((s for s in existing_roster.sessions if s.id == session.id), None)
+        if previous:
+            previous.teachers = list(dict.fromkeys(previous.teachers + session.teachers))
         else:
-            summary_text = (
-                f"Processed {file_count_str} against active timetable ({len(roster.teachers)} faculty, "
-                f"{len(roster.rooms)} facilities, {len(roster.sessions)} sessions). "
-                f"No explicit constraint conflicts or restrictions detected in the provided data dump."
-            )
-        entities_list = [
-            {"name": t, "kind": "faculty", "details": f"Faculty ({', '.join(s.course for s in roster.sessions if t in s.teachers) or 'Active instructor'})"}
-            for t in roster.teachers
-        ] + [
-            {"name": rm.name, "kind": "facility", "details": f"Capacity: {rm.capacity} seats"}
-            for rm in roster.rooms
-        ] + [
-            {"name": s.course, "kind": "session", "details": f"Session ID: {s.id} • Qualified: {', '.join(s.teachers)}"}
-            for s in roster.sessions
-        ]
-        insights_list = [
-            f"Processed data dump with {len(files)} files and direct operator directives.",
-            f"Cross-referenced active schedule ({len(schedule.placements) if schedule else 0} placed sessions) for immediate conflict detection.",
-        ]
-        warnings_list = []
+            existing_roster.sessions.append(session)
+    db.save_roster(existing_roster)
+
+    warnings_list.extend(source_warnings)
 
     # 7. Save rules to DB and construct human-friendly cards
     saved_rules: list[Rule] = []
@@ -981,6 +1068,7 @@ CONSOLIDATED DATA DUMP:
             validate_params(r_draft.type, rule_params, roster)
         except Exception as e:
             log.warning("Skipping invalid rule parameter set: %s (%s)", rule_params, e)
+            warnings_list.append(f"Could not import restriction for {r_draft.owner or 'this entity'}: specify a day and time within the configured scheduling grid ({e}).")
             continue
 
         rule_id = db.next_rule_id()
@@ -1007,6 +1095,16 @@ CONSOLIDATED DATA DUMP:
             schedule=schedule,
             roster=roster,
         )
+        if has_timetable and rule.type in {"teacher_unavailable", "room_unavailable"}:
+            conflicts = [c for c in timetable_classes if overlaps_rule(c, rule.type, rule.params, config.SLOT_TIMES)]
+            card.has_conflict = bool(conflicts)
+            if conflicts:
+                descriptions = ", ".join(f"{c.course_code} on {c.day} {c.start}–{c.end}" for c in conflicts)
+                card.timetable_impact = f"Uploaded timetable conflict: {descriptions}. Review an alternative time or instructor."
+            elif timetable_classes:
+                card.timetable_impact = "No overlap found in the extracted PDF classes. Review parsing warnings for any omitted or ambiguous cells."
+            else:
+                card.timetable_impact = "Conflict check unavailable: no uploaded class placements were extracted."
         rule_cards.append(card)
         if card.has_conflict and card.timetable_impact not in warnings_list:
             warnings_list.append(card.timetable_impact)
@@ -1016,11 +1114,10 @@ CONSOLIDATED DATA DUMP:
     if conflicting_cards:
         try:
             conflict_descriptions = [
-                f"Rule {c.id} ({c.type}): {c.headline} - Conflict Impact: {c.timetable_impact}"
+                f"Rule {c.id} ({c.type}, params={json.dumps(c.params)}): {c.headline} - Conflict Impact: {c.timetable_impact}"
                 for c in conflicting_cards[:4]
             ]
             conflict_text = "\n".join(conflict_descriptions)
-            from backend.llm.prompts import explain_conflict
             from backend.models import ExplainOut
 
             reason_res = call_json(
@@ -1031,19 +1128,34 @@ CONSOLIDATED DATA DUMP:
                         "role": "system",
                         "content": "You are a timetable conflict diagnosis engine. Explain rule conflicts clearly and propose bounded alternative solutions.",
                     },
-                    {"role": "user", "content": explain_conflict(conflict_text)},
+                    {"role": "user", "content": (
+                        "Explain these overlaps with the current uploaded timetable. They are not a proof that rescheduling is impossible. "
+                        "Return JSON with summary and options. Each option must reference one listed rule_id, "
+                        "preserve its new_params keys, and include a description. Options are suggestions for review, not solver-verified solutions. "
+                        "Use only supplied faculty and rules. An empty options list is allowed.\n" + conflict_text
+                    )},
                 ],
                 schema=ExplainOut,
                 retries=1,
-                timeout_s=15.0,
-                options={"num_predict": 400, "temperature": 0.1, "think": False},
+                timeout_s=config.LLM_TIMEOUT_S,
+                options={"num_predict": 1000, "temperature": 0.1, "think": False},
                 fallback_to_mock=False,
             )
             if reason_res and reason_res.summary:
-                insights_list.append(f"Gemma 12B Conflict Analysis: {reason_res.summary}")
+                processing.append({"stage": "Conflict explanation", "status": "completed", "model": config.REASON_MODEL})
+                insights_list.append(f"Conflict analysis: {reason_res.summary}")
                 for opt in reason_res.options[:2]:
-                    insights_list.append(f"Suggested Resolution Option: {opt.description}")
+                    original = next((c for c in conflicting_cards if c.id == opt.rule_id), None)
+                    if original is None:
+                        continue
+                    try:
+                        validate_params(original.type, opt.new_params, roster)
+                    except ValueError:
+                        continue
+                    insights_list.append(f"Suggested change (not solver-verified): {opt.description}")
         except Exception as exc:
+            processing.append({"stage": "Conflict explanation", "status": "unavailable", "model": config.REASON_MODEL})
+            warnings_list.append("Conflicts were detected, but the reasoning model could not explain them. Retry to generate an explanation.")
             log.info("12B conflict reasoning pass skipped or timed out (%s)", exc)
 
     db.log_audit_event(
@@ -1066,4 +1178,6 @@ CONSOLIDATED DATA DUMP:
         insights=insights_list,
         warnings=warnings_list,
         processed_files=processed_files,
+        timetable_classes=timetable_classes,
+        processing=processing,
     )
