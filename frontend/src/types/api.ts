@@ -94,6 +94,24 @@ export interface IngestSheetResult {
   seconds: number;
 }
 
+export interface DataDumpFileSummary {
+  filename: string;
+  file_type: string;
+  size_bytes: number;
+  status: string;
+  preview: string;
+}
+
+export interface DataDumpResult {
+  summary: string;
+  instructions_executed: string;
+  rules: Rule[];
+  entities: Array<{ name: string; kind: string; details?: string }>;
+  insights: string[];
+  warnings: string[];
+  processed_files: DataDumpFileSummary[];
+}
+
 export interface PublishResult {
   hash: string;
   tx_hash: string;

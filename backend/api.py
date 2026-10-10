@@ -43,6 +43,9 @@ def ingest_sheet(xlsx:bytes,filename:str)->IngestSheetResult:
         path.write_bytes(xlsx); result=sheet_parser.ingest_sheet(path,Path(filename).name)
         db.save_upload(Path(filename).name,xlsx); return IngestSheetResult(**result.model_dump())
     finally:path.unlink(missing_ok=True)
+def ingest_dump(files:list[tuple[str,bytes]],instructions:str="",notes:str=""):
+    from backend.intake.data_dump import ingest_data_dump
+    return ingest_data_dump(files=files,instructions=instructions,notes=notes)
 def list_rules(status:str|None=None)->list[Rule]:return db.list_rules(status)
 def edit_rule(rule_id:str,params:dict|None=None,owner:str|None=None)->Rule:
     rule=db.get_rule(rule_id)

@@ -10,6 +10,7 @@ from fastapi import (
     FastAPI,
     Depends,
     File,
+    Form,
     HTTPException,
     Query,
     Request,
@@ -339,6 +340,24 @@ async def intake_sheet(
     content = await file.read()
     try:
         result = await run_in_threadpool(api.ingest_sheet, content, file.filename or "sheet.xlsx")
+        return result.model_dump()
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.post("/api/v1/intake/dump")
+async def intake_data_dump(
+    files: list[UploadFile] = File(default=[]),
+    instructions: str = Form(default=""),
+    notes: str = Form(default=""),
+    user: UserResponse = Depends(require_user),
+):
+    try:
+        file_payloads: list[tuple[str, bytes]] = []
+        for f in files:
+            content = await f.read()
+            file_payloads.append((f.filename or "uploaded_file", content))
+        result = await run_in_threadpool(api.ingest_dump, file_payloads, instructions, notes)
         return result.model_dump()
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))

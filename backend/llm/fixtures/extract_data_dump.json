@@ -1,0 +1,43 @@
+{
+  "summary": "Consolidated multimodal data dump analyzed. Gemma synthesized operational guidelines, staff constraints, and resource availability from the uploaded spreadsheets, notes, and memos.",
+  "rules": [
+    {
+      "type": "teacher_unavailable",
+      "params": {
+        "teacher": "Prof. Rao",
+        "day": 0,
+        "slots": [0, 1]
+      },
+      "owner": "Dept Head",
+      "evidence_ref": "dump_memo.txt@L4"
+    },
+    {
+      "type": "only_qualified",
+      "params": {
+        "session_id": "DB_LAB",
+        "teachers": ["Prof. Rao"]
+      },
+      "owner": "Dean",
+      "evidence_ref": "faculty_qualifications.xlsx@Sheet1"
+    }
+  ],
+  "entities": [
+    {
+      "name": "Prof. Rao",
+      "kind": "person",
+      "details": "Lead Database Systems instructor"
+    },
+    {
+      "name": "DB_LAB",
+      "kind": "room",
+      "details": "Specialized high-capacity database laboratory"
+    }
+  ],
+  "insights": [
+    "Identified strict faculty availability window for Monday morning sessions.",
+    "Spreadsheet indicates specialized hardware dependency in DB_LAB."
+  ],
+  "warnings": [
+    "High density of required sessions on Tuesday afternoon may cause slot contention if additional rules are applied."
+  ]
+}
