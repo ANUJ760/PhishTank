@@ -1,0 +1,25 @@
+{
+  "status": "infeasible",
+  "is_minimal": true,
+  "conflicting_rule_types": [
+    "pin_session",
+    "teacher_non_overlap",
+    "room_non_overlap"
+  ],
+  "conflicting_sessions": [
+    "DATA_STRUCT",
+    "OPERATING_SYS"
+  ],
+  "recommended_relaxations": [
+    {
+      "candidate": "move_slot",
+      "target": "OPERATING_SYS",
+      "new_slot": 1
+    },
+    {
+      "candidate": "swap_room_or_teacher",
+      "target": "OPERATING_SYS",
+      "new_teacher": "Prof. Lovelace"
+    }
+  ]
+}

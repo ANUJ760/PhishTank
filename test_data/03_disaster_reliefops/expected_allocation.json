@@ -1,0 +1,7 @@
+{
+  "scenario": "cyclone_disaster_phase1",
+  "total_camps": 3,
+  "critical_priority_camp": "CAMP-RIVER-A",
+  "expected_fulfillment_rate_target": 0.85,
+  "objective": "Maximin equitable distribution weighted by urgency tier"
+}

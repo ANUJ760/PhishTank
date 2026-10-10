@@ -1,0 +1,8 @@
+{
+  "scenario": "hospital_surgical_trauma_intake",
+  "benchmark": "Level-1 Trauma Center Benchmarking",
+  "total_operating_rooms": 3,
+  "expected_scheduled_cases": 5,
+  "max_turnaround_sterilization_minutes": 30,
+  "preemption_policy": "L1_EMERGENT preempts L3_ELECTIVE strictly"
+}

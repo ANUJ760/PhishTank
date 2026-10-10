@@ -1,0 +1,6 @@
+Case_ID,Patient_MRN,Specialty,Urgency_Tier,Duration_Minutes,Lead_Surgeon_Required
+CASE-TR-01,MRN-9011,Trauma,L1_EMERGENT,120,Dr. Sarah Connor
+CASE-CARD-02,MRN-9012,Cardiac,L1_EMERGENT,180,Dr. Victor Vance
+CASE-GEN-03,MRN-9013,General,L2_URGENT,60,Dr. Emily Hayes
+CASE-ORTHO-04,MRN-9014,Orthopedics,L2_URGENT,90,Dr. James Wilson
+CASE-ELEC-05,MRN-9015,General,L3_ELECTIVE,75,Dr. Emily Hayes

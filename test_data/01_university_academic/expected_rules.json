@@ -1,0 +1,69 @@
+{
+  "scenario": "university_academic_term1",
+  "expected_faculty": [
+    "Prof. Alice Vance",
+    "Prof. Bob Chen",
+    "Prof. Catherine Miller",
+    "Dr. David Ross",
+    "Prof. Elena Rostova"
+  ],
+  "expected_rooms": [
+    "Auditorium A",
+    "Room 101",
+    "Lab 202",
+    "Seminar 303"
+  ],
+  "expected_rules": [
+    {
+      "type": "teacher_unavailable",
+      "params": {
+        "teacher": "Prof. Alice Vance",
+        "day": 0,
+        "slots": [
+          0,
+          1
+        ]
+      }
+    },
+    {
+      "type": "teacher_unavailable",
+      "params": {
+        "teacher": "Prof. Bob Chen",
+        "day": 3,
+        "slots": [
+          3,
+          4
+        ]
+      }
+    },
+    {
+      "type": "room_unavailable",
+      "params": {
+        "room": "Lab 202",
+        "day": 1,
+        "slots": [
+          0
+        ]
+      }
+    },
+    {
+      "type": "pin_session",
+      "params": {
+        "session_id": "CS501",
+        "day": 2,
+        "slots": [
+          1
+        ]
+      }
+    },
+    {
+      "type": "only_qualified",
+      "params": {
+        "session_id": "CS502",
+        "teachers": [
+          "Prof. Bob Chen"
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+MEMORANDUM: Academic Scheduling Directorate
+TO: Timetable Coordinating Committee
+FROM: Prof. M. Henderson, Dean of Computer Science
+DATE: 2026-10-10
+SUBJECT: Term 1 Scheduling Invariants & Section Placement Rules
+
+Please incorporate the following mandatory operational constraints into the solver:
+1. Faculty Unavailability:
+   - Prof. Alice Vance cannot take classes on Monday morning (Slots 0 and 1) due to University Senate duties.
+   - Prof. Bob Chen is conducting robotics calibrations on Thursday afternoon (Slots 3 and 4).
+2. Lab Equipment Constraints:
+   - Lab 202 is undergoing hardware diagnostics on Tuesday Slot 0 (09:00 - 10:00). No sessions may be placed in Lab 202 during that time.
+3. Locked / Pinned Classrooms:
+   - CS501 (Advanced Machine Learning) is locked to Wednesday Slot 1 (10:00 - 11:00) in Room 101.
+4. Instructor Qualifications:
+   - CS502 (Robotics Systems Lab) must only be assigned to Prof. Bob Chen.

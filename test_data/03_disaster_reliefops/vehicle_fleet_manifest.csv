@@ -1,0 +1,4 @@
+Vehicle_ID,Vehicle_Type,Payload_Capacity_KG,Max_Volume_M3,Status,Range_KM
+TRUCK-HEAVY-01,10-Ton Heavy Cargo Truck,10000,35.0,READY,450
+TRUCK-MEDIUM-02,5-Ton All-Terrain Truck,5000,20.0,READY,350
+HELI-CARGO-03,Emergency Cargo Helicopter,2500,12.0,READY,200
