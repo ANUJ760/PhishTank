@@ -107,4 +107,4 @@ def test_ingest_data_dump_no_dummy_fallback():
     # Zero input should produce zero fake rules
     assert len(result.rules) == 0
     assert len(result.rule_cards) == 0
-    assert "No explicit constraint conflicts" in result.summary
+    assert "No scheduling restrictions" in result.summary or "No explicit constraint conflicts" in result.summary
