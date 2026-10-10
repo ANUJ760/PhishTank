@@ -23,12 +23,24 @@ services:
       dockerfile: Dockerfile
     restart: always
     environment:
+      # Database
       POSTGRES_DB: ${POSTGRES_DB:-gecompose}
       POSTGRES_USER: ${POSTGRES_USER:-gecompose}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-gecompose_prod_secret}
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
       DATABASE_URL: postgresql://${POSTGRES_USER:-gecompose}:${POSTGRES_PASSWORD:-gecompose_prod_secret}@postgres:5432/${POSTGRES_DB:-gecompose}
+      # Google Gemini API — Gemma 4 Cloud Inference
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      MODEL_NAME: ${MODEL_NAME:-gemma-4-26b-a4b-it}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost}
+      SYSTEM_PROMPT: ${SYSTEM_PROMPT:-You are the GeCompose AI Intelligence Assistant powered by Google Gemma 4.}
+      PORT: "8000"
+      # Legacy LLM config (mock mode for non-chat endpoints)
+      MOCK_LLM: ${MOCK_LLM:-1}
+      LLM_FALLBACK_TO_MOCK: "1"
+      ALLOW_LOCAL_SANDBOX: "1"
+      SANDBOX_MODE: "local"
     depends_on:
       postgres:
         condition: service_healthy
