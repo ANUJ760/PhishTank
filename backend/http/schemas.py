@@ -1,6 +1,6 @@
 """Pydantic request and response schemas for the FastAPI HTTP adapter."""
 from __future__ import annotations
-from typing import Literal
+from typing import Literal, Optional
 from pydantic import BaseModel, EmailStr, Field
 from backend.models import Conflict
 
@@ -18,6 +18,7 @@ class UserResponse(BaseModel):
     email: str
     name: str
     role: str
+    token: str | None = None
 
 class ForgotPasswordRequest(BaseModel):
     email: str

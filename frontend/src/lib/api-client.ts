@@ -53,6 +53,14 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const url = `${BASE_URL}${path}`;
   const headers = new Headers(options.headers || {});
 
+  // Attach token from localStorage if present
+  if (typeof window !== "undefined") {
+    const savedToken = localStorage.getItem("gc_token");
+    if (savedToken && !headers.has("Authorization")) {
+      headers.set("Authorization", `Bearer ${savedToken}`);
+    }
+  }
+
   if (!(options.body instanceof FormData) && !headers.has("Content-Type") && options.body) {
     headers.set("Content-Type", "application/json");
   }
@@ -91,20 +99,37 @@ export const api = {
   // Auth
   auth: {
     me: () => request<User>("/auth/me"),
-    signIn: (email: string, password: string) =>
-      request<User>("/auth/sign-in", {
+    signIn: async (email: string, password: string) => {
+      const user = await request<User>("/auth/sign-in", {
         method: "POST",
         body: JSON.stringify({ email, password }),
-      }),
-    signUp: (name: string, email: string, password: string) =>
-      request<User>("/auth/sign-up", {
+      });
+      if (user.token && typeof window !== "undefined") {
+        localStorage.setItem("gc_token", user.token);
+      }
+      return user;
+    },
+    signUp: async (name: string, email: string, password: string) => {
+      const user = await request<User>("/auth/sign-up", {
         method: "POST",
         body: JSON.stringify({ name, email, password }),
-      }),
-    signOut: () =>
-      request<void>("/auth/sign-out", {
-        method: "POST",
-      }),
+      });
+      if (user.token && typeof window !== "undefined") {
+        localStorage.setItem("gc_token", user.token);
+      }
+      return user;
+    },
+    signOut: async () => {
+      try {
+        await request<void>("/auth/sign-out", {
+          method: "POST",
+        });
+      } finally {
+        if (typeof window !== "undefined") {
+          localStorage.removeItem("gc_token");
+        }
+      }
+    },
     forgotPassword: (email: string) =>
       request<{ message: string }>("/auth/forgot-password", {
         method: "POST",

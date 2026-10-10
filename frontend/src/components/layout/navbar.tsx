@@ -19,6 +19,9 @@ import {
   LifeBuoy,
   Activity,
   Cpu,
+  LogIn,
+  ChevronDown,
+  User,
   ShieldCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -50,21 +53,24 @@ export function Navbar() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [userDropdownOpen, setUserDropdownOpen] = useState(false);
   const [isSeeding, setIsSeeding] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const userMenuRef = useRef<HTMLDivElement>(null);
 
-  // Close menu when clicking outside
+  // Close menus when clicking outside
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
         setMenuOpen(false);
       }
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
+        setUserDropdownOpen(false);
+      }
     }
-    if (menuOpen) {
-      document.addEventListener("mousedown", handleClickOutside);
-      return () => document.removeEventListener("mousedown", handleClickOutside);
-    }
-  }, [menuOpen]);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const handleSeedDemo = async () => {
     setIsSeeding(true);
@@ -77,6 +83,7 @@ export function Navbar() {
   };
 
   const handleSignOut = async () => {
+    setUserDropdownOpen(false);
     await signOut();
     navigate("/auth/sign-in");
   };
@@ -121,26 +128,78 @@ export function Navbar() {
           </nav>
         </div>
 
-        {/* Right: Clean Demo Coordinator + Slider Trigger */}
+        {/* Right: Auth Profile / Sign In + Drawer Trigger */}
         <div className="flex items-center gap-3">
-          {/* User profile pill */}
-          {user && (
-            <div className="flex items-center gap-2.5 px-2.5 py-1 rounded-md bg-white/[0.03] border border-white/[0.07] hover:border-white/[0.12] transition-colors duration-200">
-              <div className="h-6 w-6 rounded-md bg-zinc-800 border border-white/10 text-white font-semibold flex items-center justify-center text-[11px] shadow-inner">
-                {user.name.charAt(0)}
-              </div>
-              <div className="flex flex-col text-left">
-                <span className="font-medium text-zinc-200 leading-none text-[12px]">{user.name}</span>
-                <span className="text-[10px] text-zinc-500 capitalize leading-tight mt-0.5">{user.role}</span>
-              </div>
+          {/* User profile dropdown or Sign In button */}
+          {user ? (
+            <div className="relative" ref={userMenuRef}>
               <button
-                onClick={handleSignOut}
-                className="text-zinc-500 hover:text-white p-1 rounded-md hover:bg-white/[0.08] transition-all duration-200 ml-1"
-                title="Sign out"
+                onClick={() => setUserDropdownOpen(!userDropdownOpen)}
+                className="flex items-center gap-2.5 px-2.5 py-1 rounded-md bg-white/[0.03] border border-white/[0.07] hover:border-white/[0.15] hover:bg-white/[0.06] transition-all duration-200"
               >
-                <LogOut size={13} />
+                <div className="h-6 w-6 rounded-md bg-zinc-800 border border-white/10 text-white font-semibold flex items-center justify-center text-[11px] shadow-inner">
+                  {user.name.charAt(0)}
+                </div>
+                <div className="flex flex-col text-left">
+                  <span className="font-medium text-zinc-200 leading-none text-[12px]">{user.name}</span>
+                  <span className="text-[10px] text-zinc-500 capitalize leading-tight mt-0.5">{user.role}</span>
+                </div>
+                <ChevronDown size={11} className="text-zinc-500 ml-0.5" />
               </button>
+
+              {/* User Dropdown */}
+              {userDropdownOpen && (
+                <div className="absolute right-0 mt-2 w-56 rounded-lg bg-zinc-900/95 border border-white/10 p-2 shadow-2xl backdrop-blur-xl z-50 text-left animate-in fade-in zoom-in-95 duration-150">
+                  <div className="p-2 border-b border-white/5 mb-1">
+                    <p className="text-xs font-semibold text-white">{user.name}</p>
+                    <p className="text-[10px] text-zinc-400 font-mono truncate">{user.email}</p>
+                    <div className="mt-1.5 flex items-center gap-1.5">
+                      <span className="px-1.5 py-0.5 rounded bg-zinc-800 text-[9px] text-zinc-300 font-mono uppercase">
+                        {user.role}
+                      </span>
+                      <span className="text-[9px] text-emerald-400 flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                        Authenticated
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-0.5">
+                    <NavLink
+                      to="/app/settings"
+                      onClick={() => setUserDropdownOpen(false)}
+                      className="flex items-center gap-2 px-2.5 py-1.5 rounded-md text-xs text-zinc-300 hover:text-white hover:bg-white/5 transition-colors"
+                    >
+                      <Settings size={13} className="text-zinc-400" />
+                      <span>Account Settings</span>
+                    </NavLink>
+                    <NavLink
+                      to="/auth/sign-in"
+                      onClick={() => setUserDropdownOpen(false)}
+                      className="flex items-center gap-2 px-2.5 py-1.5 rounded-md text-xs text-zinc-300 hover:text-white hover:bg-white/5 transition-colors"
+                    >
+                      <User size={13} className="text-zinc-400" />
+                      <span>Switch Account</span>
+                    </NavLink>
+                    <button
+                      onClick={handleSignOut}
+                      className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-md text-xs text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-colors"
+                    >
+                      <LogOut size={13} />
+                      <span>Sign Out</span>
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
+          ) : (
+            <NavLink
+              to="/auth/sign-in"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-white text-zinc-950 font-semibold text-xs hover:bg-zinc-200 transition-all shadow-sm active:scale-95"
+            >
+              <LogIn size={13} />
+              <span>Sign In</span>
+            </NavLink>
           )}
 
           {/* Three Lines Slider Trigger (Drawer Menu) */}
@@ -267,16 +326,27 @@ export function Navbar() {
             {/* Drawer footer */}
             <div className="pt-4 border-t border-white/[0.08] flex items-center justify-between text-xs text-zinc-500">
               <span>GeCompose Engine</span>
-              <button
-                onClick={() => {
-                  setMenuOpen(false);
-                  handleSignOut();
-                }}
-                className="flex items-center gap-1.5 text-zinc-400 hover:text-white transition-colors"
-              >
-                <LogOut size={13} />
-                <span>Sign out</span>
-              </button>
+              {user ? (
+                <button
+                  onClick={() => {
+                    setMenuOpen(false);
+                    handleSignOut();
+                  }}
+                  className="flex items-center gap-1.5 text-zinc-400 hover:text-white transition-colors"
+                >
+                  <LogOut size={13} />
+                  <span>Sign out</span>
+                </button>
+              ) : (
+                <NavLink
+                  to="/auth/sign-in"
+                  onClick={() => setMenuOpen(false)}
+                  className="flex items-center gap-1.5 text-white font-medium hover:underline"
+                >
+                  <LogIn size={13} />
+                  <span>Sign in</span>
+                </NavLink>
+              )}
             </div>
           </div>
         </div>

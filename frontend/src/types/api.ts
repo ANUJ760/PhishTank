@@ -5,6 +5,7 @@ export interface User {
   email: string;
   name: string;
   role: UserRole;
+  token?: string;
 }
 
 export type RuleType = "teacher_unavailable" | "room_unavailable" | "pin_session" | "only_qualified";
