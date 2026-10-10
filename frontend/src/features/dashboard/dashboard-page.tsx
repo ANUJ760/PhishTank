@@ -69,13 +69,14 @@ export function DashboardPage() {
       <div className="text-center space-y-4 pt-2 pb-2 max-w-3xl mx-auto">
         <Link
           to="/app/conflicts"
-          className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md bg-zinc-900 border border-white/[0.08] text-[12px] text-zinc-400 hover:text-white hover:border-white/15 transition-all duration-200"
+          className="group inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/[0.04] border border-white/[0.09] text-[12px] text-zinc-300 hover:text-white hover:border-white/25 hover:bg-white/[0.08] transition-all duration-200 shadow-sm hover:shadow-[0_0_15px_rgba(255,255,255,0.06)]"
         >
+          <span className="h-1.5 w-1.5 rounded-full bg-emerald-400/80 shadow-[0_0_8px_rgba(52,211,153,0.8)]" />
           <span>New CP-SAT Conflict Core Isolated</span>
-          <ArrowRight size={11} className="text-zinc-500" />
+          <ArrowRight size={11} className="text-zinc-500 group-hover:text-white group-hover:translate-x-0.5 transition-all duration-200" />
         </Link>
 
-        <h1 className="text-3xl md:text-[42px] font-bold tracking-tight text-white leading-[1.15]">
+        <h1 className="text-3xl md:text-[44px] font-bold tracking-tight text-white leading-[1.12]">
           Smart Scheduling with<br />Mathematical Guarantees
         </h1>
 
@@ -84,14 +85,14 @@ export function DashboardPage() {
           and a cryptographic consent ledger to produce 100% clash-free schedules.
         </p>
 
-        <div className="flex items-center justify-center gap-3 pt-2">
+        <div className="flex items-center justify-center gap-3 pt-3">
           <Link to="/app/intake">
-            <button className="h-9 px-5 rounded-lg bg-white text-zinc-950 font-medium text-sm hover:bg-zinc-200 transition-all duration-200 active:scale-[0.98]">
+            <button className="h-9 px-5 rounded-md bg-white text-zinc-950 font-medium text-sm hover:bg-zinc-100 hover:shadow-[0_0_20px_rgba(255,255,255,0.25)] hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] transition-all duration-200">
               Start Intake
             </button>
           </Link>
           <Link to="/app/rules">
-            <button className="h-9 px-5 rounded-lg bg-zinc-900 text-zinc-300 font-medium text-sm border border-white/[0.08] hover:bg-zinc-800 hover:text-white hover:border-white/15 transition-all duration-200 active:scale-[0.98]">
+            <button className="h-9 px-5 rounded-md bg-white/[0.04] text-zinc-200 font-medium text-sm border border-white/[0.1] hover:bg-white/[0.08] hover:border-white/20 hover:text-white hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] transition-all duration-200 backdrop-blur-md">
               View Constraints
             </button>
           </Link>
@@ -107,18 +108,24 @@ export function DashboardPage() {
             variants={cardMotionVariants}
             initial="initial"
             animate="animate"
-            className="glass-box p-5 space-y-3"
+            whileHover={{ y: -4, transition: { duration: 0.2 } }}
+            whileTap={{ scale: 0.99 }}
+            className="glass-box p-5 space-y-3 cursor-pointer group"
           >
             <div className="flex items-center gap-3">
-              <div className="h-8 w-8 rounded-lg bg-white/[0.06] border border-white/[0.08] flex items-center justify-center">
-                <step.icon size={16} className="text-zinc-300" />
+              <div className="h-8 w-8 rounded-md bg-white/[0.05] border border-white/[0.08] flex items-center justify-center group-hover:border-white/25 group-hover:bg-white/[0.1] group-hover:scale-105 transition-all duration-200">
+                <step.icon size={16} className="text-zinc-300 group-hover:text-white transition-colors" />
               </div>
               <div>
-                <h3 className="text-sm font-semibold text-white tracking-tight">{step.label}</h3>
+                <h3 className="text-sm font-semibold text-white tracking-tight group-hover:text-zinc-100 transition-colors">
+                  {step.label}
+                </h3>
                 <p className="text-[12px] text-zinc-500 mt-0.5">Step {i + 1} of 3</p>
               </div>
             </div>
-            <p className="text-[13px] text-zinc-400 leading-relaxed">{step.desc}</p>
+            <p className="text-[13px] text-zinc-400 leading-relaxed group-hover:text-zinc-300 transition-colors">
+              {step.desc}
+            </p>
           </motion.div>
         ))}
       </div>
@@ -134,12 +141,14 @@ export function DashboardPage() {
               variants={cardMotionVariants}
               initial="initial"
               animate="animate"
-              className="glass-box-subtle p-4 flex flex-col items-center text-center gap-2"
+              whileHover={{ y: -3, scale: 1.02, transition: { duration: 0.2 } }}
+              whileTap={{ scale: 0.98 }}
+              className="glass-box-subtle p-4 flex flex-col items-center text-center gap-2 cursor-pointer group"
             >
-              <div className="h-8 w-8 rounded-md bg-white/[0.04] flex items-center justify-center">
-                <cap.icon size={15} className="text-zinc-400" />
+              <div className="h-8 w-8 rounded-md bg-white/[0.04] border border-white/[0.06] flex items-center justify-center group-hover:border-white/20 group-hover:bg-white/[0.08] group-hover:scale-110 transition-all duration-200">
+                <cap.icon size={15} className="text-zinc-400 group-hover:text-white transition-colors" />
               </div>
-              <span className="text-[12px] font-medium text-zinc-200">{cap.label}</span>
+              <span className="text-[12px] font-medium text-zinc-200 group-hover:text-white transition-colors">{cap.label}</span>
               <span className="text-[11px] text-zinc-500 leading-tight">{cap.desc}</span>
             </motion.div>
           ))}
@@ -176,7 +185,8 @@ export function DashboardPage() {
             variants={cardMotionVariants}
             initial="initial"
             animate="animate"
-            className="glass-box p-4"
+            whileHover={{ y: -2, transition: { duration: 0.2 } }}
+            className="glass-box-subtle p-4 cursor-default"
           >
             <p className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider">{stat.label}</p>
             <p className="text-2xl font-bold text-white mt-1 font-mono">{stat.value}</p>
@@ -235,7 +245,7 @@ export function DashboardPage() {
             </div>
           ) : (
             <div className="py-10 text-center text-[13px] text-zinc-600">
-              No active schedule. Click <span className="text-zinc-400 font-medium">"Seed Demo"</span> in the navbar to populate sample data.
+              No active schedule. Click <span className="text-zinc-400 font-medium">"Seed Demo Baseline"</span> in the navigation drawer to populate sample data.
             </div>
           )}
         </div>
