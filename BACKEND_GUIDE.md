@@ -13,14 +13,13 @@ Audience: an AI coding assistant and the team. Read fully before writing code.
 | # | Item | Required? | Used by | Install | Verify | If missing |
 |---|---|---|---|---|---|---|
 | 1 | Python 3.11+ | Yes | everything | system / pyenv | `python --version` | none |
-| 2 | **llama.cpp `llama-server`** (or vLLM) | Yes for real Gemma; No if `MOCK_LLM=1` | `llm/client.py` | release binary or build from the llama.cpp GitHub repo | `llama-server --version` | `MOCK_LLM=1` |
-| 3 | **Gemma 4 weights**: E4B (GGUF + its multimodal projector file) and 12B (GGUF) | Yes for real Gemma | llama-server | Hugging Face (account and license acceptance may be needed). **Confirm exact repo and file names yourself.** | files exist on disk | `MOCK_LLM=1`, or use E4B for both tiers |
-| 4 | NVIDIA GPU, 8 GB VRAM for one model, about 12 GB for both | Recommended | llama-server | driver | `nvidia-smi` | CPU works but is slow. With under 12 GB, run only E4B and set `REASON_URL=INTAKE_URL` |
-| 5 | **Docker Engine** | Yes for sheet-parser sandbox | `intake/sandbox.py` | docs.docker.com | `docker run --rm hello-world` | `SANDBOX_MODE=local` (allowed only with `MOCK_LLM=1`) |
-| 6 | Internet | Setup only | pip, Hugging Face, `docker build` | n/a | n/a | Do all downloads before the event |
+| 2 | **Ollama** (or llama.cpp / vLLM) | Recommended for real Gemma; No if `MOCK_LLM=1` | `llm/gemma.py`, `llm/client.py` | `curl -fsSL https://ollama.com/install.sh \| sh` | `ollama --version` | `MOCK_LLM=1` |
+| 3 | **Gemma models**: 4B (intake: audio/vision/text) and 12B (reasoning: parser/conflict) | Yes for live Gemma | Ollama | `ollama run gemma:4b` and `ollama run gemma:12b` | `ollama list` | `MOCK_LLM=1`, or configure smaller tag |
+| 4 | NVIDIA GPU or fast CPU | Recommended | Ollama | driver | `nvidia-smi` | CPU works with 4-bit quantization |
+| 5 | **Docker Engine** (or local sandbox) | Optional for parser sandbox | `intake/sandbox.py` | docs.docker.com | `docker run --rm hello-world` | `SANDBOX_MODE=local` with `ALLOW_LOCAL_SANDBOX=1` |
+| 6 | **Database** (SQLite / PostgreSQL) | Yes (built-in SQLite zero-setup) | `registry/db.py` | Python built-in `sqlite3` or Docker PostgreSQL | `python -m backend.healthcheck` | automatically falls back to SQLite |
 | 7 | Python packages | Yes | all | `pip install -r requirements.txt` | `python -c "import ortools, streamlit"` | none |
-| 8 | Chrome with mic permission | Only for live voice | frontend | n/a | open `http://localhost:8501` | use typed text or a pre-recorded WAV upload |
-| 9 | ffmpeg | Optional | only if the model rejects the mic WAV | system package | `ffmpeg -version` | skip |
+| 8 | Chrome with mic permission | Only for live voice | frontend | n/a | open `http://localhost:8501` | use typed text or pre-recorded WAV |
 
 **Not needed:** Web3, Foundry, Anvil, Smart contracts, MetaMask, testnet ETH, any cloud API, Graphviz binary, Whisper or Tesseract.
 
@@ -28,11 +27,12 @@ Audience: an AI coding assistant and the team. Read fully before writing code.
 
 | Module | Touches | Fallback |
 |---|---|---|
-| `llm/client.py` | `[EXT: llama-server]` | `MOCK_LLM=1` fixtures |
-| `intake/voice_photo.py` | `[EXT: llama-server]` with audio/vision model | `ingest_text`, fixtures |
-| `intake/sheet_parser.py` | `[EXT: llama-server]` (first time per layout only) | fixture parser code |
-| `intake/sandbox.py` | `[EXT: Docker]` | `SANDBOX_MODE=local` with `MOCK_LLM=1` |
-| `solver/*`, `checker`, `hashing`, `registry` | `[PY]` only | n/a |
+| `llm/gemma.py`, `llm/client.py` | `[EXT: Ollama (gemma:4b, gemma:12b)]` | `MOCK_LLM=1` or `LLM_FALLBACK_TO_MOCK=1` fixtures |
+| `intake/voice_photo.py` | `[EXT: Ollama]` with multimodal Gemma 4B | `ingest_text`, fixtures |
+| `intake/sheet_parser.py` | `[EXT: Ollama]` (first time per layout only) | fixture parser code |
+| `intake/sandbox.py` | `[EXT: Docker]` | `SANDBOX_MODE=local` |
+| `registry/db.py` | `[EXT: PostgreSQL]` | Built-in SQLite (`data/gecompose.db`) |
+| `solver/*`, `checker`, `hashing` | `[PY]` only | n/a |
 
 ---
 
@@ -42,84 +42,45 @@ Run from the repo root.
 
 **1. Python environment**
 ```bash
-python3.11 -m venv .venv && source .venv/bin/activate
+python3.12 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env
 mkdir -p data/uploads samples models
+```
+
+**2. Database (Zero-Setup SQLite or Docker PostgreSQL)**
+- For frictionless local development, the default database is SQLite at `data/gecompose.db` (zero setup required).
+- For production Docker PostgreSQL:
+```bash
 docker compose up -d postgres
 ```
 
-`requirements.txt`
-```
-ortools>=9.11
-pydantic>=2.7
-streamlit>=1.40
-pandas>=2.2
-openpyxl>=3.1
-openai>=1.40
-python-dotenv>=1.0
-psycopg[binary,pool]>=3.2
-pytest>=8
-```
-
-PostgreSQL data persists in the `gecompose_postgres` Docker volume. The Compose service binds only to localhost. Override the development credentials with `POSTGRES_USER`, `POSTGRES_PASSWORD`, and `POSTGRES_DB` before using this setup outside a local demo.
-
-`.env.example`
-```
-MOCK_LLM=0
-INTAKE_URL=http://127.0.0.1:8080/v1
-INTAKE_MODEL=gemma-intake
-REASON_URL=http://127.0.0.1:8081/v1
-REASON_MODEL=gemma-reason
-LLM_TIMEOUT_S=120
-AUDIO_MODE=native          # native | transcript
-SANDBOX_MODE=docker        # docker | local  (local only with MOCK_LLM=1)
-SANDBOX_IMAGE=gecompose-sandbox
-DATABASE_URL=postgresql://gecompose:gecompose_dev@127.0.0.1:5432/gecompose
-UPLOAD_DIR=data/uploads
-DAYS=5
-SLOTS_PER_DAY=6
-SOLVER_TIME_S=10
-SOLVER_SEED=7
-```
-
-**2. Sandbox image `[EXT: Docker]`**
-
-`Dockerfile.sandbox`
-```dockerfile
-FROM python:3.11-slim
-RUN pip install --no-cache-dir pandas openpyxl
-WORKDIR /work
-```
+**3. Start Ollama and pull Gemma models (Skip if `MOCK_LLM=1`)**
 ```bash
-docker build -f Dockerfile.sandbox -t gecompose-sandbox .
+# Start the Ollama background daemon
+ollama serve
+
+# Pull or run the Gemma models (in another terminal or background)
+ollama pull gemma:4b       # Multimodal intake tier (text, audio, photos)
+ollama pull gemma:12b      # Reasoning tier (conflict diagnosis, parser coding)
 ```
-Build this now while you have internet. The sandbox runs with no network.
 
-**3. Start Gemma servers `[EXT: llama-server]` (two terminals; skip if `MOCK_LLM=1`)**
-
-File names below are placeholders. Use the real names you downloaded.
+**4. Run Health Check**
 ```bash
-# Intake tier: audio + images + text
-llama-server -m models/<gemma4-e4b>.gguf --mmproj models/<gemma4-e4b-mmproj>.gguf \
-  --host 127.0.0.1 --port 8080 -ngl 99 -c 8192 --alias gemma-intake
-
-# Reasoning tier: parser codegen + conflict explanation
-llama-server -m models/<gemma4-12b>.gguf \
-  --host 127.0.0.1 --port 8081 -ngl 99 -c 8192 --alias gemma-reason
+python -m backend.healthcheck
 ```
-**Verify audio works on your exact runtime and model before building voice features:**
+Verify that database, Ollama, Gemma 4B, and Gemma 12B report `[OK]`.
+
+**5. Run the Backend REST API Server**
 ```bash
-python -m backend.healthcheck --audio samples/rao_hindi.wav
+python -m backend.server
+# Server starts at http://127.0.0.1:8000
 ```
-If audio is rejected, set `AUDIO_MODE=transcript` (the UI then asks for typed text). Do not add a separate speech model unless you accept losing the "one model" claim.
 
-**7. Health check**
+**6. Run Frontend & Verification Portal**
 ```bash
-python -m backend.healthcheck       # prints OK/FAIL per external item
+streamlit run frontend/app.py
 ```
-
-**8. Run frontend:** see `FRONTEND_SETUP.md`.
 
 ---
 
