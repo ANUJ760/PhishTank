@@ -87,6 +87,7 @@ GeCompose runs a straightforward 6-step pipeline with human checkpoints at every
 - **Tamper-Proof Audit Trail:** Rule changes require cryptographic signatures from rule owners.
 - **Privacy by Default:** Audio, photos, and availability stay on your local machine; only secure hashes go on-chain.
 - **Runs on a Laptop:** Intake runs on consumer GPUs (under 8 GB VRAM with 4-bit quantization).
+- **Measurable Proof:** Show with real numbers that an LLM alone produces clashes while GeCompose produces none.
 
 ---
 
@@ -107,7 +108,7 @@ GeCompose runs a straightforward 6-step pipeline with human checkpoints at every
 4. **Verified Options:** Gemma 4 proposes:
    - **Option 1:** Move Database Lab to Tuesday 10 AM (Needs approval from Department Head).
    - **Option 2:** Add Prof. Mehta as co-instructor (Needs approval from Dean).
-5. **Consent:** The Department Head approves Option 1 using their wallet. CP-SAT instantly re-solves and publishes the final schedule.
+5. **Consent:** The Department Head approves Option 1 using their wallet. CP-SAT instantly re-solves with minimum disruption and publishes the final schedule.
 
 ---
 
@@ -215,10 +216,11 @@ flowchart TD
 | **2** | **Format Adapter** | `.xlsx` and `.csv` files | Clean rows with cell references | Docker Sandbox + Python |
 | **3** | **Review Screen** | Draft rules + image crops / audio clips | Confirmed rules | Streamlit UI |
 | **4** | **Constraint Registry** | Confirmed rules | Salted hashes and rule IDs | Local SQLite |
-| **5** | **CP-SAT Solver** | Mathematical constraints | Complete schedule or conflict set | Google OR-Tools |
+| **5** | **CP-SAT Solver** | Mathematical constraints, previous schedule (optional) | Complete schedule or conflict set | Google OR-Tools |
 | **6** | **Gemma 4 Explainer** | Conflicting rule IDs | Plain-English summary + verified options | Gemma 4 12B |
 | **7** | **Consent Contract** | Signed approvals from owners | On-chain status update | Solidity (`ConsentLedger.sol`) |
 | **8** | **Schedule Publisher** | Verified timetable matrix | Timetable grid, `.ics` calendar files, proof page | Python + Web3.py |
+| **9** | **Independent Checker** | Schedule + confirmed rules | Violation count (used for publishing and for the LLM-vs-GeCompose scoreboard) | Plain Python, no solver |
 
 ---
 
@@ -309,11 +311,21 @@ flowchart LR
 - **Public Schedule Verifier:** Anyone can drop a schedule file into a web page to verify its hash against the blockchain.
 - **Calendar Feeds:** One-click export to `.ics` for Google Calendar, Outlook, and Apple Calendar.
 
+### Advanced Features (Demo Differentiators)
+
+- **Tamper-Evident Verifier:** Publish a schedule, change a single cell in the exported file, and drop it into the verifier. The hash no longer matches the on-chain record and the page turns red. This shows exactly why the ledger exists.
+- **LLM-vs-GeCompose Scoreboard:** The same inputs are given to Gemma 4 alone ("build this timetable") and to the GeCompose pipeline. An independent checker counts double-bookings and rule violations in both outputs and shows the numbers side by side.
+- **Minimal-Change Re-Solve:** After a rule changes, the solver re-solves with an objective that minimizes how many existing classes move. The UI reports "3 classes moved" instead of rebuilding the whole timetable.
+- **Conflict Graph View:** The minimal conflicting rules are drawn as a small graph (for example Prof. Rao, Database Lab, Monday morning) with the clash highlighted, shown next to Gemma's plain-English explanation.
+- **"Why Is This Class Here?" Button:** Click any cell in the timetable and see which rules forced that slot. Explainability for successful schedules, not only failed ones.
+- **Live Hindi / Marathi Voice Rule:** A rule spoken in Hindi or Marathi is extracted live, with the audio clip attached as evidence.
+- **Fairness Score (stretch):** Workload balance and teacher gap-time are tracked as soft constraints, with a before/after number.
+
 ---
 
 ## 16. Implementation Approach
 
-Our engineering implementation divides the system into four decoupled modules, each with independent unit testing and integration criteria:
+Our engineering implementation divides the system into four decoupled modules, each with independent unit testing and integration criteria. A detailed backend build guide is in [`BACKEND_GUIDE.md`](BACKEND_GUIDE.md).
 
 ### Module 1: Multimodal Ingestion and Layout Parsing
 - **Audio and Image Feature Lifting:** Stream raw microphone audio and document crops into Gemma 4 E4B using native structured tool calling. Map temporal references and visual regions to concrete time slots and room identifiers.
@@ -322,23 +334,27 @@ Our engineering implementation divides the system into four decoupled modules, e
 ### Module 2: Constraint Modeling and Conflict Isolation
 - **Mathematical Scheduling Core:** Map confirmed Pydantic constraint records into Google OR-Tools CP-SAT Boolean decision variables. Formulate room capacities, instructor non-overlap, and session continuity as linear constraints.
 - **Minimal Conflict Core Extraction:** When the constraint set is infeasible, trigger assumption-literal extraction in CP-SAT to isolate the exact minimal unsatisfiable subset (MUS) rather than returning a generic failure.
+- **Minimal-Change Objective:** When a previous schedule exists, add an objective term that penalizes every session moved away from its previous slot.
+- **Rule Provenance:** Every placed session records which rules constrain it, powering the "Why is this class here?" view.
+- **Independent Checker:** A solver-free Python function re-validates any schedule (including an LLM-generated one) against the confirmed rules and returns the list of violations.
 
 ### Module 3: Smart Contract Consensus Protocol
 - **ConsentLedger Deployment:** Implement and compile `ConsentLedger.sol` using Foundry, targeting an isolated local Anvil node with zero network fees.
 - **Non-Repudiation Enforcement:** Restrict the `approveRelaxation` entrypoint so only the registered rule owner can sign off on changes. Anchor the final schedule hash immutably on-chain.
 
 ### Module 4: Coordinator Interface and Verification
-- **Streamlit Frontend:** Build an interactive single-page dashboard featuring live audio capture, visual evidence crops, interactive timetable grids, and conflict resolution cards.
-- **Client-Side Proof Checker:** Provide a standalone verification utility that re-computes local schedule hashes and queries the public ledger to guarantee authenticity.
+- **Streamlit Frontend:** Build an interactive single-page dashboard featuring live audio capture, visual evidence crops, interactive timetable grids, conflict graph, and conflict resolution cards.
+- **Client-Side Proof Checker:** Provide a standalone verification utility that re-computes local schedule hashes and queries the public ledger to guarantee authenticity, including a visible pass/fail result for tampered files.
+- **Scoreboard Page:** Run the LLM-only baseline and the GeCompose pipeline on the same inputs and display violation counts side by side.
 
 ### Milestone Schedule and Validation Targets
 
 | Engineering Sprint | Core Deliverable | Validation Mechanism | Success Benchmark |
 |---|---|---|---|
-| **Sprint 1: Core Solver & Schema** | Constraint models, CP-SAT solver, conflict extractor | Synthetic benchmark test suite | 100% hard rule satisfaction on 50 test instances |
+| **Sprint 1: Core Solver & Schema** | Constraint models, CP-SAT solver, conflict extractor, independent checker, minimal-change objective | Synthetic benchmark test suite | 100% hard rule satisfaction on 50 test instances |
 | **Sprint 2: Multimodal & Sandbox** | Gemma 4 E4B intake, Docker parser sandbox | Sample audio files and diverse Excel templates | > 95% parser synthesis accuracy within 3 attempts |
 | **Sprint 3: On-Chain Consensus** | `ConsentLedger.sol`, Foundry unit test suite | Automated Anvil deployment scripts | Owner authorization reverts all non-owner calls |
-| **Sprint 4: Frontend & Evaluation** | Streamlit UI, public proof portal, full integration | End-to-end integration test with user walkthrough | Sub-3-second rule extraction on laptop hardware |
+| **Sprint 4: Frontend & Evaluation** | Streamlit UI, public proof portal, scoreboard, full integration | End-to-end integration test with user walkthrough | Sub-3-second rule extraction on laptop hardware |
 
 ---
 
@@ -346,9 +362,11 @@ Our engineering implementation divides the system into four decoupled modules, e
 
 1. **Interactive Web App:** A clean Streamlit application supporting microphone recording, image upload, spreadsheet drop, and live timetable grid visualization.
 2. **Side-by-Side Evidence Inspector:** Click any rule to see the highlighted photo crop, audio player snippet, or spreadsheet cell it came from.
-3. **Conflict Diagnostic Screen:** When rules clash, see a plain-English explanation, the people involved, and one-click solver-tested fixes.
+3. **Conflict Diagnostic Screen:** When rules clash, see a plain-English explanation, a conflict graph, the people involved, and one-click solver-tested fixes.
 4. **Local Blockchain Explorer:** View the local Anvil event log showing rule registrations, signed approvals, and published schedule hashes.
 5. **Universal Export:** Download verified timetables in interactive grid view, PDF, or `.ics` calendar format.
+6. **Tamper Verifier Page:** Drop in a schedule file and get a clear match or mismatch against the on-chain hash.
+7. **Scoreboard Page:** LLM-only vs GeCompose violation counts for the same inputs.
 
 ---
 
@@ -389,6 +407,7 @@ Our engineering implementation divides the system into four decoupled modules, e
 | **5** | Changed Spreadsheet Layouts | Medium | If more than 5% of rows fail, the system automatically triggers a re-synthesis of the parser. |
 | **6** | Users Unfamiliar with Wallets | Medium | Pre-configured local test accounts for demo; roadmap adds gasless one-tap signatures. |
 | **7** | Laptop GPU Memory Limits | High | Lightweight E4B model for intake; larger 12B model called only when a conflict occurs. |
+| **8** | Live Demo Failure | High | Every Gemma call has a recorded-fixture fallback so the full flow can run without the model. |
 
 ---
 
