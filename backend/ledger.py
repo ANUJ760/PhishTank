@@ -145,6 +145,7 @@ class TamperProofLedger:
         if total == 0:
             return {
                 "verified": True,
+                "valid": True,
                 "total_entries": 0,
                 "tip_hash": GENESIS_HASH,
                 "genesis_hash": GENESIS_HASH,
@@ -160,6 +161,7 @@ class TamperProofLedger:
             if i > 0 and entry["prev_hash"] != expected_prev:
                 return {
                     "verified": False,
+                    "valid": False,
                     "total_entries": total,
                     "tampered_seq": seq,
                     "tip_hash": entry["entry_hash"],
@@ -168,6 +170,7 @@ class TamperProofLedger:
                         f"expected prev_hash {expected_prev[:16]}..., "
                         f"got {entry['prev_hash'][:16]}..."
                     ),
+                    "message": f"Tampering detected: Broken chain link at seq {seq}",
                 }
 
             # 2. Recompute and verify entry hash against payload
@@ -184,6 +187,7 @@ class TamperProofLedger:
             if entry["entry_hash"] != recomputed:
                 return {
                     "verified": False,
+                    "valid": False,
                     "total_entries": total,
                     "tampered_seq": seq,
                     "tip_hash": entry["entry_hash"],
@@ -192,6 +196,7 @@ class TamperProofLedger:
                         f"recorded hash {entry['entry_hash'][:16]}... != "
                         f"recomputed hash {recomputed[:16]}..."
                     ),
+                    "message": f"Tampering detected: Payload hash mismatch at seq {seq}",
                 }
 
             expected_prev = entry["entry_hash"]
@@ -199,6 +204,7 @@ class TamperProofLedger:
         tip_hash = chained_entries[-1]["entry_hash"]
         return {
             "verified": True,
+            "valid": True,
             "total_entries": total,
             "tip_hash": tip_hash,
             "genesis_hash": chained_entries[0]["entry_hash"],
