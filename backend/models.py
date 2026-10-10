@@ -50,6 +50,8 @@ class RelaxOption(Strict):
     approver: str
     verified: bool = False
     option_hash: str = ""
+    approved: bool = False
+    approved_by: str | None = None
 class Explanation(Strict):
     summary: str
     options: list[RelaxOption]

@@ -2,9 +2,7 @@
 import json
 from pathlib import Path
 import pytest
-from backend import api, config, models
-from backend.chain import hashing
-from backend.chain.client import Chain, ChainError
+from backend import api, config, hashing, models
 from backend.models import Rule, Roster, validate_params
 from backend.registry import db
 from backend.solver import checker, conflicts, model
@@ -135,23 +133,45 @@ def test_validate_params():
         validate_params("teacher_unavailable", {"teacher": "Prof. Rao", "day": 0, "slots": [0], "extra": "invalid"}, roster)
 
 
-def test_chain_integration():
-    """Register, approve, anchor, is_anchored; non-owner approve raises ChainError."""
-    chain = Chain()
-    salt = hashing.new_salt()
-    digest = hashing.rule_hash("TEST_R", "teacher_unavailable", "Prof. Rao", salt)
-    tx = chain.register_rule(digest, "Prof. Rao")
-    assert tx.startswith("0x")
+def test_consent_approval():
+    """Rule confirmation, relaxation approval authorization, and apply restriction."""
+    r3 = Rule(
+        id="R3",
+        type="teacher_unavailable",
+        owner="Prof. Rao",
+        params={"teacher": "Prof. Rao", "day": 0, "slots": [0, 1, 2]},
+        status="draft",
+    )
+    db.save_rule(r3)
+    api.confirm_rule("R3")
 
-    opt_digest = hashing.option_hash("TEST_R", {"day": 1})
-    # Non-owner cannot approve
-    with pytest.raises(ChainError):
-        chain.approve(digest, opt_digest, as_user="Coordinator")
+    opt = models.RelaxOption(
+        id="O_TEST",
+        rule_id="R3",
+        new_params={"teacher": "Prof. Rao", "day": 0, "slots": [0]},
+        description="Relax Rao unavailability",
+        approver="Prof. Rao",
+        verified=True,
+        option_hash="0x1234",
+    )
+    db.save_option(opt)
 
-    # Owner can approve
-    app_tx = chain.approve(digest, opt_digest, as_user="Prof. Rao")
-    assert app_tx.startswith("0x")
-    assert chain.is_approved(digest, opt_digest) is True
+    # Non-approver cannot approve
+    unauthorized = api.approve_option("O_TEST", as_user="Coordinator")
+    assert unauthorized.ok is False
+    assert "Only Prof. Rao can approve" in (unauthorized.error or "")
+
+    # Cannot apply before approval
+    with pytest.raises(ValueError, match="not approved"):
+        api.apply_option("O_TEST")
+
+    # Authorized approver can approve
+    authorized = api.approve_option("O_TEST", as_user="Prof. Rao")
+    assert authorized.ok is True
+
+    # Now can apply
+    updated = api.apply_option("O_TEST")
+    assert updated.params == opt.new_params
 
 
 def test_sheet_cache():

@@ -9,6 +9,5 @@ __pycache__/
 .pytest_cache/
 data/
 models/
-contracts/out/
-contracts/cache/
-contracts/lib/
+frontend/node_modules/
+frontend/dist/

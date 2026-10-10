@@ -11,11 +11,33 @@ def run_parser(code: str, xlsx: Path, timeout_s: int=15) -> list[dict]:
     with tempfile.TemporaryDirectory(prefix="gecompose-parser-") as temp:
         folder=Path(temp); (folder/"parser.py").write_text(code,encoding="utf-8"); (folder/"runner.py").write_text(RUNNER,encoding="utf-8"); shutil.copyfile(xlsx,folder/"input.xlsx")
         name=f"gc-{uuid.uuid4().hex[:12]}"
-        if config.SANDBOX_MODE=="docker":
-            cmd=["docker","run","--rm","--name",name,"--network","none","--read-only","--tmpfs","/tmp:rw,noexec,nosuid,size=32m","--memory","256m","--cpus","1","--pids-limit","64","--cap-drop","ALL","--security-opt","no-new-privileges","-v",f"{folder}:/work:ro",config.SANDBOX_IMAGE,"python","/work/runner.py","/work"]
-        elif config.MOCK_LLM:
-            cmd=[sys.executable,str(folder/"runner.py"),str(folder)]
-        else: raise SandboxError("local parser execution requires MOCK_LLM=1")
+        can_docker = (
+            config.SANDBOX_MODE == "docker"
+            and shutil.which("docker") is not None
+            and not config.MOCK_LLM
+        )
+        if can_docker:
+            img_check = subprocess.run(
+                ["docker", "image", "inspect", config.SANDBOX_IMAGE],
+                capture_output=True,
+                check=False,
+            )
+            if img_check.returncode != 0:
+                can_docker = False
+
+        if can_docker:
+            cmd = [
+                "docker", "run", "--rm", "--name", name, "--network", "none",
+                "--read-only", "--tmpfs", "/tmp:rw,noexec,nosuid,size=32m",
+                "--memory", "256m", "--cpus", "1", "--pids-limit", "64",
+                "--cap-drop", "ALL", "--security-opt", "no-new-privileges",
+                "-v", f"{folder}:/work:ro", config.SANDBOX_IMAGE,
+                "python", "/work/runner.py", "/work"
+            ]
+        elif config.MOCK_LLM or config.ALLOW_LOCAL_SANDBOX or config.SANDBOX_MODE == "local":
+            cmd = [sys.executable, str(folder / "runner.py"), str(folder)]
+        else:
+            raise SandboxError("Sandbox docker image not found and local execution is disabled")
         try: result=subprocess.run(cmd,capture_output=True,text=True,timeout=timeout_s,check=False)
         except FileNotFoundError as exc: raise SandboxError("Docker executable was not found") from exc
         except subprocess.TimeoutExpired as exc:

@@ -4,9 +4,7 @@ import json, logging, shutil, threading, time
 from pathlib import Path
 from typing import Literal
 from pydantic import BaseModel
-from backend import config
-from backend.chain import hashing
-from backend.chain.client import Chain, ChainError
+from backend import config, export, hashing
 from backend.export import csv_bytes,ics_bytes,json_bytes
 from backend.intake import sheet_parser,voice_photo
 from backend.llm.client import call_json
@@ -22,8 +20,8 @@ log=logging.getLogger(__name__)
 class IngestSheetResult(BaseModel): rules:list[Rule];cache_hit:bool;attempts:int;tokens_used:int;seconds:float
 class SolveResult(BaseModel): status:Literal["feasible","infeasible","unknown","error"];schedule:Schedule|None=None;conflict:Conflict|None=None;moved:list[str]=[];solve_ms:int=0;message:str=""
 class ApprovalResult(BaseModel):ok:bool;tx_hash:str|None=None;error:str|None=None
-class PublishResult(BaseModel):hash:str;tx_hash:str;version:int;json_bytes:bytes;csv_bytes:bytes;ics_bytes:bytes
-class VerifyResult(BaseModel):match:bool;recomputed_hash:str;anchored:bool;error:str|None=None
+class PublishResult(BaseModel):hash:str;tx_hash:str="";version:int;json_bytes:bytes;csv_bytes:bytes;ics_bytes:bytes
+class VerifyResult(BaseModel):match:bool;recomputed_hash:str;anchored:bool=True;error:str|None=None
 class ScoreboardRow(BaseModel):run:int;baseline_violations:int;baseline_details:list[str];gecompose_violations:int
 class ScoreboardResult(BaseModel):rows:list[ScoreboardRow]
 class Health(BaseModel):items:dict[str,dict]
@@ -33,6 +31,8 @@ def health()->Health:
     from backend.healthcheck import inspect
     return Health(items=inspect())
 def get_roster()->Roster:return db.get_roster()
+def get_pending_schedule()->Schedule|None:return _pending
+def get_latest_schedule()->Schedule|None:return db.latest_schedule()
 def ingest_audio(wav:bytes,filename:str)->list[Rule]:return voice_photo.ingest_audio(wav,filename)
 def ingest_image(img:bytes,filename:str)->list[Rule]:return voice_photo.ingest_image(img,filename)
 def ingest_text(text:str)->list[Rule]:return voice_photo.ingest_text(text)
@@ -56,8 +56,10 @@ def edit_rule(rule_id:str,params:dict|None=None,owner:str|None=None)->Rule:
 def confirm_rule(rule_id:str)->Rule:
     rule=db.get_rule(rule_id)
     if rule.status!="draft":raise ValueError("Only draft rules can be confirmed")
-    validate_params(rule.type,rule.params,db.get_roster()); salt=hashing.new_salt(); digest=hashing.rule_hash(rule.id,rule.type,rule.owner,salt)
-    tx=Chain().register_rule(digest,rule.owner); db.save_rule(rule.model_copy(update={"status":"confirmed"}),salt,hashing.hexs(digest));return db.get_rule(rule_id)
+    validate_params(rule.type,rule.params,db.get_roster()); salt=hashing.new_salt(); digest=hashing.rule_hash(rule.id,rule.type,rule.owner,salt); hex_digest=hashing.hexs(digest)
+    db.save_rule(rule.model_copy(update={"status":"confirmed"}),salt,hex_digest)
+    db.log_audit_event("RuleConfirmed",rule.id,rule.owner,{"rule_hash":hex_digest})
+    return db.get_rule(rule_id)
 def reject_rule(rule_id:str)->Rule:
     rule=db.get_rule(rule_id)
     if rule.status!="draft":raise ValueError("Only draft rules can be rejected")
@@ -106,16 +108,26 @@ def approve_option(option_id:str,as_user:str)->ApprovalResult:
     try:
         option=db.get_option(option_id)
         if not option.verified:return ApprovalResult(ok=False,error="This option was not solver-verified")
-        tx=Chain().approve(bytes.fromhex(db.get_rule_hash(option.rule_id).removeprefix("0x")),bytes.fromhex(option.option_hash.removeprefix("0x")),as_user)
-        return ApprovalResult(ok=True,tx_hash=tx)
+        rule=db.get_rule(option.rule_id)
+        if as_user!=option.approver and as_user!=rule.owner:
+            return ApprovalResult(ok=False,error=f"Only {option.approver} can approve this relaxation (attempted by {as_user})")
+        if option.approved:
+            return ApprovalResult(ok=False,error="Option is already approved")
+        updated=option.model_copy(update={"approved":True,"approved_by":as_user})
+        db.save_option(updated)
+        audit_ref=f"appr_{option.id}_{int(time.time())}"
+        db.log_audit_event("RelaxationApproved",option.id,as_user,{"rule_id":option.rule_id,"option_hash":option.option_hash})
+        return ApprovalResult(ok=True,tx_hash=audit_ref)
     except Exception as exc:log.warning("Consent approval failed: %s",exc);return ApprovalResult(ok=False,error=str(exc))
 def apply_option(option_id:str)->Rule:
     option=db.get_option(option_id)
     if not option.verified:raise ValueError("Option was not verified")
-    rule=db.get_rule(option.rule_id); rh=bytes.fromhex(db.get_rule_hash(rule.id).removeprefix("0x")); oh=bytes.fromhex(option.option_hash.removeprefix("0x"))
-    if not Chain().is_approved(rh,oh):raise ValueError("The rule owner has not approved this option on-chain")
+    if not option.approved:raise ValueError("The rule owner has not approved this option")
+    rule=db.get_rule(option.rule_id)
     validate_params(rule.type,option.new_params,db.get_roster())
-    updated=rule.model_copy(update={"params":option.new_params});db.save_rule(updated);return updated
+    updated=rule.model_copy(update={"params":option.new_params});db.save_rule(updated)
+    db.log_audit_event("RuleUpdated",rule.id,option.approved_by or option.approver,{"new_params":option.new_params})
+    return updated
 def why_cell(session_id:str)->list[Rule]:
     schedule=_pending or db.latest_schedule()
     return why(session_id,schedule,db.list_rules("confirmed")) if schedule else []
@@ -126,20 +138,21 @@ def publish()->PublishResult:
         violations=check(_pending,db.get_roster(),db.list_rules("confirmed"))
         if violations:raise ValueError("Schedule failed independent verification: "+"; ".join(violations))
         digest=hashing.schedule_hash(_pending)
-        chain=Chain()
-        tx=chain.anchor(digest,_pending.version) if not chain.is_anchored(digest) else "0x0000000000000000000000000000000000000000000000000000000000000000"
         hex_digest=hashing.hexs(digest)
-        db.save_schedule(_pending,hex_digest,tx);schedule=_pending;_pending=None
-        return PublishResult(hash=hex_digest,tx_hash=tx,version=schedule.version,json_bytes=json_bytes(schedule),csv_bytes=csv_bytes(schedule),ics_bytes=ics_bytes(schedule,db.get_roster()))
+        db.save_schedule(_pending,hex_digest,hex_digest)
+        db.log_audit_event("SchedulePublished",hex_digest,"Coordinator",{"version":_pending.version,"hash":hex_digest})
+        schedule=_pending;_pending=None
+        return PublishResult(hash=hex_digest,tx_hash=hex_digest,version=schedule.version,json_bytes=json_bytes(schedule),csv_bytes=csv_bytes(schedule),ics_bytes=ics_bytes(schedule,db.get_roster()))
 def verify_file(data:bytes)->VerifyResult:
     try:
-        raw=json.loads(data);schedule=Schedule.model_validate(raw);digest=hashing.schedule_hash(schedule);hex_digest=hashing.hexs(digest);anchored=Chain().is_anchored(digest)
-        return VerifyResult(match=anchored,recomputed_hash=hex_digest,anchored=anchored,error=None if anchored else "Schedule hash is not anchored on the ledger")
+        raw=json.loads(data);schedule=Schedule.model_validate(raw);digest=hashing.schedule_hash(schedule);hex_digest=hashing.hexs(digest);anchored=db.is_schedule_published(hex_digest)
+        return VerifyResult(match=anchored,recomputed_hash=hex_digest,anchored=anchored,error=None if anchored else "Schedule hash is not found in published registry")
     except Exception as exc:return VerifyResult(match=False,recomputed_hash="",anchored=False,error=str(exc))
 def run_scoreboard(runs:int=5)->ScoreboardResult:
     from backend.scoreboard import run
     return run(runs)
-def chain_events()->list[dict]:return Chain().events()
+def chain_events()->list[dict]:return db.list_audit_events()
+def audit_events()->list[dict]:return db.list_audit_events()
 def seed_demo()->None:
     from backend.samples import DEMO_ROSTER
     reset_demo();roster=Roster.model_validate(DEMO_ROSTER);db.save_roster(roster)

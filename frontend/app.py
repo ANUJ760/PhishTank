@@ -112,7 +112,7 @@ with st.sidebar:
 
 # Main Content Tabs
 st.markdown('<div class="main-header">GeCompose Timetable Engine & Proof Portal</div>', unsafe_allow_html=True)
-st.markdown('<div class="sub-header">Constraint-Satisfaction Scheduling with Multi-Party Cryptographic Consent</div>', unsafe_allow_html=True)
+st.markdown('<div class="sub-header">Constraint-Satisfaction Scheduling with Multi-Party Consent & Deterministic Verification</div>', unsafe_allow_html=True)
 
 tabs = st.tabs([
     "📅 Timetable Grid",
@@ -120,7 +120,7 @@ tabs = st.tabs([
     "📥 Rule Management",
     "🛡️ Proof Portal & Verifier",
     "📊 Evaluation Scoreboard",
-    "⛓️ Blockchain Events",
+    "📜 Audit Log",
     "🩺 System Health"
 ])
 
@@ -143,10 +143,10 @@ with tabs[0]:
                 else:
                     st.warning(f"Solver returned: {res.status}. {res.message}")
 
-        if st.button("📜 Publish to Blockchain", use_container_width=True):
+        if st.button("📋 Publish Schedule", use_container_width=True):
             try:
                 pub = api.publish()
-                st.success(f"Published Version {pub.version}! Hash: {pub.hash[:16]}... Anchored on-chain!")
+                st.success(f"Published Version {pub.version}! Hash: {pub.hash[:16]}... Recorded in verified registry!")
                 st.download_button("Download JSON", data=pub.json_bytes, file_name=f"schedule_v{pub.version}.json", mime="application/json")
                 st.download_button("Download CSV", data=pub.csv_bytes, file_name=f"schedule_v{pub.version}.csv", mime="text/csv")
                 st.download_button("Download ICS Calendar", data=pub.ics_bytes, file_name=f"schedule_v{pub.version}.ics", mime="text/calendar")
@@ -186,7 +186,7 @@ with tabs[0]:
 
 # ---------------- TAB 2: Conflict Studio ----------------
 with tabs[1]:
-    st.markdown("### Conflict Core Isolation & On-Chain Consent Simulation")
+    st.markdown("### Conflict Core Isolation & Multi-Party Consent Simulation")
     st.markdown("Demonstrating how GeCompose handles impossible timetable constraints without arbitrary AI overrides.")
 
     col_c1, col_c2 = st.columns(2)
@@ -203,7 +203,7 @@ with tabs[1]:
             )
             api.db.save_rule(r3)
             api.confirm_rule("R3")
-            st.warning("Rule R3 registered on-chain and confirmed! Solving now...")
+            st.warning("Rule R3 registered in registry and confirmed! Solving now...")
             res = api.solve()
             if res.status == "infeasible":
                 st.session_state["active_conflict"] = res.conflict
@@ -249,9 +249,9 @@ with tabs[1]:
                     if st.button(f"Sign & Approve as {test_user}", key=f"btn_app_{opt.id}"):
                         res = api.approve_option(opt.id, as_user=test_user)
                         if res.ok:
-                            st.success(f"Approved on-chain! Tx: {res.tx_hash[:16]}...")
+                            st.success(f"Approved! Recorded in consent ledger (Ref: {res.tx_hash}).")
                         else:
-                            st.error(f"Reverted on-chain: {res.error}")
+                            st.error(f"Approval rejected: {res.error}")
                 with col_ap3:
                     if st.button(f"Apply Option {opt.id} to Schedule", key=f"btn_apply_{opt.id}"):
                         try:
@@ -301,7 +301,7 @@ with tabs[2]:
 # ---------------- TAB 4: Proof Portal ----------------
 with tabs[3]:
     st.markdown("### Public Timetable Proof & Integrity Verifier")
-    st.markdown("Verify that a published schedule has not been altered since being cryptographically anchored on Ethereum.")
+    st.markdown("Verify that a published schedule has not been altered since being cryptographically registered in the schedule registry.")
 
     verify_tab1, verify_tab2 = st.columns(2)
     with verify_tab1:
@@ -310,9 +310,9 @@ with tabs[3]:
         if verify_upload:
             v_res = api.verify_file(verify_upload.getvalue())
             if v_res.match:
-                st.success(f"✅ SCHEDULE IS AUTHENTIC & ANCHORED ON-CHAIN!\nRecomputed Hash: {v_res.recomputed_hash}")
+                st.success(f"✅ SCHEDULE IS AUTHENTIC & REGISTERED!\nRecomputed Hash: {v_res.recomputed_hash}")
             else:
-                st.error(f"❌ VERIFICATION FAILED: {v_res.error or 'Hash mismatch with ledger.'}")
+                st.error(f"❌ VERIFICATION FAILED: {v_res.error or 'Hash mismatch with registry.'}")
 
     with verify_tab2:
         st.markdown("#### Tamper Detection Demo")
@@ -324,7 +324,7 @@ with tabs[3]:
                 if st.button("Test Original Schedule", use_container_width=True):
                     res = api.verify_file(api.export.json_bytes(latest))
                     if res.match:
-                        st.success(f"Original Validated: {res.recomputed_hash[:16]}... is anchored on-chain!")
+                        st.success(f"Original Validated: {res.recomputed_hash[:16]}... is registered!")
             with col_d2:
                 if st.button("Test Tampered Schedule (Altered Slot)", use_container_width=True):
                     # Tamper one slot
@@ -334,7 +334,7 @@ with tabs[3]:
                     tampered_data = json.dumps(raw).encode("utf-8")
                     res = api.verify_file(tampered_data)
                     if not res.match:
-                        st.error(f"Tampering Caught! Hash {res.recomputed_hash[:16]}... NOT found on ledger!")
+                        st.error(f"Tampering Caught! Hash {res.recomputed_hash[:16]}... NOT found in registry!")
         else:
             st.info("Publish a schedule first to run tamper checks.")
 
@@ -359,10 +359,10 @@ with tabs[4]:
             st.table(pd.DataFrame(rows))
 
 
-# ---------------- TAB 6: Blockchain Events ----------------
+# ---------------- TAB 6: Audit Log ----------------
 with tabs[5]:
-    st.markdown("### On-Chain Event Audit Log")
-    st.markdown("Live events read directly from the deployed `ConsentLedger` contract on local Anvil node.")
+    st.markdown("### Consent Ledger & System Audit Log")
+    st.markdown("Immutable record of rule registrations, stakeholder approvals, and published schedule hashes.")
     try:
         events = api.chain_events()
         if events:
@@ -370,15 +370,14 @@ with tabs[5]:
             for e in reversed(events):
                 ev_list.append({
                     "Event": e.get("event"),
-                    "Block": e.get("block"),
-                    "Index": e.get("idx"),
+                    "ID": e.get("block"),
                     "Arguments": json.dumps(e.get("args", {}))
                 })
             st.dataframe(pd.DataFrame(ev_list), use_container_width=True)
         else:
-            st.info("No events logged yet. Perform a rule confirmation or schedule publish to generate transactions.")
+            st.info("No events logged yet. Perform a rule confirmation or schedule publish to generate events.")
     except Exception as e:
-        st.error(f"Could not load blockchain events: {e}")
+        st.error(f"Could not load audit events: {e}")
 
 
 # ---------------- TAB 7: System Health ----------------

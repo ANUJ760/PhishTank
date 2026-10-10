@@ -359,6 +359,7 @@ Our engineering implementation divides the system into three decoupled modules, 
 |---|---|---|---|
 | **Google Gemma 4** | [ai.google.dev/gemma](https://ai.google.dev/gemma) | Apache 2.0 | Multimodal intake, parser coding, conflict explanations |
 | **Google OR-Tools** | [github.com/google/or-tools](https://github.com/google/or-tools) | Apache 2.0 | Discrete constraint optimization solver |
+| **PostgreSQL** | [postgresql.org](https://www.postgresql.org) | PostgreSQL | ACID persistence for constraint registry and audit logs |
 | **llama.cpp** | [github.com/ggerganov/llama.cpp](https://github.com/ggerganov/llama.cpp) | MIT | Fast local 4-bit quantized inference |
 | **Pydantic** | [docs.pydantic.dev](https://docs.pydantic.dev) | MIT | Data schema validation |
 | **Docker Engine** | [docker.com](https://www.docker.com) | Apache 2.0 | Isolated container sandbox for parsing scripts |

@@ -13,30 +13,26 @@ Audience: an AI coding assistant and the team. Read fully before writing code.
 | # | Item | Required? | Used by | Install | Verify | If missing |
 |---|---|---|---|---|---|---|
 | 1 | Python 3.11+ | Yes | everything | system / pyenv | `python --version` | none |
-| 2 | **llama.cpp `llama-server`** (or vLLM) | Yes for real Gemma; No if `MOCK_LLM=1` | `llm/client.py` | release binary or build from the llama.cpp GitHub repo | `llama-server --version` | `MOCK_LLM=1` |
-| 3 | **Gemma 4 weights**: E4B (GGUF + its multimodal projector file) and 12B (GGUF) | Yes for real Gemma | llama-server | Hugging Face (account and license acceptance may be needed). **Confirm exact repo and file names yourself.** | files exist on disk | `MOCK_LLM=1`, or use E4B for both tiers |
-| 4 | NVIDIA GPU, 8 GB VRAM for one model, about 12 GB for both | Recommended | llama-server | driver | `nvidia-smi` | CPU works but is slow. With under 12 GB, run only E4B and set `REASON_URL=INTAKE_URL` |
-| 5 | **Docker Engine** | Yes for sheet-parser sandbox | `intake/sandbox.py` | docs.docker.com | `docker run --rm hello-world` | `SANDBOX_MODE=local` (allowed only with `MOCK_LLM=1`) |
-| 6 | **Foundry** (`forge`, `anvil`) | Yes for consent and verifier | `contracts/`, `chain/` | `curl -L https://foundry.paradigm.xyz \| bash` then `foundryup` | `anvil --version`, `forge --version` | **No fallback.** Install first. |
-| 7 | Internet | Setup only | pip, Hugging Face, `docker build`, `foundryup`, forge's first solc download | n/a | n/a | Do all downloads before the event |
-| 8 | Python packages | Yes | all | `pip install -r requirements.txt` | `python -c "import ortools, web3, streamlit"` | none |
-| 9 | Chrome with mic permission | Only for live voice | frontend | n/a | open `http://localhost:8501` | use typed text or a pre-recorded WAV upload |
-| 10 | ffmpeg | Optional | only if the model rejects the mic WAV | system package | `ffmpeg -version` | skip |
+| 2 | **Ollama** (or llama.cpp / vLLM) | Recommended for real Gemma; No if `MOCK_LLM=1` | `llm/gemma.py`, `llm/client.py` | `curl -fsSL https://ollama.com/install.sh \| sh` | `ollama --version` | `MOCK_LLM=1` |
+| 3 | **Gemma models**: 4B (intake: audio/vision/text) and 12B (reasoning: parser/conflict) | Yes for live Gemma | Ollama | `ollama run gemma:4b` and `ollama run gemma:12b` | `ollama list` | `MOCK_LLM=1`, or configure smaller tag |
+| 4 | NVIDIA GPU or fast CPU | Recommended | Ollama | driver | `nvidia-smi` | CPU works with 4-bit quantization |
+| 5 | **Docker Engine** (or local sandbox) | Optional for parser sandbox | `intake/sandbox.py` | docs.docker.com | `docker run --rm hello-world` | `SANDBOX_MODE=local` with `ALLOW_LOCAL_SANDBOX=1` |
+| 6 | **Database** (SQLite / PostgreSQL) | Yes (built-in SQLite zero-setup) | `registry/db.py` | Python built-in `sqlite3` or Docker PostgreSQL | `python -m backend.healthcheck` | automatically falls back to SQLite |
+| 7 | Python packages | Yes | all | `pip install -r requirements.txt` | `python -c "import ortools, streamlit"` | none |
+| 8 | Chrome with mic permission | Only for live voice | frontend | n/a | open `http://localhost:8501` | use typed text or pre-recorded WAV |
 
-**Not needed:** Node.js, MetaMask, testnet ETH, any cloud API, Graphviz binary, Whisper or Tesseract, OpenZeppelin (the contract below does not use it).
-
-**Honest note on wallets:** the demo uses Anvil's pre-unlocked accounts to stand in for each person's wallet. There is no browser wallet and no real signature prompt. Real wallet signing (EIP-712) is Future Scope. Say this plainly if asked.
+**Not needed:** Web3, Foundry, Anvil, Smart contracts, MetaMask, testnet ETH, any cloud API, Graphviz binary, Whisper or Tesseract.
 
 ### Where the external stack is touched
 
 | Module | Touches | Fallback |
 |---|---|---|
-| `llm/client.py` | `[EXT: llama-server]` | `MOCK_LLM=1` fixtures |
-| `intake/voice_photo.py` | `[EXT: llama-server]` with audio/vision model | `ingest_text`, fixtures |
-| `intake/sheet_parser.py` | `[EXT: llama-server]` (first time per layout only) | fixture parser code |
-| `intake/sandbox.py` | `[EXT: Docker]` | `SANDBOX_MODE=local` with `MOCK_LLM=1` |
-| `chain/*`, `contracts/` | `[EXT: Foundry/Anvil]` | none |
-| `solver/*`, `checker`, `hashing`, `registry` | `[PY]` only | n/a |
+| `llm/gemma.py`, `llm/client.py` | `[EXT: Ollama (gemma:4b, gemma:12b)]` | `MOCK_LLM=1` or `LLM_FALLBACK_TO_MOCK=1` fixtures |
+| `intake/voice_photo.py` | `[EXT: Ollama]` with multimodal Gemma 4B | `ingest_text`, fixtures |
+| `intake/sheet_parser.py` | `[EXT: Ollama]` (first time per layout only) | fixture parser code |
+| `intake/sandbox.py` | `[EXT: Docker]` | `SANDBOX_MODE=local` |
+| `registry/db.py` | `[EXT: PostgreSQL]` | Built-in SQLite (`data/gecompose.db`) |
+| `solver/*`, `checker`, `hashing` | `[PY]` only | n/a |
 
 ---
 
@@ -46,106 +42,45 @@ Run from the repo root.
 
 **1. Python environment**
 ```bash
-python3.11 -m venv .venv && source .venv/bin/activate
+python3.12 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env
 mkdir -p data/uploads samples models
+```
+
+**2. Database (Zero-Setup SQLite or Docker PostgreSQL)**
+- For frictionless local development, the default database is SQLite at `data/gecompose.db` (zero setup required).
+- For production Docker PostgreSQL:
+```bash
 docker compose up -d postgres
 ```
 
-`requirements.txt`
-```
-ortools>=9.11
-pydantic>=2.7
-web3>=7
-streamlit>=1.40
-pandas>=2.2
-openpyxl>=3.1
-openai>=1.40
-python-dotenv>=1.0
-psycopg[binary,pool]>=3.2
-pytest>=8
-```
-
-PostgreSQL data persists in the `gecompose_postgres` Docker volume. The Compose service binds only to localhost. Override the development credentials with `POSTGRES_USER`, `POSTGRES_PASSWORD`, and `POSTGRES_DB` before using this setup outside a local demo.
-
-`.env.example`
-```
-MOCK_LLM=0
-INTAKE_URL=http://127.0.0.1:8080/v1
-INTAKE_MODEL=gemma-intake
-REASON_URL=http://127.0.0.1:8081/v1
-REASON_MODEL=gemma-reason
-LLM_TIMEOUT_S=120
-AUDIO_MODE=native          # native | transcript
-SANDBOX_MODE=docker        # docker | local  (local only with MOCK_LLM=1)
-SANDBOX_IMAGE=gecompose-sandbox
-RPC_URL=http://127.0.0.1:8545
-DATABASE_URL=postgresql://gecompose:gecompose_dev@127.0.0.1:5432/gecompose
-UPLOAD_DIR=data/uploads
-DAYS=5
-SLOTS_PER_DAY=6
-SOLVER_TIME_S=10
-SOLVER_SEED=7
-```
-
-**2. Sandbox image `[EXT: Docker]`**
-
-`Dockerfile.sandbox`
-```dockerfile
-FROM python:3.11-slim
-RUN pip install --no-cache-dir pandas openpyxl
-WORKDIR /work
-```
+**3. Start Ollama and pull Gemma models (Skip if `MOCK_LLM=1`)**
 ```bash
-docker build -f Dockerfile.sandbox -t gecompose-sandbox .
-```
-Build this now while you have internet. The sandbox runs with no network.
+# Start the Ollama background daemon
+ollama serve
 
-**3. Foundry project `[EXT: Foundry]`**
+# Pull or run the Gemma models (in another terminal or background)
+ollama pull gemma:4b       # Multimodal intake tier (text, audio, photos)
+ollama pull gemma:12b      # Reasoning tier (conflict diagnosis, parser coding)
+```
+
+**4. Run Health Check**
 ```bash
-forge init contracts --no-git
-rm contracts/src/Counter.sol contracts/test/Counter.t.sol contracts/script/Counter.s.sol
-# put ConsentLedger.sol in contracts/src/ and ConsentLedger.t.sol in contracts/test/ (Section 7.4)
-# in contracts/foundry.toml under [profile.default] add: solc = "0.8.24"
-cd contracts && forge build && forge test -vv && cd ..
+python -m backend.healthcheck
 ```
-ABI file produced: `contracts/out/ConsentLedger.sol/ConsentLedger.json`.
+Verify that database, Ollama, Gemma 4B, and Gemma 12B report `[OK]`.
 
-**4. Start the local chain `[EXT: Anvil]` (own terminal, leave running)**
+**5. Run the Backend REST API Server**
 ```bash
-anvil --port 8545
+python -m backend.server
+# Server starts at http://127.0.0.1:8000
 ```
-**5. Deploy**
+
+**6. Run Frontend & Verification Portal**
 ```bash
-python -m backend.chain.deploy      # writes data/deployment.json
+streamlit run frontend/app.py
 ```
-If you restart Anvil, the chain is wiped. Redeploy and run `python -m backend.reset_demo`.
-
-**6. Start Gemma servers `[EXT: llama-server]` (two terminals; skip if `MOCK_LLM=1`)**
-
-File names below are placeholders. Use the real names you downloaded.
-```bash
-# Intake tier: audio + images + text
-llama-server -m models/<gemma4-e4b>.gguf --mmproj models/<gemma4-e4b-mmproj>.gguf \
-  --host 127.0.0.1 --port 8080 -ngl 99 -c 8192 --alias gemma-intake
-
-# Reasoning tier: parser codegen + conflict explanation
-llama-server -m models/<gemma4-12b>.gguf \
-  --host 127.0.0.1 --port 8081 -ngl 99 -c 8192 --alias gemma-reason
-```
-**Verify audio works on your exact runtime and model before building voice features:**
-```bash
-python -m backend.healthcheck --audio samples/rao_hindi.wav
-```
-If audio is rejected, set `AUDIO_MODE=transcript` (the UI then asks for typed text). Do not add a separate speech model unless you accept losing the "one model" claim.
-
-**7. Health check**
-```bash
-python -m backend.healthcheck       # prints OK/FAIL per external item
-```
-
-**8. Run frontend:** see `FRONTEND_SETUP.md`.
 
 ---
 
@@ -168,18 +103,16 @@ python -m backend.healthcheck       # prints OK/FAIL per external item
 .env.example  requirements.txt  Dockerfile.sandbox
 backend/
   __init__.py
-  config.py  models.py  api.py  healthcheck.py  reset_demo.py  scoreboard.py
+  config.py  models.py  hashing.py  api.py  healthcheck.py  reset_demo.py  scoreboard.py
   registry/db.py
   llm/client.py  llm/prompts.py  llm/fixtures/*.json
   intake/voice_photo.py  intake/sheet_parser.py  intake/sandbox.py
   solver/model.py  solver/conflicts.py  solver/checker.py  solver/trace.py
-  chain/hashing.py  chain/client.py  chain/deploy.py
   export.py
-contracts/            # Foundry project
 frontend/             # see FRONTEND_SETUP.md
 samples/              # roster.json, base_rules.json, workload.xlsx, workload2.xlsx, rao_hindi.wav, board.png
 tests/
-data/                 # created at runtime: gecompose.db, deployment.json, uploads/
+data/                 # created at runtime: gecompose.db, uploads/
 ```
 
 ---
@@ -203,7 +136,6 @@ LLM_TIMEOUT_S = int(os.getenv("LLM_TIMEOUT_S", "120"))
 AUDIO_MODE = os.getenv("AUDIO_MODE", "native")
 SANDBOX_MODE = os.getenv("SANDBOX_MODE", "docker")
 SANDBOX_IMAGE = os.getenv("SANDBOX_IMAGE", "gecompose-sandbox")
-RPC_URL = os.getenv("RPC_URL", "http://127.0.0.1:8545")
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://gecompose:gecompose_dev@127.0.0.1:5432/gecompose")
 UPLOAD_DIR = Path(os.getenv("UPLOAD_DIR", "data/uploads"))
 DAYS = int(os.getenv("DAYS", "5"))
@@ -212,12 +144,9 @@ SOLVER_TIME_S = float(os.getenv("SOLVER_TIME_S", "10"))
 SOLVER_SEED = int(os.getenv("SOLVER_SEED", "7"))
 
 DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri"]
-SLOT_TIMES = ["09:00", "10:00", "11:00", "12:00", "14:00", "15:00"]  # 1 hour each
+SLOTS_TIMES = ["09:00", "10:00", "11:00", "12:00", "14:00", "15:00"]  # 1 hour each
 WEEK_START_MONDAY = "2026-10-12"                                      # for .ics export
 
-# Anvil account index per person. Anvil's accounts are pre-unlocked, so no keys are needed.
-ACCOUNT_INDEX = {"Coordinator": 0, "Prof. Rao": 1, "Prof. Mehta": 2,
-                 "Dept Head": 3, "Dean": 4, "Prof. Iyer": 5}
 # Default approver per rule type (Gemma never decides this; editable in the review screen)
 DEFAULT_OWNER = {"teacher_unavailable": None,   # None = the teacher named in params
                  "room_unavailable": "Coordinator",
@@ -782,99 +711,11 @@ The fixture `explain_conflict.json` then uses `R1` (pin) and `R2` (only_qualifie
 
 ---
 
-## 10. Chain `[EXT: Foundry/Anvil]`
+## 10. Consent Ledger & Cryptographic Hashing `[PY]`
 
-### 10.1 `contracts/src/ConsentLedger.sol`
-```solidity
-// SPDX-License-Identifier: MIT
-pragma solidity 0.8.24;
-
-contract ConsentLedger {
-    address public coordinator;
-    mapping(bytes32 => address) public ruleOwner;                 // ruleHash => owner
-    mapping(bytes32 => mapping(bytes32 => bool)) public approved; // ruleHash => optionHash => approved
-    mapping(bytes32 => bool) public anchored;                     // scheduleHash => exists
-
-    event RuleRegistered(bytes32 indexed ruleHash, address indexed owner);
-    event RelaxationApproved(bytes32 indexed ruleHash, bytes32 indexed optionHash, address indexed owner);
-    event ScheduleAnchored(bytes32 indexed scheduleHash, uint256 version, address indexed by);
-
-    constructor() { coordinator = msg.sender; }
-
-    function registerRule(bytes32 ruleHash, address owner) external {
-        require(msg.sender == coordinator, "only coordinator");
-        require(owner != address(0), "zero owner");
-        require(ruleOwner[ruleHash] == address(0), "already registered");
-        ruleOwner[ruleHash] = owner;
-        emit RuleRegistered(ruleHash, owner);
-    }
-
-    function approveRelaxation(bytes32 ruleHash, bytes32 optionHash) external {
-        require(ruleOwner[ruleHash] == msg.sender, "not rule owner");
-        approved[ruleHash][optionHash] = true;
-        emit RelaxationApproved(ruleHash, optionHash, msg.sender);
-    }
-
-    function anchorSchedule(bytes32 scheduleHash, uint256 version) external {
-        require(msg.sender == coordinator, "only coordinator");
-        require(!anchored[scheduleHash], "already anchored");
-        anchored[scheduleHash] = true;
-        emit ScheduleAnchored(scheduleHash, version, msg.sender);
-    }
-}
-```
-
-### 10.2 `contracts/test/ConsentLedger.t.sol`
-```solidity
-// SPDX-License-Identifier: MIT
-pragma solidity 0.8.24;
-import "forge-std/Test.sol";
-import "../src/ConsentLedger.sol";
-
-contract ConsentLedgerTest is Test {
-    ConsentLedger l;
-    address rao = address(0xA1);
-    address eve = address(0xB2);
-    bytes32 rh = keccak256("rule1");
-    bytes32 oh = keccak256("opt1");
-
-    function setUp() public { l = new ConsentLedger(); }
-
-    function test_ownerCanApprove() public {
-        l.registerRule(rh, rao);
-        vm.prank(rao);
-        l.approveRelaxation(rh, oh);
-        assertTrue(l.approved(rh, oh));
-    }
-    function test_nonOwnerReverts() public {
-        l.registerRule(rh, rao);
-        vm.prank(eve);
-        vm.expectRevert(bytes("not rule owner"));
-        l.approveRelaxation(rh, oh);
-    }
-    function test_onlyCoordinatorRegisters() public {
-        vm.prank(eve);
-        vm.expectRevert(bytes("only coordinator"));
-        l.registerRule(rh, rao);
-    }
-    function test_doubleRegisterReverts() public {
-        l.registerRule(rh, rao);
-        vm.expectRevert(bytes("already registered"));
-        l.registerRule(rh, rao);
-    }
-    function test_anchorOnce() public {
-        l.anchorSchedule(rh, 1);
-        assertTrue(l.anchored(rh));
-        vm.expectRevert(bytes("already anchored"));
-        l.anchorSchedule(rh, 1);
-    }
-}
-```
-
-### 10.3 `backend/chain/hashing.py` `[PY]`
+### 10.1 `backend/hashing.py` `[PY]`
 ```python
-import json, os
-from web3 import Web3
+import hashlib, json, os
 from backend.models import Schedule
 
 def canonical(obj) -> str:
@@ -884,95 +725,30 @@ def schedule_obj(s: Schedule) -> dict:
     return {"version": s.version,
             "placements": sorted((p.model_dump() for p in s.placements), key=lambda p: p["session_id"])}
 
+def _hash(data: bytes) -> bytes:
+    return hashlib.sha256(data).digest()
+
 def schedule_hash(s: Schedule) -> bytes:
-    return Web3.keccak(canonical(schedule_obj(s)).encode())
+    return _hash(canonical(schedule_obj(s)).encode("utf-8"))
 
 def new_salt() -> bytes: return os.urandom(16)
 
 def rule_hash(rule_id: str, rtype: str, owner: str, salt: bytes) -> bytes:
-    # identity of the rule; does NOT commit to params (params can be relaxed later)
-    return Web3.keccak(salt + canonical({"id": rule_id, "type": rtype, "owner": owner}).encode())
+    return _hash(salt + canonical({"id": rule_id, "type": rtype, "owner": owner}).encode("utf-8"))
 
 def option_hash(rule_id: str, new_params: dict) -> bytes:
-    # commits to the exact change the owner approves
-    return Web3.keccak(canonical({"rule_id": rule_id, "new_params": new_params}).encode())
+    return _hash(canonical({"rule_id": rule_id, "new_params": new_params}).encode("utf-8"))
 
-hexs = Web3.to_hex   # bytes -> "0x..." (always with prefix)
+def hexs(value: bytes) -> str:
+    return "0x" + value.hex()
 ```
 
-### 10.4 `backend/chain/client.py`
-```python
-import json
-from pathlib import Path
-from web3 import Web3
-from web3.exceptions import ContractLogicError
-from backend import config
-
-ABI_PATH = Path("contracts/out/ConsentLedger.sol/ConsentLedger.json")
-DEPLOY_PATH = Path("data/deployment.json")
-class ChainError(Exception): ...
-
-class Chain:
-    def __init__(self):
-        self.w3 = Web3(Web3.HTTPProvider(config.RPC_URL))              # [EXT: Anvil]
-        abi = json.loads(ABI_PATH.read_text())["abi"]
-        addr = json.loads(DEPLOY_PATH.read_text())["address"]
-        self.c = self.w3.eth.contract(address=addr, abi=abi)
-        self.accounts = self.w3.eth.accounts
-
-    def addr(self, name: str) -> str:
-        if name not in config.ACCOUNT_INDEX: raise ChainError(f"no wallet configured for {name}")
-        return self.accounts[config.ACCOUNT_INDEX[name]]
-
-    def _send(self, fn, sender: str) -> str:
-        try:
-            h = fn.transact({"from": self.addr(sender)})
-            self.w3.eth.wait_for_transaction_receipt(h)
-            return Web3.to_hex(h)
-        except ContractLogicError as e:
-            raise ChainError(str(e))          # e.g. "execution reverted: not rule owner"
-
-    def register_rule(self, rule_hash: bytes, owner: str) -> str:
-        return self._send(self.c.functions.registerRule(rule_hash, self.addr(owner)), "Coordinator")
-    def approve(self, rule_hash: bytes, option_hash: bytes, as_user: str) -> str:
-        return self._send(self.c.functions.approveRelaxation(rule_hash, option_hash), as_user)
-    def is_approved(self, rule_hash: bytes, option_hash: bytes) -> bool:
-        return self.c.functions.approved(rule_hash, option_hash).call()
-    def anchor(self, sched_hash: bytes, version: int) -> str:
-        return self._send(self.c.functions.anchorSchedule(sched_hash, version), "Coordinator")
-    def is_anchored(self, sched_hash: bytes) -> bool:
-        return self.c.functions.anchored(sched_hash).call()
-    def events(self) -> list[dict]:
-        out = []
-        for name in ("RuleRegistered", "RelaxationApproved", "ScheduleAnchored"):
-            for e in getattr(self.c.events, name)().get_logs(from_block=0):
-                out.append({"event": name, "block": e["blockNumber"], "idx": e["logIndex"],
-                            "args": {k: (Web3.to_hex(v) if isinstance(v, (bytes, bytearray)) else v)
-                                     for k, v in e["args"].items()}})
-        return sorted(out, key=lambda r: (r["block"], r["idx"]))
-```
-A non-owner calling `approve` raises `ChainError("... not rule owner")`. The UI shows this message (it is the demo of "nobody can approve for someone else").
-
-### 10.5 `backend/chain/deploy.py`
-```python
-import json
-from pathlib import Path
-from web3 import Web3
-from backend import config
-from backend.chain.client import ABI_PATH, DEPLOY_PATH
-
-def deploy():
-    w3 = Web3(Web3.HTTPProvider(config.RPC_URL))
-    art = json.loads(ABI_PATH.read_text())
-    C = w3.eth.contract(abi=art["abi"], bytecode=art["bytecode"]["object"])
-    h = C.constructor().transact({"from": w3.eth.accounts[0]})   # account 0 = Coordinator
-    addr = w3.eth.wait_for_transaction_receipt(h).contractAddress
-    DEPLOY_PATH.parent.mkdir(exist_ok=True)
-    DEPLOY_PATH.write_text(json.dumps({"address": addr}))
-    print("deployed", addr)
-
-if __name__ == "__main__": deploy()
-```
+### 10.2 Consent Ledger Protocol
+Consent is managed directly by the application backend and PostgreSQL registry:
+- **Rule Registration:** When a rule is confirmed, a cryptographic salt and canonical SHA-256 hash are recorded, and an audit event (`RuleConfirmed`) is logged.
+- **Conflict Relaxation:** When an infeasible schedule causes conflicts, proposed relaxation options require explicit approval from the rule owner (`opt.approver`).
+- **Authorization Enforcement:** A user cannot approve a change to someone else's rule (`as_user != option.approver` rejects with authorization failure).
+- **Audit Log:** Every confirmation, approval, and publication writes to the `audit_events` ledger for an immutable verification trace.
 
 ---
 
@@ -990,7 +766,7 @@ class ScoreboardRow(BaseModel): run: int; baseline_violations: int; baseline_det
 class ScoreboardResult(BaseModel): rows: list[ScoreboardRow]
 class Health(BaseModel): items: dict[str, dict]   # name -> {"ok": bool, "detail": str}
 
-def health() -> Health                                   # intake, reason, docker, anvil, contract, mock flags
+def health() -> Health                                   # intake, reason, docker, mock flags
 def seed_demo() -> None;  def reset_demo() -> None
 def get_roster() -> Roster
 def ingest_audio(wav: bytes, filename: str) -> list[Rule]
@@ -1028,7 +804,7 @@ def chain_events() -> list[dict]
 For each run: send the roster plus confirmed rules to the reasoning model with "produce a full timetable as JSON in this schema" (Placement list). Validate with `Schedule`. Invalid JSON counts as 1 violation ("invalid output"). Run `checker.check` on it. GeCompose side: run `solver.solve` then `checker.check` (expect 0). Report real numbers from all runs. If the baseline happens to be clean on a run, show it as 0. In `MOCK_LLM=1`, load a recorded baseline from `fixtures/baseline_runs.json` and label it "recorded".
 
 ### 11.3 `backend/healthcheck.py`
-Prints OK/FAIL with detail for: intake model (`client.models.list()` with a 3 s timeout), reason model, Docker (`docker info`, and `docker image inspect gecompose-sandbox`), Anvil (`w3.is_connected()`), contract (code at the saved address is not empty; empty means Anvil was restarted), `MOCK_LLM`. `--audio file.wav` sends the clip to the intake model and prints the rules or the error.
+Prints OK/FAIL with detail for: intake model (`client.models.list()` with a 3 s timeout), reason model, Docker (`docker info`, and `docker image inspect gecompose-sandbox`), `MOCK_LLM`. `--audio file.wav` sends the clip to the intake model and prints the rules or the error.
 
 ### 11.4 `backend/reset_demo.py`
 Calls `api.reset_demo()`: clears DB tables and `data/uploads/`, keeps parser cache **only if** `--keep-parsers` is passed. (For the zero-token demo you want the parser cache empty before the first sheet.)
@@ -1046,8 +822,8 @@ Calls `api.reset_demo()`: clears DB tables and `data/uploads/`, keeps parser cac
 | `test_checker_catches` | hand-made schedule with a double-booked room reports a room clash; one with an unavailable teacher reports it |
 | `test_hash_stable` | same schedule hashes identically across runs; changing one placement changes the hash |
 | `test_validate_params` | unknown teacher, bad day, extra keys all raise |
-| Foundry `forge test` | owner approves; non-owner reverts; non-coordinator reverts; double register and double anchor revert |
-| `test_chain_integration` (needs Anvil) | register, approve, anchor, `is_anchored`; non-owner approve raises `ChainError` |
+| `test_consent_approval` | rule confirmation, relaxation approval authorization, non-owner reject, and apply restriction |
+| `test_publish_and_verify` | publish schedule, verify against registry returns True, tampered schedule returns False |
 | `test_sheet_cache` (MOCK + `SANDBOX_MODE=local`) | first sheet `cache_hit=False`; second sheet same layout `cache_hit=True`, `tokens_used=0` |
 
 ---
@@ -1059,7 +835,7 @@ Calls `api.reset_demo()`: clears DB tables and `data/uploads/`, keeps parser cac
 | 1 | `config`, `models`, `registry/db` | no |
 | 2 | solver, checker, tests 1 to 5 and 7 | no |
 | 3 | conflicts, options, minimal change | no |
-| 4 | contract, `forge test`, `deploy`, `chain/client`, hashing, chain tests | Foundry, Anvil |
+| 4 | consent ledger, hashing, consent tests | no |
 | 5 | `llm/client` + fixtures, `explain_conflict`, `api.py` with `MOCK_LLM=1` | no |
 | 6 | frontend skeleton running on mock data | no |
 | 7 | real Gemma: text intake, then audio, then image | llama-server |
@@ -1077,7 +853,7 @@ Calls `api.reset_demo()`: clears DB tables and `data/uploads/`, keeps parser cac
 | Gemma server down or slow | `MOCK_LLM=1`, restart Streamlit |
 | Audio not accepted | `AUDIO_MODE=transcript`, type the rule, or upload the pre-tested `rao_hindi.wav` |
 | Docker not running | `SANDBOX_MODE=local` with `MOCK_LLM=1` (fixture parser only) |
-| Anvil restarted | `python -m backend.chain.deploy` then `python -m backend.reset_demo`, then `seed_demo` |
+| Database reset needed | `python -m backend.reset_demo`, then `seed_demo` |
 | Solver slow | lower `SOLVER_TIME_S`; the demo roster is tiny so this should not happen |
 
 ---
@@ -1087,7 +863,7 @@ Calls `api.reset_demo()`: clears DB tables and `data/uploads/`, keeps parser cac
 - [ ] `python -m backend.healthcheck` shows OK for every item you are using.
 - [ ] Clash scenario runs end to end in `MOCK_LLM=1` and with the real model.
 - [ ] Checker returns no violations on every published schedule.
-- [ ] Non-owner approval reverts on-chain (Foundry test and shown in the UI).
+- [ ] Non-owner approval is rejected by consent authorization (shown in the UI).
 - [ ] Tampered schedule shows a mismatch in the verifier.
 - [ ] Second sheet with the same layout runs with `tokens_used=0`.
 - [ ] Scoreboard shows measured numbers.

@@ -3,7 +3,7 @@ from __future__ import annotations
 import csv, io
 from datetime import date,datetime,timedelta,timezone
 from backend import config
-from backend.chain.hashing import canonical,schedule_obj
+from backend.hashing import canonical,schedule_obj
 from backend.models import Roster,Schedule
 
 def json_bytes(schedule: Schedule) -> bytes: return canonical(schedule_obj(schedule)).encode("utf-8")

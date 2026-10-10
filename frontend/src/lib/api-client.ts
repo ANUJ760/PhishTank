@@ -1,0 +1,312 @@
+import {
+  AuditRecord,
+  ChainEvent,
+  DashboardSummary,
+  Explanation,
+  HealthReport,
+  HospitalComparison,
+  HospitalExplanation,
+  HospitalORPlan,
+  IngestSheetResult,
+  MedicalStaff,
+  MedOpsOverview,
+  OperatingRoom,
+  PatientCase,
+  PublishResult,
+  ReliefCamp,
+  ReliefComparison,
+  ReliefExplanation,
+  ReliefInventoryItem,
+  ReliefOverview,
+  ReliefPlan,
+  ReliefVehicle,
+  ReliefWarehouse,
+  Roster,
+  Rule,
+  Schedule,
+  ScoreboardResult,
+  SolveResult,
+  UniversalProblem,
+  UniversalSolution,
+  User,
+  VerifyResult,
+} from "@/types/api";
+
+
+const BASE_URL = "/api/v1";
+
+export class ApiError extends Error {
+  status: number;
+  data: any;
+
+  constructor(status: number, message: string, data?: any) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+    this.data = data;
+  }
+}
+
+async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const url = `${BASE_URL}${path}`;
+  const headers = new Headers(options.headers || {});
+
+  if (!(options.body instanceof FormData) && !headers.has("Content-Type") && options.body) {
+    headers.set("Content-Type", "application/json");
+  }
+
+  const res = await fetch(url, {
+    credentials: "include",
+    ...options,
+    headers,
+  });
+
+  if (res.status === 204) {
+    return {} as T;
+  }
+
+  let data: any = null;
+  const contentType = res.headers.get("content-type") || "";
+  if (contentType.includes("application/json")) {
+    try {
+      data = await res.json();
+    } catch {
+      data = null;
+    }
+  } else {
+    data = await res.text();
+  }
+
+  if (!res.ok) {
+    const message = (data && typeof data === "object" && data.detail) || res.statusText || `Request failed (${res.status})`;
+    throw new ApiError(res.status, message, data);
+  }
+
+  return data as T;
+}
+
+export const api = {
+  // Auth
+  auth: {
+    me: () => request<User>("/auth/me"),
+    signIn: (email: string, password: string) =>
+      request<User>("/auth/sign-in", {
+        method: "POST",
+        body: JSON.stringify({ email, password }),
+      }),
+    signUp: (name: string, email: string, password: string) =>
+      request<User>("/auth/sign-up", {
+        method: "POST",
+        body: JSON.stringify({ name, email, password }),
+      }),
+    signOut: () =>
+      request<void>("/auth/sign-out", {
+        method: "POST",
+      }),
+    forgotPassword: (email: string) =>
+      request<{ message: string }>("/auth/forgot-password", {
+        method: "POST",
+        body: JSON.stringify({ email }),
+      }),
+    resetPassword: (token: string, new_password: string) =>
+      request<void>("/auth/reset-password", {
+        method: "POST",
+        body: JSON.stringify({ token, new_password }),
+      }),
+  },
+
+  // Health & Summary
+  health: () => request<HealthReport>("/health"),
+  dashboardSummary: () => request<DashboardSummary>("/dashboard/summary"),
+
+  // Roster & Rules
+  roster: () => request<Roster>("/roster"),
+  rules: {
+    list: (status?: string) => request<Rule[]>(`/rules${status ? `?status=${status}` : ""}`),
+    edit: (id: string, params?: Record<string, any>, owner?: string) =>
+      request<Rule>(`/rules/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ params, owner }),
+      }),
+    confirm: (id: string) =>
+      request<Rule>(`/rules/${id}/confirm`, {
+        method: "POST",
+      }),
+    reject: (id: string) =>
+      request<Rule>(`/rules/${id}/reject`, {
+        method: "POST",
+      }),
+  },
+
+  // Intake
+  intake: {
+    text: (text: string) =>
+      request<Rule[]>("/intake/text", {
+        method: "POST",
+        body: JSON.stringify({ text }),
+      }),
+    audio: (file: File) => {
+      const fd = new FormData();
+      fd.append("file", file);
+      return request<Rule[]>("/intake/audio", {
+        method: "POST",
+        body: fd,
+      });
+    },
+    image: (file: File) => {
+      const fd = new FormData();
+      fd.append("file", file);
+      return request<Rule[]>("/intake/image", {
+        method: "POST",
+        body: fd,
+      });
+    },
+    sheet: (file: File) => {
+      const fd = new FormData();
+      fd.append("file", file);
+      return request<IngestSheetResult>("/intake/sheet", {
+        method: "POST",
+        body: fd,
+      });
+    },
+  },
+
+  // Scheduling
+  solve: (minimal_change: boolean = true) =>
+    request<SolveResult>("/solve", {
+      method: "POST",
+      body: JSON.stringify({ minimal_change }),
+    }),
+  schedules: {
+    latest: () => request<Schedule>("/schedules/latest"),
+    pending: () => request<Schedule>("/schedules/pending"),
+    whyCell: (sessionId: string) => request<Rule[]>(`/schedule/why/${sessionId}`),
+  },
+
+  // Conflict Resolution
+  conflicts: {
+    explain: (conflict: any) =>
+      request<Explanation>("/conflicts/explain", {
+        method: "POST",
+        body: JSON.stringify({ conflict }),
+      }),
+    approve: (optionId: string, as_user: string) =>
+      request<{ ok: boolean; tx_hash?: string; error?: string }>(`/options/${optionId}/approve`, {
+        method: "POST",
+        body: JSON.stringify({ as_user }),
+      }),
+    apply: (optionId: string) =>
+      request<Rule>(`/options/${optionId}/apply`, {
+        method: "POST",
+      }),
+  },
+
+  // Publish & Verify
+  publish: () =>
+    request<PublishResult>("/publish", {
+      method: "POST",
+    }),
+  verify: (file?: File, rawJson?: string) => {
+    if (file) {
+      const fd = new FormData();
+      fd.append("file", file);
+      return request<VerifyResult>("/verify", {
+        method: "POST",
+        body: fd,
+      });
+    }
+    return request<VerifyResult>(`/verify?raw_json=${encodeURIComponent(rawJson || "")}`, {
+      method: "POST",
+    });
+  },
+
+  // Scoreboard & Chain
+  scoreboard: (runs: number = 5) =>
+    request<ScoreboardResult>("/scoreboard", {
+      method: "POST",
+      body: JSON.stringify({ runs }),
+    }),
+  chainEvents: () => request<{ events: ChainEvent[] }>("/chain/events"),
+
+  // ReliefOps Disaster Operations
+  reliefops: {
+    overview: () => request<ReliefOverview>("/reliefops/overview"),
+    camps: () => request<ReliefCamp[]>("/reliefops/camps"),
+    inventory: () => request<ReliefInventoryItem[]>("/reliefops/inventory"),
+    warehouses: () => request<ReliefWarehouse[]>("/reliefops/warehouses"),
+    vehicles: () => request<ReliefVehicle[]>("/reliefops/vehicles"),
+    requests: () => request<any[]>("/reliefops/requests"),
+    optimize: (scenario_name: string = "Optimal Supply Allocation") =>
+      request<ReliefPlan>("/reliefops/optimize", {
+        method: "POST",
+        body: JSON.stringify({ scenario_name }),
+      }),
+    latestPlan: () => request<ReliefPlan>("/reliefops/plan/latest"),
+    getPlan: (id: string) => request<ReliefPlan>(`/reliefops/plan/${id}`),
+    simulate: (delta: any, scenario_name?: string) =>
+      request<{ simulation_plan: ReliefPlan; comparison: ReliefComparison }>("/reliefops/simulate", {
+        method: "POST",
+        body: JSON.stringify({ delta, scenario_name }),
+      }),
+    explain: (plan_id?: string) =>
+      request<ReliefExplanation>("/reliefops/explain", {
+        method: "POST",
+        body: JSON.stringify({ plan_id }),
+      }),
+    approve: (plan_id: string, approved_by: string, notes?: string) =>
+      request<AuditRecord>("/reliefops/approve", {
+        method: "POST",
+        body: JSON.stringify({ plan_id, approved_by, notes }),
+      }),
+    audit: () => request<{ verified: boolean; message: string; records: AuditRecord[] }>("/reliefops/audit"),
+    seed: () => request<{ ok: boolean; message: string }>("/reliefops/demo/seed", { method: "POST" }),
+  },
+
+  // MedOps Hospital Emergency Surgical Theatres
+  medops: {
+    overview: () => request<MedOpsOverview>("/medops/overview"),
+    rooms: () => request<OperatingRoom[]>("/medops/rooms"),
+    staff: () => request<MedicalStaff[]>("/medops/staff"),
+    cases: () => request<PatientCase[]>("/medops/cases"),
+    optimize: (plan_id?: string) =>
+      request<HospitalORPlan>("/medops/optimize", {
+        method: "POST",
+        body: JSON.stringify({ plan_id }),
+      }),
+    latestPlan: () => request<HospitalORPlan>("/medops/plan/latest"),
+    getPlan: (id: string) => request<HospitalORPlan>(`/medops/plan/${id}`),
+    simulate: (delta: any) =>
+      request<{ simulation_plan: HospitalORPlan; comparison: HospitalComparison }>("/medops/simulate", {
+        method: "POST",
+        body: JSON.stringify({ delta }),
+      }),
+    explain: (plan_id?: string) =>
+      request<HospitalExplanation>("/medops/explain", {
+        method: "POST",
+        body: JSON.stringify({ plan_id }),
+      }),
+    approve: (plan_id: string, approved_by: string, notes?: string) =>
+      request<AuditRecord>("/medops/approve", {
+        method: "POST",
+        body: JSON.stringify({ plan_id, approved_by, notes }),
+      }),
+    audit: () => request<{ verified: boolean; message: string; records: AuditRecord[] }>("/medops/audit"),
+    seed: () => request<{ ok: boolean; message: string }>("/medops/demo/seed", { method: "POST" }),
+  },
+
+  // Universal Global Constraint Solver
+  universal: {
+    solve: (problem: UniversalProblem) =>
+      request<UniversalSolution>("/universal/solve", {
+        method: "POST",
+        body: JSON.stringify({ problem }),
+      }),
+  },
+
+  // Demo management
+  demo: {
+    seed: () => request<{ ok: boolean; message: string }>("/demo/seed", { method: "POST" }),
+    reset: () => request<{ ok: boolean; message: string }>("/demo/reset", { method: "POST" }),
+  },
+};
+
