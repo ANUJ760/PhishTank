@@ -128,24 +128,6 @@ async def get_rules(status: str | None = None):
         return JSONResponse({"error": str(exc)}, status_code=500)
 
 
-@app.post("/intake/dump")
-async def post_intake_dump(request: Request):
-    try:
-        form = await request.form()
-        instructions = form.get("instructions", "")
-        notes = form.get("notes", "")
-        files_list = form.getlist("files")
-        file_payloads = []
-        for item in files_list:
-            if hasattr(item, "read"):
-                content = await item.read()
-                filename = getattr(item, "filename", "dump_file")
-                file_payloads.append((filename, content))
-        res = api.ingest_dump(file_payloads, instructions=str(instructions), notes=str(notes))
-        return JSONResponse(res.model_dump())
-    except Exception as exc:
-        return JSONResponse({"error": str(exc)}, status_code=400)
-
 
 @app.post("/rules", status_code=201)
 async def post_rule(rule_data: dict):

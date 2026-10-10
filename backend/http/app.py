@@ -30,6 +30,7 @@ from backend.http.auth import (
     create_user,
     delete_session,
     get_user_by_email,
+    get_user_or_demo,
     require_coordinator,
     require_user,
     seed_demo_users,
@@ -346,11 +347,12 @@ async def intake_sheet(
 
 
 @app.post("/api/v1/intake/dump")
+@app.post("/intake/dump")
 async def intake_data_dump(
     files: list[UploadFile] = File(default=[]),
     instructions: str = Form(default=""),
     notes: str = Form(default=""),
-    user: UserResponse = Depends(require_user),
+    user: UserResponse = Depends(get_user_or_demo),
 ):
     try:
         file_payloads: list[tuple[str, bytes]] = []
