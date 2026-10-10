@@ -88,6 +88,14 @@ async def index():
                 <li><code>POST /api/v1/reliefops/simulate</code> - What-If counterfactual simulation</li>
                 <li><code>POST /api/v1/reliefops/explain</code> - Gemma 12B plan rationale</li>
                 <li><a href="/api/v1/reliefops/audit"><code>GET /api/v1/reliefops/audit</code></a> - SHA-256 audit ledger</li>
+                <li><a href="/api/v1/medops/overview"><code>GET /api/v1/medops/overview</code></a> - MedOps hospital surgical status</li>
+                <li><a href="/api/v1/medops/rooms"><code>GET /api/v1/medops/rooms</code></a> - Operating theatre suites</li>
+                <li><a href="/api/v1/medops/cases"><code>GET /api/v1/medops/cases</code></a> - Emergency surgical triage cases</li>
+                <li><code>POST /api/v1/medops/optimize</code> - CP-SAT surgical master schedule</li>
+                <li><code>POST /api/v1/medops/simulate</code> - Mass-casualty surge simulation</li>
+                <li><code>POST /api/v1/medops/explain</code> - Gemma 12B clinical operational explanation</li>
+                <li><a href="/api/v1/medops/audit"><code>GET /api/v1/medops/audit</code></a> - Surgical audit ledger</li>
+                <li><code>POST /api/v1/universal/solve</code> - Domain-agnostic global constraint solver</li>
             </ul>
         </div>
     </body>

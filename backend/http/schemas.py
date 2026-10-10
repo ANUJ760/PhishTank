@@ -84,3 +84,35 @@ class ReliefDispatchIntakeRequest(BaseModel):
 class ReliefExplainRequest(BaseModel):
     plan_id: str | None = None
 
+
+# -------------------------------------------------------------------------
+# MedOps & Universal Solver Request Schemas
+# -------------------------------------------------------------------------
+
+class UniversalSolveRequest(BaseModel):
+    problem: dict
+
+
+class MedOpsOptimizeRequest(BaseModel):
+    plan_id: str | None = None
+
+
+class MedOpsSimulateRequest(BaseModel):
+    delta: dict = Field(default_factory=dict)
+    scenario_id: str | None = None
+
+
+class MedOpsApproveRequest(BaseModel):
+    plan_id: str
+    approved_by: str
+    notes: str = "Chief of Surgery sign-off"
+
+
+class MedOpsDispatchIntakeRequest(BaseModel):
+    text: str = Field(..., min_length=5)
+
+
+class MedOpsExplainRequest(BaseModel):
+    plan_id: str | None = None
+
+

@@ -601,6 +601,80 @@ flowchart TD
 
 ---
 
+## 9. Universal Global Constraint Solver Engine (`backend.universal`)
+
+GeCompose provides a domain-agnostic global constraint satisfaction and discrete optimization engine capable of solving multi-resource, time-windowed operations across healthcare, logistics, manufacturing, and university schedules:
+
+- **Generalized Resource Abstractions**: Models spatial assets (`ResourceKind.SPACE`), human specialists (`ResourceKind.HUMAN`), machinery (`ResourceKind.EQUIPMENT`), and consumables (`ResourceKind.INVENTORY`).
+- **Flexible Invariants**: Enforces capabilities matching, mandatory setup/turnaround windows, non-overlap groups, precedence task chains, and clinical/operational deadlines.
+- **CP-SAT Core**: Formulates optimal schedules using Google OR-Tools CP-SAT interval variables and multi-criteria lexicographic objective functions.
+
+---
+
+## 10. GeCompose MedOps — Hospital Emergency Surgical Theatre Optimizer (`backend.medops`)
+
+**GeCompose MedOps** provides clinical operations intelligence and mathematical optimization for Hospital Emergency Departments and Surgical Operating Room Suites during mass-casualty events and everyday surgical emergencies.
+
+### Core Workflow
+
+```mermaid
+flowchart TD
+    A["Emergency Dispatches & EHR Waitlists\n(Paramedic Radio, CSV)"] --> B["Hospital Intake Service\n(Gemma 4B Clinical Triage Extraction)"]
+    B --> C["MedOps Surgical Registry\n(OR Suites, Surgeons, Anesthesiologists, ICU Beds)"]
+    C --> D["Surgical Theatre Optimizer\n(Google OR-Tools CP-SAT)"]
+    D --> E["Independent Clinical Validator\n(Sterility Turnaround & Team Non-Overlap)"]
+    E --> F["Clinical Explanation Service\n(Gemma 12B Triage Prioritization & Bottlenecks)"]
+    E --> G["Surgical Audit Ledger\n(Cryptographic SHA-256 Chain)"]
+    C --> H["What-If Surge Simulator\n(Mass-Casualty Incident & OR Closure)"]
+    H --> D
+```
+
+### Key Modules
+
+1. **Surgical Theatre CP-SAT Optimizer (`backend.medops.optimizer`)**:
+   - Enforces strict Operating Room non-overlap separated by mandatory sterilization decontamination windows (30-45 mins).
+   - Prevents clinical team double-booking (lead surgeons, anesthesiologists, and scrub nurses).
+   - Matches surgical specialties (Trauma, Cardiac, Neurosurgery, Orthopedics) and specialized OR equipment (cardiopulmonary bypass, fluoroscopy C-arm, rapid infuser).
+   - Prioritizes triage urgency: **ESI Level 1 Resuscitation** (immediate life-threat) > **ESI Level 2 Emergent** (< 60m) > **ESI Level 3 Urgent** > **ESI Level 4 Elective** (safely deferred when capacity is saturated).
+
+2. **Independent Clinical Validator (`backend.medops.validator`)**:
+   - Guarantees zero room double-booking, verifies sterilization clearance windows, checks surgeon credentials, and prevents patient arrival-time paradoxes.
+
+3. **Mass-Casualty Surge Simulator (`backend.medops.simulator`)**:
+   - Evaluates counterfactuals (e.g. mass-casualty multi-trauma arrivals, contaminated OR closures, surgeon diversions) without mutating live active theatre boards.
+   - Computes side-by-side metrics: wait-to-incision diff, displaced elective cases, and emergency fulfillment.
+
+4. **Gemma 12B Clinical Operational Explainer (`backend.medops.explainer`)**:
+   - Explains clinical trade-offs to the Chief Medical Officer, identifying ICU bottlenecks and articulating why elective surgeries were deferred.
+
+5. **Paramedic Radio & EHR Intake (`backend.medops.intake`)**:
+   - Ingests tabular CSV waitlists and parses unstructured paramedic ambulance dispatches with **Gemma 4B**.
+
+6. **Cryptographic Surgical Ledger (`backend.medops.audit`)**:
+   - Records surgical master schedules, emergency bumps, validations, and Chief of Surgery approvals in a tamper-evident SHA-256 chain.
+
+### MedOps REST API Endpoints
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `POST` | `/api/v1/universal/solve` | Universal domain-agnostic CP-SAT constraint solver |
+| `GET` | `/api/v1/medops/overview` | Active surgical theatre operational status and metrics |
+| `GET` | `/api/v1/medops/rooms` | Operating theatre suites and equipped capabilities |
+| `GET` | `/api/v1/medops/staff` | Active surgical teams, credentials, and duty status |
+| `GET` | `/api/v1/medops/cases` | Pending emergency triage and scheduled surgical cases |
+| `POST` | `/api/v1/medops/intake/csv` | Ingest surgical waitlist via CSV upload |
+| `POST` | `/api/v1/medops/intake/dispatch` | Ingest paramedic emergency radio dispatches using Gemma 4B |
+| `POST` | `/api/v1/medops/optimize` | Run Google OR-Tools CP-SAT surgical master schedule |
+| `GET` | `/api/v1/medops/plan/latest` | Retrieve latest verified surgical theatre master plan |
+| `POST` | `/api/v1/medops/simulate` | Run mass-casualty surge or OR biohazard closure simulation |
+| `POST` | `/api/v1/medops/explain` | Generate Gemma 12B clinical operations explanation |
+| `POST` | `/api/v1/medops/approve` | Authorize surgical plan with Chief of Surgery cryptographic sign-off |
+| `GET` | `/api/v1/medops/audit` | Retrieve verified surgical SHA-256 audit ledger |
+| `POST` | `/api/v1/medops/demo/seed` | Reset operational state to Level-1 Trauma Hospital benchmark |
+
+
+---
+
 
 ### Project and Team Details
 

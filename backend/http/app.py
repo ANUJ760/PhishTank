@@ -40,6 +40,11 @@ from backend.http.schemas import (
     EditRuleRequest,
     ExplainConflictRequest,
     ForgotPasswordRequest,
+    MedOpsApproveRequest,
+    MedOpsDispatchIntakeRequest,
+    MedOpsExplainRequest,
+    MedOpsOptimizeRequest,
+    MedOpsSimulateRequest,
     ReliefApproveRequest,
     ReliefDispatchIntakeRequest,
     ReliefExplainRequest,
@@ -49,9 +54,22 @@ from backend.http.schemas import (
     ScoreboardRequest,
     SolveRequest,
     TextIntakeRequest,
+    UniversalSolveRequest,
     UserResponse,
     UserSignInRequest,
     UserSignUpRequest,
+)
+from backend.universal import (
+    UniversalConstraintSolver,
+    UniversalProblem,
+    UniversalResource,
+    UniversalTask,
+)
+from backend.medops import (
+    HospitalORPlan,
+    PatientCase,
+    WhatIfHospitalDelta,
+    get_medops_service,
 )
 from backend.reliefops import (
     AllocationPlan,
@@ -64,6 +82,7 @@ from backend.reliefops import (
     get_reliefops_service,
     validate_allocation_plan,
 )
+
 
 
 
@@ -636,4 +655,146 @@ async def reliefops_demo_seed():
     srv = get_reliefops_service()
     await run_in_threadpool(srv.registry.seed_cyclone_disaster_demo)
     return {"ok": True, "message": "Disaster relief demo environment seeded"}
+
+
+# =========================================================================
+# Universal Global Constraint Solver Endpoints
+# =========================================================================
+
+@app.post("/api/v1/universal/solve")
+async def universal_solve(body: UniversalSolveRequest):
+    try:
+        problem = UniversalProblem.model_validate(body.problem)
+        solver = UniversalConstraintSolver()
+        solution = await run_in_threadpool(solver.solve, problem)
+        return solution.model_dump()
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+# =========================================================================
+# GeCompose MedOps — Hospital Emergency Surgical Theatre Endpoints
+# =========================================================================
+
+@app.get("/api/v1/medops/overview")
+async def medops_overview():
+    srv = get_medops_service()
+    return await run_in_threadpool(srv.get_overview)
+
+
+@app.get("/api/v1/medops/rooms")
+async def medops_list_rooms():
+    srv = get_medops_service()
+    rooms = await run_in_threadpool(srv.registry.get_rooms)
+    return [r.model_dump() for r in rooms]
+
+
+@app.get("/api/v1/medops/staff")
+async def medops_list_staff():
+    srv = get_medops_service()
+    staff = await run_in_threadpool(srv.registry.get_staff)
+    return [s.model_dump() for s in staff]
+
+
+@app.get("/api/v1/medops/cases")
+async def medops_list_cases():
+    srv = get_medops_service()
+    cases = await run_in_threadpool(srv.registry.get_cases)
+    return [c.model_dump() for c in cases]
+
+
+@app.post("/api/v1/medops/intake/csv")
+async def medops_intake_csv(file: UploadFile = File(...)):
+    content = await file.read()
+    srv = get_medops_service()
+    cases = await run_in_threadpool(srv.intake_csv, content)
+    return [c.model_dump() for c in cases]
+
+
+@app.post("/api/v1/medops/intake/dispatch")
+async def medops_intake_dispatch(body: MedOpsDispatchIntakeRequest):
+    srv = get_medops_service()
+    cases = await run_in_threadpool(srv.intake_dispatch, body.text)
+    return [c.model_dump() for c in cases]
+
+
+@app.post("/api/v1/medops/optimize")
+async def medops_optimize(body: MedOpsOptimizeRequest | None = None):
+    plan_id = body.plan_id if body else None
+    srv = get_medops_service()
+    plan = await run_in_threadpool(srv.optimize_schedule, plan_id)
+    return plan.model_dump()
+
+
+@app.get("/api/v1/medops/plan/latest")
+async def medops_latest_plan():
+    srv = get_medops_service()
+    plan = await run_in_threadpool(srv.registry.get_latest_plan)
+    if not plan:
+        raise HTTPException(status_code=404, detail="No surgical master plan generated yet")
+    return plan.model_dump()
+
+
+@app.get("/api/v1/medops/plan/{plan_id}")
+async def medops_get_plan(plan_id: str):
+    srv = get_medops_service()
+    plan = await run_in_threadpool(srv.registry.get_plan, plan_id)
+    if not plan:
+        raise HTTPException(status_code=404, detail=f"Hospital plan '{plan_id}' not found")
+    return plan.model_dump()
+
+
+@app.post("/api/v1/medops/simulate")
+async def medops_simulate(body: MedOpsSimulateRequest):
+    srv = get_medops_service()
+    delta = WhatIfHospitalDelta.model_validate(body.delta)
+    sim_plan, comparison = await run_in_threadpool(
+        srv.run_simulation, delta, body.scenario_id
+    )
+    return {
+        "simulation_plan": sim_plan.model_dump(),
+        "comparison": comparison.model_dump(),
+    }
+
+
+@app.post("/api/v1/medops/explain")
+async def medops_explain(body: MedOpsExplainRequest | None = None):
+    plan_id = body.plan_id if body else None
+    srv = get_medops_service()
+    explanation = await run_in_threadpool(srv.explain_schedule, plan_id)
+    return explanation.model_dump()
+
+
+@app.post("/api/v1/medops/approve")
+async def medops_approve(body: MedOpsApproveRequest):
+    srv = get_medops_service()
+    try:
+        record = await run_in_threadpool(
+            srv.approve_schedule, body.plan_id, body.approved_by, body.notes
+        )
+        return record.model_dump()
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.get("/api/v1/medops/audit")
+async def medops_audit(plan_id: Optional[str] = Query(None)):
+    srv = get_medops_service()
+    records = await run_in_threadpool(srv.audit.get_records, plan_id)
+    is_valid, msg = await run_in_threadpool(srv.audit.verify_chain_integrity)
+    return {
+        "verified": is_valid,
+        "message": msg,
+        "records": [r.model_dump() for r in records],
+    }
+
+
+@app.post("/api/v1/medops/demo/seed")
+async def medops_demo_seed():
+    srv = get_medops_service()
+    await run_in_threadpool(srv.registry.seed_level1_trauma_benchmark)
+    return {"ok": True, "message": "Level-1 Trauma hospital surgical demo environment seeded"}
+
 
