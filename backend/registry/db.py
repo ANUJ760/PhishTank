@@ -164,6 +164,7 @@ def _connect() -> Iterator:
     if pool is not None:
         try:
             with pool.connection() as connection:
+                connection.autocommit = True
                 yield connection
         except Exception as exc:
             raise RuntimeError(f"PostgreSQL connection error: {exc}") from exc
@@ -222,8 +223,12 @@ def init_db() -> None:
     pool = _get_pool()
     if pool is not None:
         with pool.connection() as connection:
+            connection.autocommit = True
             for statement in statements:
-                connection.execute(statement)
+                try:
+                    connection.execute(statement)
+                except Exception:
+                    pass
             for col_stmt in (
                 "ALTER TABLE audit_events ADD COLUMN prev_hash TEXT DEFAULT '0000000000000000000000000000000000000000000000000000000000000000'",
                 "ALTER TABLE audit_events ADD COLUMN entry_hash TEXT DEFAULT ''",
