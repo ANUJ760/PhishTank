@@ -125,7 +125,26 @@ export interface ChainEvent {
   event: string;
   block: number;
   idx: number;
+  seq?: number;
+  timestamp?: string;
+  entity_id?: string;
+  actor?: string;
+  payload?: Record<string, any>;
   args: Record<string, any>;
+  prev_hash?: string;
+  entry_hash?: string;
+}
+
+export type LedgerEvent = ChainEvent;
+
+export interface LedgerVerifyResult {
+  valid: boolean;
+  total_entries: number;
+  checked_entries?: number;
+  latest_hash?: string;
+  failed_at_seq?: number;
+  reason?: string;
+  message: string;
 }
 
 export interface HealthItem {

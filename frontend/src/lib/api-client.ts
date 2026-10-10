@@ -8,6 +8,7 @@ import {
   HospitalExplanation,
   HospitalORPlan,
   IngestSheetResult,
+  LedgerVerifyResult,
   MedicalStaff,
   MedOpsOverview,
   OperatingRoom,
@@ -220,13 +221,23 @@ export const api = {
     });
   },
 
-  // Scoreboard & Chain
+  // Scoreboard & Ledger
   scoreboard: (runs: number = 5) =>
     request<ScoreboardResult>("/scoreboard", {
       method: "POST",
       body: JSON.stringify({ runs }),
     }),
-  chainEvents: () => request<{ events: ChainEvent[] }>("/chain/events"),
+  chainEvents: () => request<{ events: ChainEvent[] }>("/ledger/events"),
+  ledger: {
+    events: (event?: string, limit?: number) => {
+      const q = new URLSearchParams();
+      if (event) q.set("event", event);
+      if (limit) q.set("limit", String(limit));
+      const qs = q.toString();
+      return request<{ events: ChainEvent[] }>(`/ledger/events${qs ? `?${qs}` : ""}`);
+    },
+    verify: () => request<LedgerVerifyResult>("/ledger/verify"),
+  },
 
   // ReliefOps Disaster Operations
   reliefops: {

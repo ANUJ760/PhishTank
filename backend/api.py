@@ -151,8 +151,14 @@ def verify_file(data:bytes)->VerifyResult:
 def run_scoreboard(runs:int=5)->ScoreboardResult:
     from backend.scoreboard import run
     return run(runs)
-def chain_events()->list[dict]:return db.list_audit_events()
-def audit_events()->list[dict]:return db.list_audit_events()
+def ledger_events(event_filter: str | None = None, limit: int = 200) -> list[dict]:
+    from backend.ledger import ledger
+    return ledger.get_entries(event_filter=event_filter, limit=limit)
+def verify_ledger() -> dict:
+    from backend.ledger import ledger
+    return ledger.verify_integrity()
+def chain_events() -> list[dict]: return ledger_events()
+def audit_events() -> list[dict]: return ledger_events()
 def seed_demo()->None:
     from backend.samples import DEMO_ROSTER
     reset_demo();roster=Roster.model_validate(DEMO_ROSTER);db.save_roster(roster)

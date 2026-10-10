@@ -195,7 +195,7 @@ export function ConflictsPage() {
                   <div className="flex items-center justify-between pt-2 border-t border-white/5">
                     <div className="flex items-center gap-1.5 text-[11px] text-zinc-400">
                       <Lock size={12} className="text-zinc-500" />
-                      <span>Requires on-chain approval</span>
+                      <span>Requires verified approval</span>
                     </div>
 
                     <Link to="/app/approvals">

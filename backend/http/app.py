@@ -224,6 +224,8 @@ async def dashboard_summary(user: UserResponse = Depends(require_user)):
     except Exception:
         pass
 
+    latest_schedule_hash = hashing.hexs(hashing.schedule_hash(latest)) if latest else None
+
     return DashboardSummaryResponse(
         confirmed_rules_count=confirmed_count,
         draft_rules_count=draft_count,
@@ -231,7 +233,7 @@ async def dashboard_summary(user: UserResponse = Depends(require_user)):
         conflict_rule_ids=conflict_ids,
         scheduled_sessions_count=len(active_sched.placements) if active_sched else 0,
         published_version=latest.version if latest else None,
-        latest_schedule_hash=h.items.get("contract", {}).get("detail") if latest else None,
+        latest_schedule_hash=latest_schedule_hash,
         system_healthy=healthy,
     )
 
@@ -452,11 +454,25 @@ async def scoreboard(
     return res.model_dump()
 
 
+@app.get("/api/v1/ledger/events")
 @app.get("/api/v1/chain/events")
-async def chain_events(user: UserResponse = Depends(require_user)):
+async def ledger_events(
+    event: Optional[str] = Query(None),
+    limit: int = Query(200),
+    user: UserResponse = Depends(require_user),
+):
     try:
-        events = await run_in_threadpool(api.chain_events)
+        events = await run_in_threadpool(api.ledger_events, event, limit)
         return {"events": events}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/v1/ledger/verify")
+async def ledger_verify(user: UserResponse = Depends(require_user)):
+    try:
+        result = await run_in_threadpool(api.verify_ledger)
+        return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

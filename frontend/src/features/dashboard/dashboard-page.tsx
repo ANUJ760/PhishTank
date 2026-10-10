@@ -169,7 +169,7 @@ export function DashboardPage() {
             sub: schedule?.placements ? "active" : "none loaded",
           },
           {
-            label: "Chain Events",
+            label: "Audit Events",
             value: eventsData?.events?.length ?? "—",
             sub: "audit entries",
           },
@@ -250,12 +250,12 @@ export function DashboardPage() {
           )}
         </div>
 
-        {/* ConsentLedger Audit */}
+        {/* Cryptographic Audit Ledger */}
         <div className="glass-box p-5 space-y-4">
           <div className="flex items-center justify-between border-b border-white/[0.06] pb-3">
             <div>
-              <h3 className="text-sm font-semibold text-white">ConsentLedger</h3>
-              <p className="text-[12px] text-zinc-500 mt-0.5">Audit trail</p>
+              <h3 className="text-sm font-semibold text-white">Audit Ledger</h3>
+              <p className="text-[12px] text-zinc-500 mt-0.5">Tamper-proof log</p>
             </div>
             <Link to="/app/chain-log">
               <button className="h-7 px-3 rounded-md bg-white/[0.04] border border-white/[0.08] text-[12px] text-zinc-400 hover:text-white hover:bg-white/[0.08] hover:border-white/15 transition-all duration-200 flex items-center gap-1.5">
@@ -268,7 +268,7 @@ export function DashboardPage() {
           <div className="space-y-2">
             {recentEvents.length === 0 ? (
               <div className="py-10 text-center text-[13px] text-zinc-600">
-                No on-chain events recorded yet.
+                No audit events recorded yet.
               </div>
             ) : (
               recentEvents.map((ev, i) => (
@@ -278,7 +278,7 @@ export function DashboardPage() {
                 >
                   <div className="flex items-center justify-between">
                     <span className="font-medium text-zinc-200 text-[12px]">{ev.event}</span>
-                    <span className="font-mono text-[10px] text-zinc-600">Block #{ev.block}</span>
+                    <span className="font-mono text-[10px] text-zinc-600">Seq #{ev.seq || ev.block}</span>
                   </div>
                   {ev.args?.rule_id && (
                     <div className="text-[11px] text-zinc-500 flex items-center gap-1.5">

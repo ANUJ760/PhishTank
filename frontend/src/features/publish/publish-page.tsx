@@ -97,7 +97,7 @@ export function PublishPage() {
       <div>
         <h2 className="text-xl font-bold tracking-tight text-white">Schedule Publication & Proof Portal</h2>
         <p className="text-xs text-zinc-400 mt-0.5">
-          Immutable on-chain anchoring, cryptographic receipt generation, multi-format export, and zero-knowledge verification.
+          Cryptographic ledger anchoring, tamper-proof receipt generation, multi-format export, and zero-knowledge verification.
         </p>
       </div>
 
@@ -226,7 +226,7 @@ export function PublishPage() {
             {tamperDemoResult && (
               <div className="p-3 rounded-md border border-white/5 bg-white/[0.02] text-xs space-y-1">
                 <div className="flex items-center gap-1.5 text-zinc-300">
-                  <span>&bull; Original Schedule Hash matches on-chain: <strong>Yes</strong></span>
+                  <span>&bull; Original Schedule Hash matches audit ledger: <strong>Yes</strong></span>
                 </div>
                 <div className="flex items-center gap-1.5 text-zinc-300">
                   <span>&bull; Tampered 1-Slot Modification rejected: <strong>Yes</strong></span>

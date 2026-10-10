@@ -246,9 +246,18 @@ async def post_verify(request: Request):
 
 
 @app.get("/events")
-async def get_events():
+@app.get("/ledger/events")
+async def get_events(event: str | None = None, limit: int = 200):
     try:
-        return JSONResponse({"events": api.chain_events()})
+        return JSONResponse({"events": api.ledger_events(event, limit)})
+    except Exception as exc:
+        return JSONResponse({"error": str(exc)}, status_code=500)
+
+
+@app.get("/ledger/verify")
+async def verify_ledger():
+    try:
+        return JSONResponse(api.verify_ledger())
     except Exception as exc:
         return JSONResponse({"error": str(exc)}, status_code=500)
 

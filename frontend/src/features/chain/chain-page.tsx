@@ -15,12 +15,14 @@ import {
 } from "lucide-react";
 import { api } from "@/lib/api-client";
 import { toast } from "sonner";
-import { ChainEvent } from "@/types/api";
+import { ChainEvent, LedgerVerifyResult } from "@/types/api";
 
 export function ChainPage() {
   const [filterType, setFilterType] = useState<string>("ALL");
   const [expandedIndices, setExpandedIndices] = useState<Record<number, boolean>>({});
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const [verifyResult, setVerifyResult] = useState<LedgerVerifyResult | null>(null);
+  const [isVerifying, setIsVerifying] = useState(false);
 
   const {
     data: chainData,
@@ -29,9 +31,26 @@ export function ChainPage() {
     refetch,
   } = useQuery({
     queryKey: ["chain-events"],
-    queryFn: api.chainEvents,
+    queryFn: () => api.ledger.events(),
     refetchInterval: 15000,
   });
+
+  const handleVerifyIntegrity = async () => {
+    setIsVerifying(true);
+    try {
+      const res = await api.ledger.verify();
+      setVerifyResult(res);
+      if (res.valid) {
+        toast.success(`Ledger Integrity Intact (${res.total_entries} entries verified)`);
+      } else {
+        toast.error(`Tampering detected: ${res.reason || res.message}`);
+      }
+    } catch (e: any) {
+      toast.error(`Verification error: ${e.message || "Failed to verify ledger"}`);
+    } finally {
+      setIsVerifying(false);
+    }
+  };
 
   const events: ChainEvent[] = chainData?.events || [];
 
@@ -70,15 +89,46 @@ export function ChainPage() {
           </p>
         </div>
 
-        <button
-          onClick={() => refetch()}
-          disabled={isLoading || isRefetching}
-          className="h-8 px-4 rounded-md bg-zinc-900 border border-white/10 text-zinc-300 hover:text-white font-medium text-xs transition-all flex items-center gap-1.5 self-start sm:self-auto"
-        >
-          <RefreshCw className={`w-3.5 h-3.5 ${isRefetching ? "animate-spin" : ""}`} />
-          <span>Refresh Log</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleVerifyIntegrity}
+            disabled={isVerifying}
+            className="h-8 px-4 rounded-md bg-white text-zinc-950 hover:bg-zinc-200 font-medium text-xs transition-all flex items-center gap-1.5 self-start sm:self-auto shadow-sm active:scale-[0.98] disabled:opacity-50"
+          >
+            <ShieldCheck className={`w-3.5 h-3.5 ${isVerifying ? "animate-spin" : ""}`} />
+            <span>Verify Integrity</span>
+          </button>
+
+          <button
+            onClick={() => refetch()}
+            disabled={isLoading || isRefetching}
+            className="h-8 px-4 rounded-md bg-zinc-900 border border-white/10 text-zinc-300 hover:text-white font-medium text-xs transition-all flex items-center gap-1.5 self-start sm:self-auto"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${isRefetching ? "animate-spin" : ""}`} />
+            <span>Refresh Log</span>
+          </button>
+        </div>
       </div>
+
+      {verifyResult && (
+        <div
+          className={`p-4 rounded-lg border text-xs leading-relaxed flex items-center justify-between ${
+            verifyResult.valid
+              ? "border-emerald-500/30 bg-emerald-950/20 text-emerald-300"
+              : "border-rose-500/30 bg-rose-950/20 text-rose-300"
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="w-4 h-4 shrink-0" />
+            <span>{verifyResult.message}</span>
+          </div>
+          {verifyResult.latest_hash && (
+            <span className="font-mono text-[10px] opacity-75 hidden sm:inline">
+              Latest SHA-256: {verifyResult.latest_hash.slice(0, 16)}...
+            </span>
+          )}
+        </div>
+      )}
 
       {/* Info notice in glass box */}
       <div className="p-4 rounded-lg border border-white/10 bg-zinc-900/80 backdrop-blur-xl text-xs text-zinc-400 leading-relaxed flex items-start gap-3">
@@ -155,11 +205,17 @@ export function ChainPage() {
                         {ev.event}
                       </span>
                       <span className="font-mono text-xs px-2 py-0.5 rounded-md bg-white/[0.04] text-zinc-400 border border-white/5">
-                        Block #{ev.block}
+                        Seq #{ev.seq ?? ev.block}
                       </span>
-                      <span className="font-mono text-xs text-zinc-500">
-                        LogIdx #{ev.idx}
-                      </span>
+                      {ev.entry_hash ? (
+                        <span className="font-mono text-xs text-zinc-500">
+                          Hash: {ev.entry_hash.slice(0, 10)}...
+                        </span>
+                      ) : (
+                        <span className="font-mono text-xs text-zinc-500">
+                          Entry #{ev.idx}
+                        </span>
+                      )}
                     </div>
                   </div>
 

@@ -179,7 +179,7 @@ export function RulesPage() {
           <div className="border-b border-white/5 pb-3">
             <h3 className="text-white text-sm font-semibold">Rule Detail & Evidence</h3>
             <p className="text-xs text-zinc-400 mt-0.5">
-              Inspect provenance, natural evidence, and on-chain hash
+              Inspect provenance, natural evidence, and cryptographic hash
             </p>
           </div>
 
@@ -220,7 +220,7 @@ export function RulesPage() {
                     className="flex-1 h-8 rounded-md bg-white text-zinc-950 font-medium text-xs hover:bg-zinc-200 transition-all flex items-center justify-center gap-1.5"
                   >
                     <Check size={13} />
-                    <span>Confirm Rule On-Chain</span>
+                    <span>Confirm Rule in Ledger</span>
                   </button>
                   <button
                     onClick={() => rejectMutation.mutate(activeRule.id)}

@@ -39,7 +39,7 @@ export function Sidebar({ isCollapsed, setIsCollapsed }: SidebarProps) {
     { label: "Approvals", to: "/app/approvals", icon: CheckCheck },
     { label: "Publish & Verify", to: "/app/publish", icon: FileCheck },
     { label: "Scoreboard", to: "/app/scoreboard", icon: BarChart3 },
-    { label: "Chain Log", to: "/app/chain-log", icon: Link2 },
+    { label: "Audit Ledger", to: "/app/chain-log", icon: Link2 },
   ];
 
   return (
