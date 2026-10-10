@@ -313,3 +313,160 @@ class ScheduleResult(BaseModel):
     def is_success(self) -> bool:
         """Returns True only if the solver found a solution AND independent verification passed."""
         return self.status in (SolverStatus.OPTIMAL, SolverStatus.FEASIBLE) and self.validation_passed
+
+
+class ConstraintType(str, Enum):
+    """Types of constraints that can participate in conflicts or relaxations."""
+    SESSION_REQUIRED = "SESSION_REQUIRED"
+    PINNED_TEACHER = "PINNED_TEACHER"
+    PINNED_ROOM = "PINNED_ROOM"
+    PINNED_SLOT = "PINNED_SLOT"
+    ALLOWED_TEACHERS = "ALLOWED_TEACHERS"
+    ALLOWED_ROOMS = "ALLOWED_ROOMS"
+    ALLOWED_SLOTS = "ALLOWED_SLOTS"
+    TEACHER_UNAVAILABLE = "TEACHER_UNAVAILABLE"
+    ROOM_UNAVAILABLE = "ROOM_UNAVAILABLE"
+    TEACHER_QUALIFICATION = "TEACHER_QUALIFICATION"
+    ROOM_CAPACITY = "ROOM_CAPACITY"
+    TEACHER_NON_OVERLAP = "TEACHER_NON_OVERLAP"
+    ROOM_NON_OVERLAP = "ROOM_NON_OVERLAP"
+
+
+class ConflictConstraint(BaseModel):
+    """An individual constraint identified as part of an unsatisfiable conflict core."""
+    model_config = ConfigDict(frozen=True)
+
+    id: str = Field(..., description="Unique diagnostic assumption/constraint identifier")
+    constraint_type: ConstraintType = Field(..., description="Semantic type of the constraint")
+    description: str = Field(..., description="Human-readable factual description of the constraint")
+    session_id: str | None = Field(default=None, description="Associated session ID if applicable")
+    teacher_id: str | None = Field(default=None, description="Associated teacher ID if applicable")
+    room_id: str | None = Field(default=None, description="Associated room ID if applicable")
+    slot_id: str | None = Field(default=None, description="Associated time slot ID if applicable")
+    details: dict[str, Any] = Field(default_factory=dict, description="Additional constraint metadata")
+
+
+class ConflictDiagnosis(BaseModel):
+    """Structured diagnosis of an infeasible or unsatisfiable scheduling problem."""
+    model_config = ConfigDict(frozen=True)
+
+    status: SolverStatus = Field(..., description="Diagnostic outcome status")
+    is_infeasible: bool = Field(..., description="Whether the problem was proven infeasible")
+    is_minimal: bool = Field(
+        default=False, 
+        description="True if the conflict core is mathematically verified to be a Minimal Unsatisfiable Subset (MUS)"
+    )
+    conflicting_constraints: list[ConflictConstraint] = Field(
+        default_factory=list, 
+        description="Structured list of constraints forming the unsatisfiable core"
+    )
+    explanation: str = Field(
+        default="", 
+        description="Factual, deterministic explanation generated directly from the conflict core"
+    )
+    diagnosed_entities: dict[str, list[str]] = Field(
+        default_factory=dict, 
+        description="IDs of participating entities (sessions, teachers, rooms, slots)"
+    )
+    statistics: dict[str, Any] = Field(
+        default_factory=dict, 
+        description="Diagnostic solver performance metrics and core reduction stats"
+    )
+    wall_time_seconds: float = Field(
+        default=0.0, 
+        ge=0.0, 
+        description="Diagnosis wall time in seconds"
+    )
+
+    @property
+    def has_core(self) -> bool:
+        """Returns True if a non-empty conflict core was successfully identified."""
+        return len(self.conflicting_constraints) > 0
+
+
+class RelaxationPolicy(BaseModel):
+    """Configuration governing which constraints can be softened to find alternative schedules."""
+    model_config = ConfigDict(frozen=True)
+
+    allow_slot_relaxation: bool = Field(
+        default=True, 
+        description="Whether pinned or restricted time slots may be relaxed"
+    )
+    allow_teacher_relaxation: bool = Field(
+        default=True, 
+        description="Whether pinned or restricted teachers may be relaxed"
+    )
+    allow_room_relaxation: bool = Field(
+        default=True, 
+        description="Whether pinned or restricted rooms may be relaxed"
+    )
+    relaxable_session_ids: set[str] | None = Field(
+        default=None, 
+        description="Subset of session IDs allowed to be relaxed. If None, all sessions are eligible."
+    )
+    max_alternatives: int = Field(
+        default=3, 
+        ge=1, 
+        le=20, 
+        description="Maximum number of distinct alternative schedules to return"
+    )
+    timeout_seconds: float = Field(
+        default=5.0, 
+        gt=0.0, 
+        description="Time limit for alternative generation in seconds"
+    )
+
+
+class RelaxedRequirement(BaseModel):
+    """Details of a specific constraint that was softened in an alternative schedule."""
+    model_config = ConfigDict(frozen=True)
+
+    session_id: str = Field(..., description="ID of the session whose requirement was relaxed")
+    constraint_type: ConstraintType = Field(..., description="Type of constraint relaxed")
+    original_value: Any = Field(..., description="Original required value (e.g. original pinned slot)")
+    relaxed_value: Any = Field(..., description="Value assigned in the alternative schedule")
+    description: str = Field(..., description="Human-readable description of the relaxation")
+
+
+class ScheduleAlternative(BaseModel):
+    """A solver-verified alternative schedule generated by relaxing select user constraints."""
+    model_config = ConfigDict(frozen=True)
+
+    alternative_id: int = Field(..., description="1-based index of this alternative")
+    assignments: list[ScheduledAssignment] = Field(
+        default_factory=list, 
+        description="Verified session assignments"
+    )
+    relaxed_requirements: list[RelaxedRequirement] = Field(
+        default_factory=list, 
+        description="List of user requirements that were softened"
+    )
+    penalty_score: int = Field(
+        default=0, 
+        ge=0, 
+        description="Total penalty metric (lower means fewer/smaller relaxations)"
+    )
+    validation_passed: bool = Field(
+        default=False, 
+        description="Whether this alternative passed independent constraint verification"
+    )
+    status: SolverStatus = Field(
+        default=SolverStatus.FEASIBLE, 
+        description="Solver status for this alternative"
+    )
+
+
+class AlternativeSearchResult(BaseModel):
+    """Container of solver-generated, verified alternatives for an infeasible problem."""
+    model_config = ConfigDict(frozen=True)
+
+    status: SolverStatus = Field(..., description="Overall search status (FEASIBLE, INFEASIBLE, TIMEOUT, etc.)")
+    original_status: SolverStatus = Field(..., description="Status of the original unrelaxed problem")
+    alternatives: list[ScheduleAlternative] = Field(
+        default_factory=list, 
+        description="List of verified alternative schedules"
+    )
+    search_time_seconds: float = Field(default=0.0, ge=0.0, description="Total search time in seconds")
+    message: str | None = Field(default=None, description="Informative message about the alternative search")
+    statistics: dict[str, Any] = Field(default_factory=dict, description="Search statistics")
+
